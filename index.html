@@ -1,352 +1,486 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>생산2팀 반제품 FIFO 대시보드 (D-Day 모드)</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;900&display=swap');
-        body { font-family: 'Pretendard', sans-serif; background-color: #f1f5f9; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-        
-        /* Layout Sections */
-        .db-section { background: white; border-bottom: 1px solid #e2e8f0; padding: 0.75rem 1.5rem; }
-        .kanban-container { flex: 1; overflow: hidden; display: flex; gap: 1rem; padding: 0.75rem 1.5rem; }
-        
-        /* Kanban Columns */
-        .kanban-col { flex: 1; display: flex; flex-direction: column; background: #eef2f6; border-radius: 10px; border: 1px solid #cbd5e1; min-width: 280px; }
-        .kanban-header { padding: 0.8rem; text-align: center; font-weight: 700; border-bottom: 2px solid #cbd5e1; }
-        .lot-list { flex: 1; overflow-y: auto; padding: 0.6rem; scrollbar-width: thin; }
-        
-        /* Lot Cards */
-        .lot-card { background: white; border-radius: 8px; padding: 0.8rem; margin-bottom: 0.6rem; border: 1px solid #e2e8f0; border-left: 5px solid #94a3b8; box-shadow: 0 2px 4px rgba(0,0,0,0.04); transition: transform 0.2s; }
-        .lot-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.08); }
-        
-        /* Status Colors (Based on Remaining Days) */
-        .status-danger { border-left-color: #ef4444; background-color: #fef2f2; } /* D-7 이내 */
-        .status-warning { border-left-color: #f59e0b; background-color: #fffbeb; } /* D-14 이내 */
-        .status-safe { border-left-color: #10b981; }
-
-        .progress-bar { height: 6px; background: #e2e8f0; border-radius: 3px; margin-top: 0.6rem; overflow: hidden; }
-        .progress-fill { height: 100%; transition: width 0.4s ease; }
-        
-        /* DB Table Style */
-        .db-table th { font-size: 11px; background: #f8fafc; color: #64748b; padding: 4px 8px; border: 1px solid #e2e8f0; }
-        .db-table td { font-size: 11px; padding: 4px 8px; border: 1px solid #e2e8f0; text-align: center; }
-
-        .lot-list::-webkit-scrollbar { width: 5px; }
-        .lot-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- CSP 메타 태그: 인라인 스크립트/외부 리소스 제한 -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self';
+               script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+               style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+               font-src https://fonts.gstatic.com;
+               img-src 'self' data:;
+               connect-src 'self';">
+  <title>KPI 대시보드</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- DOMPurify: XSS 방어용 라이브러리 -->
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+    .header {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      padding: 20px 32px;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header h1 { font-size: 22px; font-weight: 700; color: #f8fafc; }
+    .header .security-badge {
+      background: #065f46;
+      color: #6ee7b7;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .dashboard { padding: 24px 32px; }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+    .kpi-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 24px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+    .kpi-label { font-size: 13px; color: #94a3b8; margin-bottom: 8px; }
+    .kpi-value { font-size: 32px; font-weight: 700; }
+    .kpi-change {
+      font-size: 13px; margin-top: 8px;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .kpi-change.up { color: #4ade80; }
+    .kpi-change.down { color: #f87171; }
+    .chart-section {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+    .chart-box {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .chart-box h3 {
+      font-size: 16px; font-weight: 600;
+      margin-bottom: 16px; color: #f1f5f9;
+    }
+    .bar-chart { display: flex; flex-direction: column; gap: 12px; }
+    .bar-row {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .bar-label { width: 80px; font-size: 13px; color: #94a3b8; text-align: right; }
+    .bar-track {
+      flex: 1; height: 28px;
+      background: #0f172a;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      padding-left: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+      transition: width 0.8s ease;
+    }
+    .donut-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .donut-svg { width: 180px; height: 180px; }
+    .donut-legend {
+      margin-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .legend-item {
+      display: flex; align-items: center; gap: 8px; font-size: 13px;
+    }
+    .legend-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+    }
+    .table-section {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .table-section h3 {
+      font-size: 16px; font-weight: 600;
+      margin-bottom: 16px; color: #f1f5f9;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      text-align: left;
+      padding: 10px 12px;
+      font-size: 12px;
+      color: #64748b;
+      border-bottom: 1px solid #334155;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    td {
+      padding: 12px;
+      font-size: 14px;
+      border-bottom: 1px solid #1e293b;
+    }
+    tr:hover td { background: #263044; }
+    .status {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .status.good { background: #064e3b; color: #6ee7b7; }
+    .status.warn { background: #78350f; color: #fbbf24; }
+    .status.bad  { background: #7f1d1d; color: #fca5a5; }
+    .security-log {
+      margin-top: 32px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .security-log h3 {
+      font-size: 16px; font-weight: 600;
+      margin-bottom: 16px; color: #f1f5f9;
+    }
+    .log-entry {
+      display: flex; justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #0f172a;
+      font-size: 13px;
+    }
+    .log-entry .log-type { color: #38bdf8; font-weight: 500; }
+    .log-entry .log-time { color: #64748b; }
+    .csrf-info {
+      margin-top: 24px;
+      padding: 16px;
+      background: #172554;
+      border: 1px solid #1e40af;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #93c5fd;
+    }
+    @media (max-width: 768px) {
+      .chart-section { grid-template-columns: 1fr; }
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
 </head>
 <body>
 
-    <!-- 상단 헤더 & 싱크 제어 -->
-    <header class="bg-white px-6 py-3 flex justify-between items-center border-b shadow-sm z-10">
-        <div class="flex items-center gap-3">
-            <div class="bg-indigo-600 p-2 rounded-lg text-white shadow-md">
-                <i class="fas fa-warehouse text-lg"></i>
-            </div>
-            <div>
-                <h1 class="text-lg font-bold text-slate-900 tracking-tight">생산2팀 반제품 FIFO 관리 대시보드</h1>
-                <p class="text-[10px] text-slate-500 font-medium"><i class="far fa-calendar-check mr-1"></i> 기준일: 2026. 04. 16 (D-Day 잔여일 기준 모니터링)</p>
-            </div>
-        </div>
-        <div class="flex items-center gap-6">
-            <div class="flex gap-4 text-[11px] font-bold">
-                <span class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-red-500"></div>긴급(D-7 이내)</span>
-                <span class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-amber-500"></div>주의(D-14 이내)</span>
-                <span class="flex items-center gap-1.5"><div class="w-2.5 h-2.5 rounded-full bg-green-500"></div>안전</span>
-            </div>
-            <button onclick="fetchData()" class="bg-indigo-600 text-white px-4 py-1.5 rounded-md text-xs font-bold hover:bg-indigo-700 transition flex items-center gap-2 shadow-sm">
-                <i class="fas fa-sync-alt" id="refresh-icon"></i> 실시간 데이터 동기화
-            </button>
-        </div>
-    </header>
+  <!-- 헤더 -->
+  <div class="header">
+    <h1>📊 KPI 대시보드</h1>
+    <span class="security-badge">🔒 보안 활성화 (XSS/CSRF 방어)</span>
+  </div>
 
-    <!-- [신규] 반제품 보관 기간 표준 DB 섹션 (상단 고정) -->
-    <section class="db-section shadow-inner bg-slate-50">
-        <div class="flex gap-4 overflow-x-auto pb-1">
-            <div class="flex-shrink-0">
-                <p class="text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest"><i class="fas fa-database mr-1"></i> 보관 표준 DB (일반 기준)</p>
-                <table class="db-table bg-white">
-                    <thead>
-                        <tr>
-                            <th>제형</th>
-                            <th>과립~타정/충전</th>
-                            <th>타정~코팅/선별</th>
-                            <th>코팅~선별</th>
-                            <th>선별~포장</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td class="font-bold bg-slate-50">나정</td>
-                            <td>30일(1개월)</td>
-                            <td>45일(1.5개월)</td>
-                            <td>-</td>
-                            <td>60일(2개월)</td>
-                        </tr>
-                        <tr>
-                            <td class="font-bold bg-slate-50">코팅정</td>
-                            <td>30일(1개월)</td>
-                            <td>45일(1.5개월)</td>
-                            <td>45일(1.5개월)</td>
-                            <td>60일(2개월)</td>
-                        </tr>
-                        <tr>
-                            <td class="font-bold bg-slate-50">경질캡슐</td>
-                            <td>30일(1개월)</td>
-                            <td>45일(1.5개월)</td>
-                            <td>-</td>
-                            <td>60일(2개월)</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="flex-shrink-0 border-l border-slate-200 pl-4">
-                <p class="text-[10px] font-bold text-red-400 mb-1 uppercase tracking-widest"><i class="fas fa-star mr-1"></i> 특이 보관 품목 (예외)</p>
-                <table class="db-table bg-white">
-                    <thead>
-                        <tr>
-                            <th>제품명</th>
-                            <th>과립~타정</th>
-                            <th>타정~선별/코팅</th>
-                            <th>선별~포장</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td class="font-bold bg-red-50">록소닌정</td>
-                            <td>30일</td>
-                            <td><span class="text-red-600 font-bold">21일</span></td>
-                            <td>65일</td>
-                        </tr>
-                        <tr>
-                            <td class="font-bold bg-red-50">복합제(6종)</td>
-                            <td><span class="text-red-600 font-bold">30일</span></td>
-                            <td><span class="text-red-600 font-bold">30일</span></td>
-                            <td><span class="text-red-600 font-bold">30일</span></td>
-                        </tr>
-                    </tbody>
-                </table>
-                <p class="text-[10px] text-slate-500 mt-1.5 pl-1 font-medium tracking-tight">* 복합제 6종: 리나디엠, 엠플디엠, 아토스타, 다시디엠 등 전 공정 30일 엄격 적용</p>
-            </div>
-        </div>
-    </section>
+  <div class="dashboard">
+    <!-- KPI 카드 -->
+    <div class="kpi-grid" id="kpiGrid"></div>
 
-    <!-- 메인 칸반 보드 -->
-    <main class="kanban-container">
-        <div class="kanban-col">
-            <div class="kanban-header text-blue-700 bg-blue-100/50">1. 과립 완료 <span class="text-[10px] block font-normal text-blue-500 mt-0.5">▶ 타정/충전 대기</span></div>
-            <div id="col-granulation" class="lot-list"></div>
-        </div>
+    <!-- 차트 섹션 -->
+    <div class="chart-section">
+      <div class="chart-box">
+        <h3>월별 매출 추이</h3>
+        <div class="bar-chart" id="barChart"></div>
+      </div>
+      <div class="chart-box">
+        <h3>카테고리별 비율</h3>
+        <div class="donut-container" id="donutChart"></div>
+      </div>
+    </div>
 
-        <div class="kanban-col">
-            <div class="kanban-header text-purple-700 bg-purple-100/50">2. 타정 완료 <span class="text-[10px] block font-normal text-purple-500 mt-0.5">▶ 코팅/선별 대기</span></div>
-            <div id="col-tableting" class="lot-list"></div>
-        </div>
+    <!-- 테이블 -->
+    <div class="table-section">
+      <h3>최근 KPI 상세</h3>
+      <table id="kpiTable">
+        <thead>
+          <tr>
+            <th>지표</th>
+            <th>현재값</th>
+            <th>목표</th>
+            <th>달성률</th>
+            <th>상태</th>
+          </tr>
+        </thead>
+        <tbody id="kpiTableBody"></tbody>
+      </table>
+    </div>
 
-        <div class="kanban-col">
-            <div class="kanban-header text-teal-700 bg-teal-100/50">3. 코팅 완료 <span class="text-[10px] block font-normal text-teal-500 mt-0.5">▶ 선별 대기</span></div>
-            <div id="col-coating" class="lot-list"></div>
-        </div>
+    <!-- 보안 로그 -->
+    <div class="security-log">
+      <h3>🛡️ 보안 이벤트 로그</h3>
+      <div id="securityLog"></div>
+    </div>
 
-        <div class="kanban-col">
-            <div class="kanban-header text-orange-700 bg-orange-100/50">4. 선별/충전 완료 <span class="text-[10px] block font-normal text-orange-500 mt-0.5">▶ 포장 대기</span></div>
-            <div id="col-packaging" class="lot-list"></div>
-        </div>
-    </main>
+    <!-- CSRF 토큰 정보 -->
+    <div class="csrf-info">
+      <strong>CSRF 토큰:</strong>
+      <span id="csrfDisplay"></span>
+      <br><small>모든 데이터 요청 시 이 토큰이 자동으로 헤더에 포함됩니다.</small>
+    </div>
+  </div>
 
-    <!-- 하단 리포트 섹션 -->
-    <footer class="bg-slate-900 text-white px-6 py-4 shadow-2xl">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-            <div>
-                <h3 class="text-[11px] font-bold text-red-400 mb-2 uppercase tracking-widest"><i class="fas fa-exclamation-triangle mr-1"></i> 긴급 관리 대상 (D-Day 임박)</h3>
-                <div id="risk-summary" class="text-xs leading-relaxed text-slate-300">데이터를 동기화하면 분석이 시작됩니다.</div>
-            </div>
-            <div>
-                <h3 class="text-[11px] font-bold text-green-400 mb-2 uppercase tracking-widest"><i class="fas fa-bolt mr-1"></i> 현장 대응 지침 (Action Plan)</h3>
-                <div id="action-summary" class="text-xs leading-relaxed text-slate-300">상사 보고를 위한 핵심 액션 플랜이 자동으로 생성됩니다.</div>
-            </div>
-        </div>
-    </footer>
+  <script>
+    // =============================================
+    // 1. 보안 유틸리티
+    // =============================================
 
-    <script>
-        // [구글 시트 링크] 
-        const DATA_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQIrUB61owG33Oqyufj_sdspRfpGv-tyWzesMqRrL2l0aV3gUa5AD45X2vtnKJzdw-Hytk8K63JMrPQ/pub?output=csv";
-        
-        // 보관 기한 DB
-        const LIMITS_DB = {
-            'granulation': 30, // 기본 1개월
-            'tableting': 45,   // 기본 1.5개월
-            'coating': 45,     // 기본 1.5개월
-            'packaging': 60    // 기본 2개월
+    const Security = {
+      // CSRF 토큰 생성
+      csrfToken: '',
+      generateCSRFToken() {
+        const array = new Uint8Array(32);
+        crypto.getRandomValues(array);
+        this.csrfToken = Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
+        return this.csrfToken;
+      },
+
+      // XSS 방어: HTML 이스케이프
+      escapeHTML(str) {
+        if (typeof str !== 'string') return String(str);
+        const div = document.createElement('div');
+        div.appendChild(document.createTextNode(str));
+        return div.innerHTML;
+      },
+
+      // DOMPurify를 통한 HTML 정화
+      sanitize(dirty) {
+        if (typeof DOMPurify !== 'undefined') {
+          return DOMPurify.sanitize(dirty, {
+            ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'span'],
+            ALLOWED_ATTR: ['class']
+          });
+        }
+        return this.escapeHTML(dirty);
+      },
+
+      // 입력값 검증
+      validateNumber(value, min = 0, max = Number.MAX_SAFE_INTEGER) {
+        const num = Number(value);
+        if (isNaN(num) || num < min || num > max) {
+          this.logEvent('VALIDATION', `잘못된 숫자 입력 차단: ${this.escapeHTML(String(value))}`);
+          return null;
+        }
+        return num;
+      },
+
+      validateString(value, maxLength = 200) {
+        if (typeof value !== 'string') return '';
+        if (value.length > maxLength) {
+          this.logEvent('VALIDATION', `문자열 길이 초과 차단 (${value.length}자)`);
+          return value.substring(0, maxLength);
+        }
+        return value;
+      },
+
+      // 보안 fetch 래퍼 (CSRF 토큰 자동 첨부)
+      async secureFetch(url, options = {}) {
+        const headers = {
+          ...options.headers,
+          'X-CSRF-Token': this.csrfToken,
+          'Content-Type': 'application/json',
         };
+        this.logEvent('REQUEST', `보안 요청: ${this.escapeHTML(url)}`);
+        return fetch(url, { ...options, headers, credentials: 'same-origin' });
+      },
 
-        // 특이 보관 복합제 키워드
-        const SPECIAL_DRUGS = ['리나디엠', '엠플디엠', '아토스타', '다시디엠'];
-
-        window.onload = () => {
-            fetchData();
+      // 보안 이벤트 로그
+      events: [],
+      logEvent(type, message) {
+        const entry = {
+          type: this.validateString(type, 50),
+          message: this.validateString(message, 500),
+          time: new Date().toLocaleTimeString('ko-KR')
         };
+        this.events.unshift(entry);
+        if (this.events.length > 50) this.events.pop();
+      }
+    };
 
-        function fetchData() {
-            const icon = document.getElementById('refresh-icon');
-            icon.classList.add('fa-spin');
+    // 초기 CSRF 토큰 생성
+    Security.generateCSRFToken();
+    Security.logEvent('INIT', 'CSRF 토큰 생성 완료');
+    Security.logEvent('INIT', 'DOMPurify XSS 방어 활성화');
+    Security.logEvent('INIT', 'CSP 정책 적용됨');
 
-            Papa.parse(DATA_URL, {
-                download: true,
-                header: false,
-                skipEmptyLines: true,
-                complete: function(results) {
-                    processData(results.data);
-                    icon.classList.remove('fa-spin');
-                },
-                error: function(err) {
-                    alert("데이터를 불러오지 못했습니다. 링크 혹은 네트워크 상태를 확인해주세요.");
-                    icon.classList.remove('fa-spin');
-                }
-            });
-        }
+    // =============================================
+    // 2. 데이터 (샘플 — 실제 API 연동 시 secureFetch 사용)
+    // =============================================
 
-        function processData(data) {
-            const headers = data[0].map(h => h.trim().replace(/\n/g, ' '));
-            let idxProduct = 0, idxLot = 2, idxProcess = 3, idxDays = 7;
+    const kpiData = [
+      { label: '총 매출', value: '₩12.4억', change: '+12.5%', direction: 'up', color: '#3b82f6' },
+      { label: '신규 고객', value: '1,284', change: '+8.2%', direction: 'up', color: '#8b5cf6' },
+      { label: '전환율', value: '3.42%', change: '-0.3%', direction: 'down', color: '#f59e0b' },
+      { label: '고객 만족도', value: '94.7%', change: '+2.1%', direction: 'up', color: '#10b981' },
+    ];
 
-            headers.forEach((h, i) => {
-                if (h.includes("제품명")) idxProduct = i;
-                if (h.includes("제조번호")) idxLot = i;
-                if (h.includes("완료공정")) idxProcess = i;
-                if (h.includes("전 공정") || h.includes("전공정")) idxDays = i;
-            });
+    const monthlyData = [
+      { month: '1월', value: 68 }, { month: '2월', value: 72 },
+      { month: '3월', value: 85 }, { month: '4월', value: 78 },
+      { month: '5월', value: 92 }, { month: '6월', value: 88 },
+    ];
 
-            const items = [];
-            for (let i = 1; i < data.length; i++) {
-                const row = data[i];
-                if (!row[idxProduct]) continue;
+    const categoryData = [
+      { name: '제품 A', value: 40, color: '#3b82f6' },
+      { name: '제품 B', value: 25, color: '#8b5cf6' },
+      { name: '제품 C', value: 20, color: '#10b981' },
+      { name: '기타',   value: 15, color: '#64748b' },
+    ];
 
-                const name = row[idxProduct].trim();
-                const lot = row[idxLot].trim();
-                const proc = row[idxProcess].trim();
-                const elapsed = parseInt(row[idxDays]) || 0;
+    const tableData = [
+      { name: '월 매출 목표', current: '₩12.4억', target: '₩15억', rate: 82.7, status: 'warn' },
+      { name: '고객 유지율', current: '91.2%', target: '90%', rate: 101.3, status: 'good' },
+      { name: '응답 시간',   current: '1.8초', target: '1.5초', rate: 83.3, status: 'warn' },
+      { name: '오류율',      current: '0.12%', target: '0.5%', rate: 100, status: 'good' },
+      { name: 'NPS 점수',    current: '72', target: '80', rate: 90.0, status: 'warn' },
+    ];
 
-                let key = '';
-                if (proc.includes('과립')) key = 'granulation';
-                else if (proc.includes('타정')) key = 'tableting';
-                else if (proc.includes('코팅')) key = 'coating';
-                else if (proc.includes('선별') || proc.includes('충전') || proc.includes('포장')) key = 'packaging';
-                
-                if (key) {
-                    // 예외 제품 한도 적용 로직 추가
-                    let limit = LIMITS_DB[key];
-                    let isSpecial = false;
+    // =============================================
+    // 3. 렌더링 (안전한 DOM 조작)
+    // =============================================
 
-                    if (name.includes('록소닌')) {
-                        // 록소닌정: 타정 21일 (나머지는 과립 30일, 선별~포장 65일 등 적용)
-                        if (key === 'tableting') limit = 21;
-                        else if (key === 'packaging') limit = 65;
-                        else limit = 30; 
-                        isSpecial = true;
-                    } 
-                    else if (SPECIAL_DRUGS.some(drug => name.includes(drug))) {
-                        // 복합제 6종: 모든 단계 대기 시 30일
-                        limit = 30;
-                        isSpecial = true;
-                    }
-                    
-                    const remaining = limit - elapsed;
-                    
-                    // 잔여율 계산 (남아있는 기간을 시각화하기 위함)
-                    const remainingRatio = Math.max(remaining / limit, 0);
-                    const remainingWidth = Math.min(Math.round(remainingRatio * 100), 100);
-                    
-                    items.push({ name, lot, proc, key, elapsed, limit, remaining, remainingWidth, isSpecial });
-                }
-            }
-            render(items);
-        }
+    function renderKPIs() {
+      const grid = document.getElementById('kpiGrid');
+      grid.innerHTML = '';
+      kpiData.forEach(kpi => {
+        const card = document.createElement('div');
+        card.className = 'kpi-card';
+        card.style.borderTop = `3px solid ${Security.escapeHTML(kpi.color)}`;
+        card.innerHTML = `
+          <div class="kpi-label">${Security.escapeHTML(kpi.label)}</div>
+          <div class="kpi-value" style="color:${Security.escapeHTML(kpi.color)}">
+            ${Security.escapeHTML(kpi.value)}
+          </div>
+          <div class="kpi-change ${kpi.direction === 'up' ? 'up' : 'down'}">
+            ${kpi.direction === 'up' ? '▲' : '▼'} ${Security.escapeHTML(kpi.change)} vs 전월
+          </div>`;
+        grid.appendChild(card);
+      });
+    }
 
-        function render(items) {
-            const cols = {
-                'granulation': document.getElementById('col-granulation'),
-                'tableting': document.getElementById('col-tableting'),
-                'coating': document.getElementById('col-coating'),
-                'packaging': document.getElementById('col-packaging')
-            };
+    function renderBarChart() {
+      const chart = document.getElementById('barChart');
+      chart.innerHTML = '';
+      const maxVal = Math.max(...monthlyData.map(d => d.value));
+      monthlyData.forEach(d => {
+        const pct = (d.value / maxVal * 100).toFixed(1);
+        const row = document.createElement('div');
+        row.className = 'bar-row';
+        row.innerHTML = `
+          <span class="bar-label">${Security.escapeHTML(d.month)}</span>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${pct}%;background:linear-gradient(90deg,#3b82f6,#8b5cf6)">
+              ${Security.escapeHTML(String(d.value))}%
+            </div>
+          </div>`;
+        chart.appendChild(row);
+      });
+    }
 
-            Object.values(cols).forEach(c => c.innerHTML = '');
+    function renderDonut() {
+      const container = document.getElementById('donutChart');
+      let cumulativePercent = 0;
+      const radius = 60, cx = 90, cy = 90;
+      let paths = '';
+      categoryData.forEach(seg => {
+        const startAngle = cumulativePercent * 3.6;
+        cumulativePercent += seg.value;
+        const endAngle = cumulativePercent * 3.6;
+        const start = polarToCartesian(cx, cy, radius, endAngle);
+        const end = polarToCartesian(cx, cy, radius, startAngle);
+        const largeArc = seg.value > 50 ? 1 : 0;
+        paths += `<path d="M ${cx} ${cy} L ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 0 ${end.x} ${end.y} Z" fill="${Security.escapeHTML(seg.color)}"/>`;
+      });
+      paths += `<circle cx="${cx}" cy="${cy}" r="35" fill="#1e293b"/>`;
 
-            // 남은 날짜가 적은 순(긴급한 순)으로 정렬
-            items.sort((a, b) => a.remaining - b.remaining);
+      let legendHTML = '<div class="donut-legend">';
+      categoryData.forEach(seg => {
+        legendHTML += `<div class="legend-item">
+          <span class="legend-dot" style="background:${Security.escapeHTML(seg.color)}"></span>
+          ${Security.escapeHTML(seg.name)} (${Security.escapeHTML(String(seg.value))}%)
+        </div>`;
+      });
+      legendHTML += '</div>';
 
-            const urgentList = [];
+      container.innerHTML = `<svg class="donut-svg" viewBox="0 0 180 180">${paths}</svg>${legendHTML}`;
+    }
 
-            items.forEach(item => {
-                let status = 'status-safe', barColor = 'bg-green-500';
-                
-                if (item.remaining <= 7) { 
-                    status = 'status-danger'; 
-                    barColor = 'bg-red-500'; 
-                    urgentList.push(item);
-                }
-                else if (item.remaining <= 14) { 
-                    status = 'status-warning'; 
-                    barColor = 'bg-amber-500'; 
-                }
+    function polarToCartesian(cx, cy, r, angleDeg) {
+      const rad = (angleDeg - 90) * Math.PI / 180;
+      return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+    }
 
-                const dDayText = item.remaining < 0 
-                    ? `<span class="text-red-600">기한초과 (${Math.abs(item.remaining)}일)</span>` 
-                    : `D-${item.remaining}`;
+    function renderTable() {
+      const tbody = document.getElementById('kpiTableBody');
+      tbody.innerHTML = '';
+      tableData.forEach(row => {
+        const statusLabel = { good: '양호', warn: '주의', bad: '위험' };
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${Security.escapeHTML(row.name)}</td>
+          <td>${Security.escapeHTML(row.current)}</td>
+          <td>${Security.escapeHTML(row.target)}</td>
+          <td>${Security.escapeHTML(String(row.rate))}%</td>
+          <td><span class="status ${row.status}">${Security.escapeHTML(statusLabel[row.status])}</span></td>`;
+        tbody.appendChild(tr);
+      });
+    }
 
-                // 특이 기준이 적용된 경우 UI에 배지 노출
-                const specialBadge = item.isSpecial ? `<span class="text-[9px] bg-indigo-100 text-indigo-700 px-1 py-0.5 rounded ml-1 font-bold border border-indigo-200 align-text-top">특이기준</span>` : '';
+    function renderSecurityLog() {
+      const logDiv = document.getElementById('securityLog');
+      logDiv.innerHTML = '';
+      Security.events.forEach(evt => {
+        const entry = document.createElement('div');
+        entry.className = 'log-entry';
+        entry.innerHTML = `
+          <span><span class="log-type">[${Security.escapeHTML(evt.type)}]</span> ${Security.escapeHTML(evt.message)}</span>
+          <span class="log-time">${Security.escapeHTML(evt.time)}</span>`;
+        logDiv.appendChild(entry);
+      });
+    }
 
-                const html = `
-                    <div class="lot-card ${status}">
-                        <div class="flex justify-between items-start mb-2">
-                            <span class="text-[14px] font-extrabold text-slate-800 leading-tight">${item.name}${specialBadge}</span>
-                            <span class="text-[16px] font-black tracking-tight ${item.remaining <= 7 ? 'text-red-600' : 'text-indigo-600'}">${dDayText}</span>
-                        </div>
-                        <div class="flex justify-between items-center text-[11px] mb-1">
-                            <div class="text-slate-600 flex items-center">
-                                <span class="bg-slate-200 text-slate-900 px-1.5 py-0.5 rounded border border-slate-300 font-bold mr-2 text-[12px] shadow-sm">Lot: ${item.lot}</span>
-                                <span class="font-medium">${item.elapsed}일 경과 <span class="text-[9px] text-slate-400">/ 한도 ${item.limit}일</span></span>
-                            </div>
-                            <span class="font-bold text-slate-500">잔여 ${item.remainingWidth}%</span>
-                        </div>
-                        <!-- 잔여 기간 시각화 바 (HP 바 형태) -->
-                        <div class="progress-bar">
-                            <div class="progress-fill ${barColor}" style="width: ${item.remainingWidth}%"></div>
-                        </div>
-                    </div>
-                `;
-                cols[item.key].insertAdjacentHTML('beforeend', html);
-            });
+    function renderCSRFInfo() {
+      document.getElementById('csrfDisplay').textContent =
+        Security.csrfToken.substring(0, 16) + '••••••••';
+    }
 
-            // 빈 공정 처리
-            Object.values(cols).forEach(c => {
-                if (!c.innerHTML) c.innerHTML = `<div class="text-center py-10 text-[10px] text-slate-400 italic">대기 품목 없음</div>`;
-            });
+    // =============================================
+    // 4. 초기화
+    // =============================================
 
-            updateReport(urgentList);
-        }
-
-        function updateReport(urgents) {
-            const riskEl = document.getElementById('risk-summary');
-            const actionEl = document.getElementById('action-summary');
-
-            if (urgents.length > 0) {
-                const top = urgents[0];
-                const dText = top.remaining < 0 ? '보관 기한을 초과' : `잔여일이 ${top.remaining}일 뿐`;
-                riskEl.innerHTML = `현재 <strong>${top.name}(${top.lot})</strong> 외 ${urgents.length - 1}건이 ${dText}인 '긴급' 상태입니다. 선입선출 이행률 저하에 따른 품질 리스크가 우려됩니다.`;
-                actionEl.innerHTML = `기한 임박 로트인 <strong>${top.name}</strong>을 최우선 생산 순위로 조정하여 익일 오전 내로 다음 공정 투입을 완료하십시오. 특히 특이 기준 적용 품목에 유의하십시오.`;
-            } else {
-                riskEl.innerHTML = `현재 D-7 이내의 긴급 관리 대상이 없습니다. 모든 반제품이 표준(일반/특이) 보관 기한 내에서 원활하게 흐르고 있습니다.`;
-                actionEl.innerHTML = `전 공정의 선입선출(FIFO) 상태를 유지하며, 잔여일 14일 미만 품목(노란색)의 투입 계획을 사전에 점검하십시오.`;
-            }
-        }
-    </script>
+    renderKPIs();
+    renderBarChart();
+    renderDonut();
+    renderTable();
+    renderSecurityLog();
+    renderCSRFInfo();
+  </script>
 </body>
 </html>
