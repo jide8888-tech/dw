@@ -146,7 +146,7 @@ td.okc{background:var(--soft);font-weight:700}
 <body>
 <div class="app">
   <header class="top">
-    <div><h1>KORSCH XL 400FT 첫 배치 시뮬레이터</h1><div class="meta">교육용 가상 배치 TRAIN-XL-001 · 동화록소닌정 표준작업조건 기준 · 실설비 연동 없음</div></div>
+    <div><h1>KORSCH XL 400FT 첫 배치 시뮬레이터</h1><div class="meta">교육용 가상 배치 TRAIN-XL-001 · 동화A 표준작업조건 기준 · 실설비 연동 없음</div></div>
     <div class="grow"></div>
     <div class="prog"><span id="progText">0 / 0 완료</span><div class="bar"><i id="progBar"></i></div></div>
     <button class="btn danger" id="drillBtn" type="button">비상상황 훈련</button>
@@ -321,7 +321,7 @@ td.okc{background:var(--soft);font-weight:700}
         </div>
         <div class="pgrid" id="pgrid"></div>
         <div class="spec">
-          <b>표준규격 — 동화록소닌정</b><br>
+          <b>표준규격 — 동화A</b><br>
           질량 250.0 mg<br>평균 245.0~255.0<br>개별 237.5~262.5<br>
           두께 2.9~3.3 mm<br>직경 8.8~9.2 mm<br>경도 8.0~12.0 KP<br>
           <span style="color:#4a5866">충전 6.8 / 예압 2.5<br>본압 1.9 mm<br>속도 30~70 RPM<br>펀치수+1 = 45 T</span>
@@ -380,7 +380,7 @@ const IDLE={feeder:0,rpm:0,tpm:0,dosing:2.0,etPre:5.00,etMain:5.00,urPre:3.00,ur
  recipe:'no_recipe',batch:'no_charge',op:'none'};
 const H=o=>Object.assign({},IDLE,o);
 
-/* 록소닌정 공정 상수 (MBR 기준) */
+/* 동화A 공정 상수 (MBR 기준) */
 const DIE=63.617, DENS=0.578, PUNCH=44, TARGET_T=800000, THEORY_KG=200.0;
 const weightOf=(dos,rpm,fee)=>dos*DIE*DENS*cl(1.0-0.0006*(rpm-30)+0.0010*(fee-25),.9,1.06);
 const forceOf =(et,w)=>10.5*Math.exp((1.90-et)/0.45)*Math.pow(Math.max(w,1)/250,1.8);
@@ -390,7 +390,7 @@ const S=(o)=>o;
 const STEPS=[
 /* 준비 */
 S({code:'P1',group:'prep',name:'사전점검',title:'타정실 사전점검·라인클리어런스',loc:'panel',say:'점검부터 시작해요',
-  instr:'타정혼합물과 작업실 상태를 확인해요. 록소닌정은 주원료 흡습성이 커서 습도 관리가 특히 중요합니다.',
+  instr:'타정혼합물과 작업실 상태를 확인해요. 동화A는 주원료 흡습성이 커서 습도 관리가 특히 중요합니다.',
   src:'제조지시·기록서 타정실 사전점검 기록표 11항목',
   checks:['제조지시·기록서 확인 (제품명·제조번호·제조단위)','전 제품 잔여 반제품·불필요 물건 없음','타정혼합물 제품명·제조번호 일치','반제품 보관기간 확인 (최종혼합 완료 후 31일 이내)','작업실·용기·도구 청결, 청소표시서 떼어 첨부','온도 18~26℃ / 습도 50%RH 이하'],
   run:{label:'현장 순회 점검',path:['press','ded','drum','ipc','panel'],dur:1100,say:'점검 끝!'},
@@ -399,17 +399,17 @@ S({code:'P2',group:'prep',name:'로그인',title:'로그인과 Recipe 선택',lo
   instr:'본인 계정으로 로그인하고 제품 Recipe를 호출해요. 계정 공유는 데이터 신뢰성(DI) 위반입니다.',
   src:'Operating Instructions 6장 User Administration · 기록서 로그인 기재란',
   q:'어떻게 시작할까요?',
-  opts:[['본인 OPERATOR 계정 + LOXONIN_250 / Ver 확인',1,'맞아요. 계정·Recipe·버전을 함께 확인했어요. Recipe 이름과 Version은 기록서에 기재합니다.'],
-        ['선배 공용 계정 + LOXONIN_250',0,'다른 사람의 ID/PASSWORD 사용은 금지예요. 감사 추적(Audit trail)이 실제 작업자를 가리키지 않게 됩니다.'],
+  opts:[['본인 OPERATOR 계정 + DWA_250 / Ver 확인',1,'맞아요. 계정·Recipe·버전을 함께 확인했어요. Recipe 이름과 Version은 기록서에 기재합니다.'],
+        ['선배 공용 계정 + DWA_250',0,'다른 사람의 ID/PASSWORD 사용은 금지예요. 감사 추적(Audit trail)이 실제 작업자를 가리키지 않게 됩니다.'],
         ['본인 계정 + 직전 배치 Recipe 그대로 사용',0,'직전 배치 Recipe를 확인 없이 쓰면 다른 품목 조건으로 타정할 위험이 있어요.']],
   run:{label:'Recipe Load · Batch 개설',anim:['panel-active'],dur:1500,say:'Recipe 로드'},
-  hmi:H({status:'LOADED',recipe:'LOXONIN_250',batch:'LX-2609A',op:'OP-KIM'})}),
+  hmi:H({status:'LOADED',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM'})}),
 S({code:'P3',group:'prep',name:'펀치 확인',title:'펀치·다이 장착 상태 확인',loc:'press',say:'펀치부터 볼게요',
   instr:'원형 9.0 mm 펀치와 각인 상태를 확인해요. 각인 문자는 기록서에 기재란만 있고 값이 비어 있어 배치별 실기재 항목입니다.',
   src:'기록서 표준규격 (모양 상/중/하, 상·하펀치 각인) · OM 11.3 Tool Change',
   checks:['펀치 수량·마모·손상 확인','상펀치 각인 = [확인 필요 · 기록서 실기재]','하펀치 각인 = [확인 필요 · 기록서 실기재]','펀치 윤활·이물 없음 확인'],
   run:{label:'장착 상태 확인 완료',path:['press','panel'],dur:1100,say:'이상 없음'},
-  hmi:H({status:'READY',recipe:'LOXONIN_250',batch:'LX-2609A',op:'OP-KIM'})}),
+  hmi:H({status:'READY',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM'})}),
 /* 세팅·시험타정 */
 S({code:'1',group:'set',name:'Feeder',title:'피더 설정과 예비운전',loc:'panel',say:'피더 먼저',
   instr:'로터리 피더 속도를 설정하고 분체가 고르게 채워지도록 예비 운전합니다. 설정범위는 10~100 RPM입니다.',
@@ -418,7 +418,7 @@ S({code:'1',group:'set',name:'Feeder',title:'피더 설정과 예비운전',loc:
   opts:[['약 20초 예비운전으로 피더를 채운 뒤 시험타정',1,'맞아요. 매뉴얼 Start-Up 절차입니다. 채워지지 않은 상태의 초기 정제는 중량이 낮게 나와 판단을 흐립니다.'],
         ['바로 타정하고 중량이 낮으면 충전깊이를 올린다',0,'원인이 피더 미충전인데 충전깊이를 올리면 이후 정상 충전 시 과중량이 됩니다.']],
   run:{label:'Feeder 25 RPM · 예비운전',anim:['panel-active'],dur:1800,say:'피더 채우는 중'},
-  hmi:H({status:'FEEDER',recipe:'LOXONIN_250',batch:'LX-2609A',op:'OP-KIM',feeder:25})}),
+  hmi:H({status:'FEEDER',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25})}),
 S({code:'2',group:'set',name:'충전깊이',title:'충전깊이(Dosing) 세팅',loc:'panel',say:'충전깊이 6.8',
   instr:'충전깊이는 정제 질량을 결정합니다. 표준작업조건 약 6.8 mm를 입력해요.',
   src:'기록서 타정 표준작업조건 (KORSCH XL-400FT 충전깊이 약 6.8 mm)',
@@ -426,13 +426,13 @@ S({code:'2',group:'set',name:'충전깊이',title:'충전깊이(Dosing) 세팅',
   opts:[['질량 ≈ 충전깊이 × 다이 단면적 × 겉보기밀도 — 깊을수록 무겁다',1,'정확해요. 질량이 벗어나면 1차 조정 인자는 충전깊이입니다.'],
         ['충전깊이는 경도를 결정하고 질량과는 무관하다',0,'경도를 결정하는 것은 본압간격(Edge Thickness Main)입니다.']],
   run:{label:'Dosing 6.80 mm 입력',anim:['panel-active'],dur:1300,say:'6.80 입력'},
-  hmi:H({status:'SETTING',recipe:'LOXONIN_250',batch:'LX-2609A',op:'OP-KIM',feeder:25,dosing:6.80})}),
+  hmi:H({status:'SETTING',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:6.80})}),
 S({code:'3',group:'set',name:'간격 세팅',title:'예압·본압 간격 세팅',loc:'panel',say:'간격 입력',
   instr:'예압 2.5 mm, 본압 1.9 mm를 입력해요. 설정범위는 0.3~11.5 mm입니다.',
   src:'기록서 타정 표준작업조건 · Operating Instructions 9.3.4',
   checks:['Edge Thickness Pre = 2.50 mm','Edge Thickness Main = 1.90 mm','Upper Roller Pre/Main 기본값 3.0 mm 확인'],
   run:{label:'간격 입력 완료',anim:['panel-active'],dur:1400,say:'간격 세팅 완료'},
-  hmi:H({status:'SETTING',recipe:'LOXONIN_250',batch:'LX-2609A',op:'OP-KIM',feeder:25,dosing:6.80,etPre:2.50,etMain:1.90})}),
+  hmi:H({status:'SETTING',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:6.80,etPre:2.50,etMain:1.90})}),
 S({code:'4',group:'set',name:'기동',title:'MOTOR ON · Manual 모드 기동',loc:'press',say:'기동합니다',
   instr:'조작반 MOTOR ON으로 기동해요. 기계는 기동 시 항상 Manual 모드로 시작합니다.',
   src:'Operating Instructions 9.1.1 Restart Auto · 9.1.2 Force Control',
@@ -441,13 +441,13 @@ S({code:'4',group:'set',name:'기동',title:'MOTOR ON · Manual 모드 기동',l
         ['Automatic 모드가 고장 나 있기 때문',0,'정상 설계 동작입니다. Restart Auto 설정 회전수 뒤 자동 전환도 가능합니다.'],
         ['Manual이 생산성이 더 높기 때문',0,'생산 중 압축력 제어·감시가 필요하므로 본생산은 Automatic으로 운전합니다.']],
   run:{label:'MOTOR ON · 30 RPM',anim:['run-state'],dur:2200,say:'저속 기동'},
-  hmi:H({status:'RUNNING',recipe:'LOXONIN_250',batch:'LX-2609A',op:'OP-KIM',feeder:25,dosing:6.80,etPre:2.50,etMain:1.90,rpm:30,mode:'Manual'})}),
+  hmi:H({status:'RUNNING',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:6.80,etPre:2.50,etMain:1.90,rpm:30,mode:'Manual'})}),
 S({code:'5',group:'set',name:'시험타정',title:'시험타정과 초기 정제 배출',loc:'press',say:'시험타정 시작',
   instr:'저속으로 시험타정합니다. 3채널 배출슈트는 설정 수량만큼 정제를 리젝트 채널로 보낸 뒤 양품 채널로 전환됩니다.',
   src:'Operating Manual 8장 Start-Up 5항 · 기록서 공정검사 요령',
   checks:['배출 흐름 정상 확인','탈분기·금속탐지기 연속 통과 확인','드럼 주변 사람·물품 없음'],
   run:{label:'시험타정 실행',anim:['run-state','dedust'],dur:2600,say:'정제 나옵니다'},
-  hmi:H({status:'RUNNING',recipe:'LOXONIN_250',batch:'LX-2609A',op:'OP-KIM',feeder:25,dosing:6.80,etPre:2.50,etMain:1.90,rpm:30,mode:'Manual',rej:520})}),
+  hmi:H({status:'RUNNING',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:6.80,etPre:2.50,etMain:1.90,rpm:30,mode:'Manual',rej:520})}),
 /* IPC */
 S({code:'6',group:'ipc',name:'IPC 측정',title:'자동공정관리기 공정검사',loc:'ipc',say:'검체 측정할게요',runFirst:true,
   instr:'자동공정관리기로 성상·평균질량·개별질량·두께·직경·경도를 측정합니다. 결과를 보고 판정하세요.',
@@ -458,13 +458,13 @@ S({code:'6',group:'ipc',name:'IPC 측정',title:'자동공정관리기 공정검
         ['질량 부적합 → 본압간격을 좁혀 재측정',0,'본압을 좁히면 경도·압축력만 올라가고 질량은 거의 변하지 않습니다. 오히려 정상이던 경도가 상한을 넘습니다.'],
         ['평균 241.8 mg은 개별편차(237.5~262.5) 안이므로 진행',0,'개별편차와 평균편차는 다른 기준입니다. 평균질량은 245.0~255.0을 만족해야 합니다.']],
   run:{label:'검체 채취 · 측정',path:['press','ipc'],dur:2400,say:'241.8 mg'},
-  hmi:H({status:'IPC',recipe:'LOXONIN_250',batch:'LX-2609A',op:'OP-KIM',feeder:25,dosing:6.80,etPre:2.50,etMain:1.90,rpm:30,mode:'Manual',rej:560})}),
+  hmi:H({status:'IPC',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:6.80,etPre:2.50,etMain:1.90,rpm:30,mode:'Manual',rej:560})}),
 S({code:'7',group:'ipc',name:'보정',title:'충전깊이 보정과 재측정',loc:'panel',say:'충전깊이 보정',
   instr:'충전깊이를 올려 질량을 규격 중심으로 맞춥니다. 보정 후에는 반드시 재측정합니다.',
   src:'기록서 공정검사 요령 · 표준규격 250.0 mg ±2.0%',
   checks:['Dosing 6.80 → 7.00 mm 보정','안정화 대기 후 재측정','재측정 결과 250.1 mg · 경도 10.0 KP — 전 항목 적합'],
   run:{label:'보정 후 재측정',path:['panel','press','ipc'],dur:2600,say:'250.1 mg 적합!'},
-  hmi:H({status:'IPC OK',recipe:'LOXONIN_250',batch:'LX-2609A',op:'OP-KIM',feeder:25,dosing:7.00,etPre:2.50,etMain:1.90,rpm:30,mode:'Manual',rej:610})}),
+  hmi:H({status:'IPC OK',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:7.00,etPre:2.50,etMain:1.90,rpm:30,mode:'Manual',rej:610})}),
 S({code:'8',group:'ipc',name:'Start 승인',title:'펀치수+1 채취와 공정관리실 승인',loc:'press',say:'45정 채취',
   instr:'전 항목이 규격에 맞으면 펀치수+1 정을 채취해 공정관리실로 보내고, Test Report에 Start 승인을 받은 뒤 작업을 진행합니다.',
   src:'기록서 공정검사 요령 1·2항 (KORSCH 45정)',
@@ -473,7 +473,7 @@ S({code:'8',group:'ipc',name:'Start 승인',title:'펀치수+1 채취와 공정�
         ['37정 (KIKUSUI 기준)',0,'37정은 KIKUSUI-I 기준입니다. 설비마다 펀치수가 달라 채취 수량도 달라집니다.'],
         ['10정 (PV 검체량)',0,'10T/10분은 PV 진행 시 성상·평균질량 검사에 적용되는 별도 조건입니다.']],
   run:{label:'45정 채취 · 판정 요청',path:['press','panel'],dur:2200,say:'Start 승인!'},
-  hmi:H({status:'QC START',recipe:'LOXONIN_250',batch:'LX-2609A',op:'OP-KIM',feeder:25,dosing:7.00,etPre:2.50,etMain:1.90,rpm:30,mode:'Manual',rej:660})}),
+  hmi:H({status:'QC START',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:7.00,etPre:2.50,etMain:1.90,rpm:30,mode:'Manual',rej:660})}),
 /* 본생산 */
 S({code:'9',group:'run',name:'한계 설정',title:'압축력 한계와 최대 펀치하중 설정',loc:'panel',say:'한계값 설정',
   instr:'Force Control 메뉴에서 평균 상·하한, S rel 정지한계, 최대 펀치하중을 설정합니다. 자동모드의 감시 기준이 됩니다.',
@@ -483,7 +483,7 @@ S({code:'9',group:'run',name:'한계 설정',title:'압축력 한계와 최대 �
   opts:[['펀치 파손·설비 손상 위험 — 공구 기준을 넘길 수 없다',1,'맞아요. 최대 펀치하중은 Manual·Automatic 양쪽에서 감시되며, 초과 시 기계가 정지합니다.'],
         ['정지가 줄어 생산성이 올라간다',0,'감시 기능을 무력화하는 설정입니다. 펀치 파손은 금속 혼입으로 이어질 수 있습니다.']],
   run:{label:'한계값 저장',anim:['panel-active'],dur:1500,say:'저장 완료'},
-  hmi:H({status:'LIMITS',recipe:'LOXONIN_250',batch:'LX-2609A',op:'OP-KIM',feeder:25,dosing:7.00,etPre:2.50,etMain:1.90,rpm:30,mode:'Manual',rej:700})}),
+  hmi:H({status:'LIMITS',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:7.00,etPre:2.50,etMain:1.90,rpm:30,mode:'Manual',rej:700})}),
 S({code:'10',group:'run',name:'자동 전환',title:'Automatic 모드 전환',loc:'panel',say:'자동 전환',
   instr:'압축력 제어·감시를 작동시킵니다. 평균 한계 이탈, S rel 초과, 단일값 초과 누적 시 기계가 자동 정지합니다.',
   src:'Operating Instructions 9.1.2 · 9.2 Compression Force Display',
@@ -491,7 +491,7 @@ S({code:'10',group:'run',name:'자동 전환',title:'Automatic 모드 전환',lo
   opts:[['리젝트 채널로 선별 배출되고, 일정 수 누적 시 기계가 정지',1,'맞아요. 단일 선별(Single sorting)이 동작하고, 설정 수량을 넘으면 정지합니다.'],
         ['그대로 양품 채널로 배출된다',0,'단일값 이탈 정제는 선별 배출됩니다. 그대로 흘려보내면 규격 외 정제가 섞입니다.']],
   run:{label:'Force Control → Automatic',anim:['panel-active','run-state','dedust'],dur:1800,say:'Automatic ON'},
-  hmi:H({status:'AUTO',recipe:'LOXONIN_250',batch:'LX-2609A',op:'OP-KIM',feeder:25,dosing:7.00,etPre:2.50,etMain:1.90,rpm:30,mode:'Automatic',auto:true,rej:720})}),
+  hmi:H({status:'AUTO',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:7.00,etPre:2.50,etMain:1.90,rpm:30,mode:'Automatic',auto:true,rej:720})}),
 S({code:'11',group:'run',name:'속도 판단',title:'타정속도 상승 — 교정 범위 판단',loc:'panel',say:'속도 올리기 전에',
   instr:'표준작업조건은 30~70 RPM입니다. 그런데 이 설비의 최근 교정 회전속도 범위는 10~50 RPM입니다. 어떻게 할까요?',
   src:'타정기 PQ 및 교정 상태 점검 DB (KORSCH 140005274) · 기록서 표준작업조건',
@@ -500,13 +500,13 @@ S({code:'11',group:'run',name:'속도 판단',title:'타정속도 상승 — 교
         ['기록서가 30~70 RPM을 허용하므로 70 RPM으로 올린다',0,'기록서 허용 범위와 설비 교정 범위는 다른 문제입니다. 교정되지 않은 구간의 속도·압력 데이터는 근거로 쓸 수 없습니다.'],
         ['속도계는 참고값이므로 무시하고 올린다',0,'타정속도는 기록서 기재 항목이자 품질 영향 인자입니다. 참고값이 아닙니다.']],
   run:{label:'50 RPM으로 상승 · 보고 완료',anim:['panel-active','run-state','dedust'],dur:2400,say:'50 RPM 유지'},
-  hmi:H({status:'AUTO',recipe:'LOXONIN_250',batch:'LX-2609A',op:'OP-KIM',feeder:25,dosing:7.00,etPre:2.50,etMain:1.90,rpm:50,mode:'Automatic',auto:true,rej:760})}),
+  hmi:H({status:'AUTO',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:7.00,etPre:2.50,etMain:1.90,rpm:50,mode:'Automatic',auto:true,rej:760})}),
 S({code:'12',group:'run',name:'금속탐지',title:'금속탐지기 검출조건 확인',loc:'ded',say:'금속탐지기 확인',
   instr:'타정 공정 전·후로 금속탐지기를 연속 통과시켜 금속 혼입 불량을 제거합니다.',
   src:'기록서 타정 1항 (Fe 0.3 mm / STS 0.5 mm 검출)',
   checks:['Fe 0.3 mm 검출 확인','STS 0.5 mm 검출 확인','금속불량 수량 기록란 확인'],
   run:{label:'검출 테스트 실행',path:['ded'],anim:['run-state','dedust','mdreject'],dur:2200,say:'검출 정상'},
-  hmi:H({status:'AUTO',recipe:'LOXONIN_250',batch:'LX-2609A',op:'OP-KIM',feeder:25,dosing:7.00,etPre:2.50,etMain:1.90,rpm:50,mode:'Automatic',auto:true,rej:820})}),
+  hmi:H({status:'AUTO',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:7.00,etPre:2.50,etMain:1.90,rpm:50,mode:'Automatic',auto:true,rej:820})}),
 S({code:'13',group:'run',name:'본생산',title:'본생산과 1시간 간격 공정검사',loc:'ipc',say:'주기 검사',
   instr:'생산 중 정해진 주기로 공정검사를 수행합니다. 검사 주기를 확인하세요.',
   src:'내용고형제 공정관리(SOP) 공정검사 항목 및 시기/빈도',
@@ -515,7 +515,7 @@ S({code:'13',group:'run',name:'본생산',title:'본생산과 1시간 간격 공
         ['전 항목 1시간 간격',0,'마손도와 붕해는 1일 1회입니다.'],
         ['전 항목 작업 시작 시 1회만',0,'작업 중 조건 변동을 잡기 위해 1시간 간격 검사가 필요합니다.']],
   run:{label:'주기 검사 · 생산 진행',path:['press','ipc'],anim:['run-state','dedust'],dur:3000,say:'적합 유지'},
-  hmi:H({status:'AUTO',recipe:'LOXONIN_250',batch:'LX-2609A',op:'OP-KIM',feeder:25,dosing:7.00,etPre:2.50,etMain:1.90,rpm:50,mode:'Automatic',auto:true,prod:412000,rej:980})}),
+  hmi:H({status:'AUTO',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:7.00,etPre:2.50,etMain:1.90,rpm:50,mode:'Automatic',auto:true,prod:412000,rej:980})}),
 /* 마감 */
 S({code:'E1',group:'end',name:'정지·수율',title:'생산 종료와 공정수율 확인',loc:'panel',say:'정지합니다',
   instr:'타정혼합물을 모두 소진하면 정지하고 나정 생산량·손실량을 확인합니다. 관리수율을 벗어나면 보고 대상입니다.',
@@ -525,26 +525,26 @@ S({code:'E1',group:'end',name:'정지·수율',title:'생산 종료와 공정수
         ['96%면 거의 맞으니 그대로 다음 공정으로 넘긴다',0,'관리수율 이탈은 보고·기록 대상입니다. 손실 원인을 확인하지 않으면 다음 배치에서 반복됩니다.'],
         ['수율이 맞을 때까지 리젝트 정제를 되섞는다',0,'리젝트 정제를 임의로 합치는 것은 명백한 품질 위반입니다.']],
   run:{label:'MOTOR OFF · 수율 산출',anim:['panel-active'],dur:2000,say:'수율 확인'},
-  hmi:H({status:'STOPPED',recipe:'LOXONIN_250',batch:'LX-2609A',op:'OP-KIM',dosing:7.00,etPre:2.50,etMain:1.90,prod:786400,rej:1180,yieldPct:98.3})}),
+  hmi:H({status:'STOPPED',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',dosing:7.00,etPre:2.50,etMain:1.90,prod:786400,rej:1180,yieldPct:98.3})}),
 S({code:'E2',group:'end',name:'리포트',title:'Report 출력과 첨부',loc:'panel',say:'기록 마감',
   instr:'공정 완료 후 리포트를 출력해 이중 확인하고 제조지시·기록서에 첨부합니다.',
   src:'기록서 타정 2항 (KORSCH: End of Batch / Force Trend Graphic / Audit trail event report)',
   checks:['End of Batch 첨부','Force Trend Graphic 첨부','Audit trail event report 첨부','작업 Batch 일치 이중 확인'],
   run:{label:'리포트 출력·첨부',anim:['panel-active'],dur:1600,say:'첨부 완료'},
-  hmi:H({status:'REPORT',recipe:'LOXONIN_250',batch:'LX-2609A',op:'OP-KIM',dosing:7.00,etPre:2.50,etMain:1.90,prod:786400,rej:1180,yieldPct:98.3})}),
+  hmi:H({status:'REPORT',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',dosing:7.00,etPre:2.50,etMain:1.90,prod:786400,rej:1180,yieldPct:98.3})}),
 S({code:'E3',group:'end',name:'반제품',title:'나정 반제품 입출고',loc:'drum',say:'반제품 처리',
   instr:'정제를 반제품 보관용기에 넣어 무게를 확인하고, 건조제를 넣은 뒤 반제품표시서를 부착해 실온 창고로 옮깁니다.',
   src:'기록서 타정 2항 · 타정실 주의사항 8항',
   checks:['용기 무게 확인·용기번호 기재','건조제 투입수량 기재','반제품표시서 부착','실온 반제품창고 이송'],
   run:{label:'반제품 처리 완료',path:['drum','panel'],dur:1800,say:'이송 완료'},
-  hmi:H({status:'DONE',recipe:'LOXONIN_250',batch:'LX-2609A',op:'OP-KIM',dosing:7.00,etPre:2.50,etMain:1.90,prod:786400,rej:1180,yieldPct:98.3})}),
+  hmi:H({status:'DONE',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',dosing:7.00,etPre:2.50,etMain:1.90,prod:786400,rej:1180,yieldPct:98.3})}),
 S({code:'E4',group:'end',name:'로그아웃',title:'로그아웃',loc:'panel',say:'마지막 한 가지',
   instr:'작업을 마치면 반드시 본인 계정에서 로그아웃합니다.',
   src:'기록서 로그아웃 기재란 · SOP 접속권한 관리',
   q:'작업 마감 시 마지막으로?',
   opts:[['본인 계정 로그아웃',1,'첫 배치 완료!'],
         ['다음 근무자를 위해 로그인 유지',0,'로그인 상태로 두면 다른 사람의 작업이 내 계정 기록으로 남습니다.']],
-  hmi:H({status:'LOGOUT',recipe:'LOXONIN_250',batch:'LX-2609A',op:'OP-KIM',prod:786400,rej:1180,yieldPct:98.3})})
+  hmi:H({status:'LOGOUT',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',prod:786400,rej:1180,yieldPct:98.3})})
 ];
 const LAST=STEPS.length-1;
 const GROUPS=[['준비','prep'],['세팅·시험타정','set'],['공정검사','ipc'],['본생산','run'],['마감','end']];
@@ -817,7 +817,7 @@ function drillAnswer(k){
 }
 function info(){
  openModal(`<h3>자료와 주의사항</h3>
- <p>KORSCH XL 400FT <b>Operating Instructions / Operating Manual (K1500223)</b>, 사내 제조지시·기록서(동화록소닌정, MBRM-00013), <b>내용고형제 공정관리 SOP</b>, 타정기 PQ·교정 상태 점검 DB를 근거로 만든 교육용 초안입니다.</p>
+ <p>KORSCH XL 400FT <b>Operating Instructions / Operating Manual (K1500223)</b>, 사내 제조지시·기록서(동화A, MBRM-00013), <b>내용고형제 공정관리 SOP</b>, 타정기 PQ·교정 상태 점검 DB를 근거로 만든 교육용 초안입니다.</p>
  <ul>
  <li>HMI는 Operating Instructions 9장 <b>Main Menu</b> 구조(압축력 바그래프·파라미터 버튼·소프트키·상태바)를 재구성한 것으로, 실기 소프트웨어 버전과 배치·표기가 다를 수 있습니다.</li>
  <li>충전깊이 6.8 / 예압 2.5 / 본압 1.9 mm, 30~70 RPM, 질량 250.0 mg ±2.0%, 두께 3.1±0.2 mm, 경도 10.0±2.0 KP, 펀치수+1 = 45정은 <b>기록서 지시값</b>입니다.</li>
