@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Singlepot 600 · 벽 부착형 정립 시뮬레이터</title>
+<style>
+:root{--bg:#e6ebe8;--surface:#fbfcfb;--ink:#15302d;--sub:#586a66;--line:#cfd9d3;--accent:#1f5a4f;--on:#fff;--soft:#dcebe3;--warn:#a8322b;--warnsoft:#fbe7e2;--steel:#9eabb0}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f181c;--surface:#17252b;--ink:#e2eee9;--sub:#a3b6b0;--line:#2e434a;--accent:#8fd2b5;--on:#0f2922;--soft:#1f3a35;--warn:#ff9f95;--warnsoft:#3b2427;--steel:#688086}}
+:root[data-theme="dark"]{--bg:#0f181c;--surface:#17252b;--ink:#e2eee9;--sub:#a3b6b0;--line:#2e434a;--accent:#8fd2b5;--on:#0f2922;--soft:#1f3a35;--warn:#ff9f95;--warnsoft:#3b2427;--steel:#688086}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.45 'Pretendard','Noto Sans KR','Malgun Gothic',system-ui,sans-serif}
+button{font:inherit;color:inherit;cursor:pointer}
+button:disabled{cursor:default;opacity:.5}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.app{display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;height:100vh;min-height:760px;max-width:1560px;margin:0 auto;padding:10px;gap:8px}
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 14px}
+.top h1{font-size:18px;margin:0;letter-spacing:-.4px}
+.top .meta{color:var(--sub);font-size:12px}
+.top .grow{flex:1}
+.prog{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--sub)}
+.bar{width:140px;height:7px;background:var(--line);border-radius:5px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .4s}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:8px 13px;font-weight:650}
+.btn:not(:disabled):hover{background:var(--soft)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on)}
+.btn.danger{border-color:var(--warn);color:var(--warn)}
+.main{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(380px,1fr);gap:8px;min-height:0}
+.scene{position:relative;background:#dde5e1;border:1px solid var(--line);border-radius:12px;overflow:hidden;min-height:0}
+.scene svg{display:block;width:100%;height:100%}
+.tag{position:absolute;left:10px;top:10px;background:rgba(255,255,255,.85);color:#34504b;border-radius:6px;padding:3px 8px;font-size:11px}
+/* HMI */
+.hmi{background:#0a1a45;border:4px solid #b9c0b4;border-radius:10px;display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;overflow:hidden;font-family:Arial,'Malgun Gothic',sans-serif;color:#eef}
+.hmi-top{background:#c4c8b6;color:#132430;display:flex;justify-content:space-between;gap:8px;padding:5px 9px;font-size:11px;font-weight:700}
+.hmi-grid{display:grid;grid-template-columns:.95fr 1.05fr;gap:6px;padding:6px;min-height:0}
+.recipe{background:#dcdfd6;color:#1b1b1b;border:2px solid #f0f2e8;display:flex;flex-direction:column;min-height:0}
+.recipe h3{margin:0;padding:4px 7px 2px;font:700 17px Arial,sans-serif;letter-spacing:-.5px}
+.recipe ol{list-style:none;margin:0;padding:2px 3px 4px;overflow:auto;font-size:10.5px;line-height:1.5}
+.recipe li{display:grid;grid-template-columns:20px 1fr 1.05fr;gap:3px;padding:0 4px;cursor:pointer;white-space:nowrap}
+.recipe li.past{color:#5d6b5f}
+.recipe li.on{background:#1b2a7a;color:#fff}
+.recipe li:hover:not(.on){background:#c6cabe}
+.proc{display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:6px;min-height:0}
+.stepbox{background:#269494;color:#052e30;padding:5px 8px;display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-weight:700}
+.stepbox .no{background:#dcdfd6;padding:1px 6px;font-size:12px}
+.stepbox .nm{font-size:12px;line-height:1.25}
+.status{font-size:10px;padding:3px 6px;background:#dcdfd6;color:#233}
+.status.run{background:#3fd14a;color:#062}
+.status.hold{background:#e04a3f;color:#fff;animation:blink .6s steps(2) infinite}
+.status.done{background:#f2d46b;color:#332}
+@keyframes blink{50%{opacity:.4}}
+.mimic{background:linear-gradient(90deg,#2f4448,#51686d,#2f4448);border:1px solid #698699;display:grid;grid-template-columns:120px 1fr;align-items:center;gap:6px;padding:4px 6px}
+.mimic svg{width:120px;height:86px}
+.mimic .ml{font-size:10px;color:#d9e4e2;line-height:1.5}
+.mimic .ml b{color:#9ff28f}
+.vals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;align-content:start;overflow:auto}
+.val{background:#d4d7c4;color:#162b37;border:1px solid #eef1dc;padding:3px 5px;font-size:9.5px;line-height:1.2;min-width:0}
+.val b{display:block;color:#1f6a1c;font-size:13.5px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.val.hot{border-color:#50d742}
+.fkeys{display:flex;gap:4px;padding:5px 6px;background:#1b3aa0}
+.fkey{flex:1;background:#d7d9d0;color:#222;text-align:center;font-size:10px;padding:4px 0;border:1px solid #fff}
+.fkey.lit{background:#f3d56b}
+.hmsg{background:#dcdfd6;color:#333;font-size:11px;padding:3px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* task */
+.task{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1.55fr) minmax(230px,.8fr);gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 14px;min-height:164px}
+.code{font-size:12px;color:var(--sub);font-weight:700}
+.task h2{font-size:18px;margin:2px 0 5px;letter-spacing:-.4px}
+.task p{margin:0 0 6px;color:var(--sub);font-size:12.5px;max-width:62ch}
+.src{font-size:11px;color:var(--sub)}
+.work{min-width:0;max-height:176px;overflow:auto;padding-right:2px}
+.chk{display:inline-flex;gap:7px;align-items:center;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 10px;margin:0 6px 6px 0;font-size:12px;text-align:left}
+.chk .box{width:16px;height:16px;border:1px solid var(--sub);border-radius:4px;display:grid;place-items:center;font-size:11px;flex:none}
+.chk[aria-pressed="true"]{background:var(--soft);border-color:var(--accent)}
+.chk[aria-pressed="true"] .box{background:var(--accent);border-color:var(--accent);color:var(--on)}
+.q{font-weight:700;margin:4px 0 5px;font-size:13px}
+.opt{display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 10px;margin-bottom:5px;font-size:12.5px}
+.opt.good{background:var(--soft);border-color:var(--accent);font-weight:700}
+.opt:not(:disabled):hover{border-color:var(--accent)}
+.muted{color:var(--sub);font-size:12px}
+.act{display:flex;flex-direction:column;gap:8px}
+.fb{background:var(--soft);border-radius:10px;padding:9px 11px;font-size:12.5px;flex:1;min-height:60px}
+.fb.bad{background:var(--warnsoft);color:var(--warn)}
+.row{display:flex;gap:6px}
+.row .btn{flex:1}
+/* rail */
+.rail{display:flex;gap:10px;overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:7px 10px}
+.grp{display:flex;flex-direction:column;gap:3px}
+.grp small{color:var(--sub);font-size:10.5px;padding-left:2px}
+.chips{display:flex;gap:4px}
+.chip{min-width:58px;border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:4px 5px;font-size:9.5px;line-height:1.2;text-align:center}
+.chip b{display:block;font-size:12px}
+.chip.done{background:var(--soft);border-color:var(--accent)}
+.chip.done b::after{content:" ✓"}
+.chip.cur{background:var(--accent);color:var(--on);border-color:var(--accent)}
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(5,15,15,.5);display:grid;place-items:center;z-index:20;padding:12px}
+.modal[hidden]{display:none}
+.card{background:var(--surface);color:var(--ink);width:min(580px,100%);max-height:88vh;overflow:auto;border-radius:14px;padding:18px 20px;border:1px solid var(--line)}
+.card h3{margin:0 0 8px;font-size:19px}
+.card p,.card li{color:var(--sub);font-size:13px}
+.logrow{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding:5px 0;font-size:12px}
+/* scene fx */
+#impeller,#chopper,#millRotor,.leg,.arm,#mImp{transform-box:fill-box;transform-origin:center}
+@keyframes spin3d{0%{transform:scaleX(1)}50%{transform:scaleX(-1)}100%{transform:scaleX(1)}}
+@keyframes rot{to{transform:rotate(360deg)}}
+.mix-slow #impeller{animation:spin3d 1.1s linear infinite}
+.mix-fast #impeller{animation:spin3d .3s linear infinite}
+.chop #chopper{animation:rot .16s linear infinite}
+.flow{opacity:0;stroke-dasharray:6 14}
+.loading .flow-hose,.spray .flow-liq{opacity:1;animation:dash .6s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-40}}
+.fx-spray{opacity:0}.spray .fx-spray{opacity:1}
+.fx-spray line{animation:drip .55s linear infinite}
+.fx-spray line:nth-child(2){animation-delay:.18s}.fx-spray line:nth-child(3){animation-delay:.36s}
+@keyframes drip{from{transform:translateY(-6px);opacity:0}30%{opacity:1}to{transform:translateY(26px);opacity:0}}
+.vapor path{opacity:0}
+.drying .vapor path{animation:rise 2.2s ease-in infinite}
+.vapor path:nth-child(2){animation-delay:.7s}.vapor path:nth-child(3){animation-delay:1.4s}
+@keyframes rise{0%{opacity:0;transform:translateY(10px)}30%{opacity:.85}100%{opacity:0;transform:translateY(-34px)}}
+#mwGlow{opacity:0}.mw #mwGlow{animation:pulse .9s ease-in-out infinite alternate}
+@keyframes pulse{from{opacity:.1}to{opacity:.6}}
+.mw .mw-ind{fill:#ff8a3d}
+.fx-mill{opacity:0}.milling .fx-mill{opacity:1}
+.fx-mill circle{animation:fall .5s linear infinite}
+.fx-mill circle:nth-child(2n){animation-delay:.25s}
+@keyframes fall{from{transform:translateY(-4px)}to{transform:translateY(30px)}}
+.milling #millRotor{animation:rot .22s linear infinite}
+.sampling #sampleCup{fill:#f2d46b}
+.panel-active #panelScreen{fill:#1d49b0}
+.run-state #lampG{fill:#48e062}
+.alarm #lampR{fill:#ff3b30;animation:blink .5s steps(2) infinite}
+#op{transition:transform 1.3s ease-in-out}
+#bubble{transition:transform 1.3s ease-in-out}
+#opFlip{transition:transform .3s}
+.leg,.arm{transform-origin:50% 5%}
+#op.walking .leg-f,#op.walking .arm-b{animation:swA .42s ease-in-out infinite alternate}
+#op.walking .leg-b,#op.walking .arm-f{animation:swB .42s ease-in-out infinite alternate}
+@keyframes swA{from{transform:rotate(24deg)}to{transform:rotate(-24deg)}}
+@keyframes swB{from{transform:rotate(-24deg)}to{transform:rotate(24deg)}}
+#op.working .arm-f{animation:press .45s ease-in-out infinite alternate}
+@keyframes press{from{transform:rotate(-105deg)}to{transform:rotate(-70deg)}}
+#opBody{animation:breathe 2.4s ease-in-out infinite}
+#op.walking #opBody{animation:bob .21s ease-in-out infinite alternate}
+@keyframes bob{to{transform:translateY(-3px)}}
+@keyframes breathe{50%{transform:translateY(-1px)}}
+.m-mix #mImp{animation:spin3d .5s linear infinite}
+#mDrop,#mWave,#mArrow{opacity:0}
+.m-drop #mDrop,.m-wave #mWave,.m-disc #mArrow{opacity:1}
+.lbl{font-size:11px;fill:#3f524e;font-weight:700}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+@media (max-width:1100px){.app{height:auto;min-height:0}.main{grid-template-columns:1fr}.scene{aspect-ratio:8/5}.hmi{min-height:520px}.task{grid-template-columns:1fr}.work{max-height:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div><h1>Singlepot 600 첫 배치 시뮬레이터</h1><div class="meta">교육용 가상 배치 TRAIN-600-001 · Recipe DEMO-600 / DEMO-v1 · 실설비 연동 없음</div></div>
+    <div class="grow"></div>
+    <div class="prog"><span id="progText">0 / 26 완료</span><div class="bar"><i id="progBar"></i></div></div>
+    <button class="btn danger" id="drillBtn" type="button">비상상황 훈련</button>
+    <button class="btn" id="infoBtn" type="button">자료·주의</button>
+  </header>
+
+  <div class="main">
+    <div class="scene">
+      <span class="tag">벽 부착형 Singlepot · 스윙 Mill · IBC 직접 수거</span>
+      <svg id="scene" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Singlepot 작업실 모식도와 작업자">
+        <defs>
+          <linearGradient id="gMetal" x1="0" x2="1"><stop offset="0" stop-color="#8e9ba0"/><stop offset=".32" stop-color="#f2f5f6"/><stop offset=".6" stop-color="#c2cbcf"/><stop offset="1" stop-color="#7c898e"/></linearGradient>
+          <linearGradient id="gMetalV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f7f8"/><stop offset="1" stop-color="#a8b3b7"/></linearGradient>
+          <linearGradient id="gWall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eff3f1"/><stop offset="1" stop-color="#d6dfdb"/></linearGradient>
+          <linearGradient id="gFloor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b6c3be"/><stop offset="1" stop-color="#d1dbd7"/></linearGradient>
+          <radialGradient id="gMW"><stop offset="0" stop-color="#ffb46b"/><stop offset="1" stop-color="#ff7a2e" stop-opacity="0"/></radialGradient>
+          <pattern id="pGran" width="7" height="6" patternUnits="userSpaceOnUse"><rect width="7" height="6" fill="#cbb98f"/><circle cx="2" cy="2" r="1.6" fill="#a58f63"/><circle cx="5.4" cy="4.4" r="1.3" fill="#b9a57b"/></pattern>
+          <pattern id="pDry" width="7" height="6" patternUnits="userSpaceOnUse"><rect width="7" height="6" fill="#eee6d1"/><circle cx="2" cy="2" r="1.5" fill="#d3c4a0"/><circle cx="5.4" cy="4.4" r="1.2" fill="#dccfae"/></pattern>
+          <clipPath id="cWin"><rect x="352" y="232" width="96" height="66" rx="10"/></clipPath>
+          <clipPath id="cIbc"><polygon points="603,218 687,218 687,298 603,298"/></clipPath>
+          
+        </defs>
+        <!-- room -->
+        <polygon points="0,0 800,0 690,22 110,22" fill="#f4f6f5"/>
+        <polygon points="110,22 690,22 690,250 110,250" fill="url(#gWall)"/>
+        <polygon points="0,0 110,22 110,250 0,340" fill="#ccd5d2"/>
+        <polygon points="800,0 690,22 690,250 800,340" fill="#c5cfcb"/>
+        <polygon points="110,250 690,250 800,500 0,500" fill="url(#gFloor)"/>
+        <g id="tiles" stroke="#a8b6b1" stroke-width="1" opacity=".55"></g>
+        <rect x="240" y="5" width="100" height="9" rx="3" fill="#fff"/><rect x="460" y="5" width="100" height="9" rx="3" fill="#fff"/>
+        <rect x="560" y="60" width="90" height="120" rx="3" fill="#e4eae7" stroke="#b7c3bf"/><line x1="605" y1="60" x2="605" y2="180" stroke="#b7c3bf"/>
+        <line x1="110" y1="140" x2="690" y2="140" stroke="#d0d9d5"/>
+        <path d="M420,98 V44 H690" stroke="#aab4b8" stroke-width="7" fill="none"/>
+
+        <!-- liquid tank + pump -->
+        <g>
+          <line x1="196" y1="262" x2="196" y2="288" stroke="#8d989c" stroke-width="3"/><line x1="234" y1="262" x2="234" y2="288" stroke="#8d989c" stroke-width="3"/>
+          <rect x="189" y="176" width="52" height="86" fill="url(#gMetal)"/>
+          <ellipse cx="215" cy="262" rx="26" ry="7" fill="#9aa6aa"/>
+          <ellipse cx="215" cy="176" rx="26" ry="7" fill="#e7ecec" stroke="#9aa6aa"/>
+          <rect x="196" y="204" width="38" height="16" rx="3" fill="#dcebf7"/>
+          <text x="215" y="216" text-anchor="middle" font-size="9" fill="#2d4f6a" font-weight="700">정제수</text>
+          <rect x="232" y="286" width="40" height="22" rx="4" fill="#5d7f96"/><circle cx="252" cy="297" r="6" fill="#9cc3dd"/>
+          <path d="M241,244 C258,248 256,297 272,297 C302,297 318,232 330,198 C336,162 347,148 354,148" stroke="#8fb5d3" stroke-width="4" fill="none"/>
+          <path class="flow flow-liq" d="M241,244 C258,248 256,297 272,297 C302,297 318,232 330,198 C336,162 347,148 354,148" stroke="#1f7fd4" stroke-width="4" fill="none"/>
+          <text x="215" y="330" text-anchor="middle" class="lbl">액체 투입</text>
+        </g>
+
+        <!-- control panel -->
+        <g>
+          <rect x="112" y="362" width="14" height="88" fill="#9aa5a9"/>
+          <ellipse cx="119" cy="450" rx="28" ry="7" fill="#8d989c"/>
+          <polygon points="66,300 170,291 174,362 70,370" fill="#374449"/>
+          <polygon id="panelScreen" points="75,307 163,299 166,354 78,362" fill="#0b2150"/>
+          <rect x="84" y="314" width="34" height="3" fill="#dcdfd6"/><rect x="84" y="321" width="26" height="3" fill="#9ff28f"/><rect x="84" y="328" width="30" height="3" fill="#dcdfd6"/>
+          <rect x="128" y="312" width="28" height="30" fill="#269494" opacity=".7"/>
+          <text x="119" y="392" text-anchor="middle" class="lbl">조작반</text>
+        </g>
+
+        <!-- Wall fixing plate and cantilever support; no floor legs -->
+        <rect x="344" y="106" width="117" height="167" rx="7" fill="#a1afb3" stroke="#687c80" stroke-width="2"/>
+        <path d="M344 120 L325 131 V285 L344 273 Z" fill="#7c9095"/>
+        <path d="M351 234 L319 270 L370 282 L440 246" fill="#7f9198" stroke="#60777d" stroke-width="3"/>
+        <g fill="#e8f0ef" stroke="#63777e"><circle cx="354" cy="116" r="4"/><circle cx="451" cy="116" r="4"/><circle cx="354" cy="261" r="4"/><circle cx="451" cy="261" r="4"/></g>
+        <g id="wallPot" transform="translate(56 0) scale(.86)">
+        <!-- singlepot -->
+        
+        
+        <g>
+          <rect x="294" y="92" width="4" height="100" fill="#8d989c"/>
+          <circle id="lampR" cx="296" cy="84" r="6" fill="#6d2a2a"/><circle cx="296" cy="97" r="6" fill="#6b5a26"/><circle id="lampG" cx="296" cy="110" r="6" fill="#2b5b35"/>
+        </g>
+        <path d="M304,205 V286 Q304,346 400,356 Q496,346 496,286 V205 Z" fill="url(#gMetal)" stroke="#7a878b"/>
+        <path d="M304,242 Q400,264 496,242" stroke="#95a1a5" fill="none"/>
+        <g clip-path="url(#cWin)">
+          <rect x="352" y="232" width="96" height="66" fill="#233438"/>
+          <rect id="powder" x="352" y="298" width="96" height="0" fill="#f1eee6"/>
+          <rect id="mwGlow" x="352" y="232" width="96" height="66" fill="url(#gMW)"/>
+          <g class="fx-spray" stroke="#7fc2f0" stroke-width="2"><line x1="378" y1="236" x2="378" y2="244"/><line x1="400" y1="238" x2="400" y2="246"/><line x1="422" y1="236" x2="422" y2="244"/></g>
+          <rect x="397" y="232" width="6" height="56" fill="#6d7b80"/>
+          <g id="impeller"><ellipse cx="400" cy="289" rx="36" ry="4.5" fill="#56656a"/><ellipse cx="400" cy="289" rx="7" ry="5" fill="#8a989c"/></g>
+          <g id="chopper"><path d="M436,266 l0,-11 M436,266 l10,6 M436,266 l-10,6" stroke="#c9d2d5" stroke-width="3" stroke-linecap="round"/></g>
+          <path d="M358,236 L372,236 L356,270 Z" fill="#fff" opacity=".12"/>
+        </g>
+        <rect x="352" y="232" width="96" height="66" rx="10" fill="none" stroke="#6f8588" stroke-width="3"/>
+        <ellipse cx="400" cy="205" rx="96" ry="18" fill="#c8d1d4" stroke="#7a878b"/>
+        <path d="M310,205 Q316,162 400,154 Q484,162 490,205 Z" fill="url(#gMetalV)" stroke="#7a878b"/>
+        <ellipse cx="400" cy="158" rx="42" ry="9" fill="#e4e9ea"/>
+        <rect x="374" y="100" width="52" height="58" rx="6" fill="url(#gMetal)" stroke="#7a878b"/>
+        <ellipse cx="400" cy="100" rx="26" ry="6" fill="#e9eeef" stroke="#7a878b"/>
+        <rect x="386" y="74" width="28" height="28" rx="4" fill="#546770"/>
+        <rect x="318" y="166" width="32" height="22" rx="3" fill="#dfe4e6" stroke="#8e9a9e"/><rect class="mw-ind" x="327" y="172" width="14" height="10" fill="#7b8a90"/>
+        <rect x="450" y="176" width="32" height="22" rx="3" fill="#dfe4e6" stroke="#8e9a9e"/><rect class="mw-ind" x="459" y="182" width="14" height="10" fill="#7b8a90"/>
+        <rect x="452" y="146" width="16" height="20" rx="3" fill="#b3bdc0" stroke="#7a878b"/>
+        <circle cx="346" cy="172" r="5" fill="#b3bdc0" stroke="#7a878b"/>
+        <g class="vapor" stroke="#ffffff" stroke-width="4" fill="none" stroke-linecap="round">
+          <path d="M412,92 q-6,-8 0,-16 q6,-8 0,-16"/><path d="M424,90 q-6,-8 0,-16 q6,-8 0,-16"/><path d="M436,94 q-6,-8 0,-16 q6,-8 0,-16"/>
+        </g>
+        <path d="M318,318 h-18" stroke="#9aa5a9" stroke-width="8"/>
+        <circle id="sampleCup" cx="295" cy="326" r="6" fill="#fff" stroke="#7a878b"/>
+        <text x="280" y="352" text-anchor="middle" class="lbl">Sample</text>
+        <path d="M478,320 L522,348" stroke="#aab4b8" stroke-width="12" stroke-linecap="round"/>
+        <circle cx="478" cy="320" r="9" fill="#dfe4e6" stroke="#7a878b"/>
+        <line id="discLine" x1="478" y1="312" x2="478" y2="328" stroke="#33454a" stroke-width="3"/>
+        
+        
+        <text x="400" y="62" text-anchor="middle" class="lbl">Singlepot 600 · 벽 부착</text>
+
+</g>
+        <!-- Wall mounted swing mill. The head stays upright while the arm swings. -->
+        <g transform="translate(56 0) scale(.86)">
+          <rect x="624" y="235" width="32" height="139" rx="5" fill="url(#gMetal)" stroke="#60777c" stroke-width="2"/>
+          <circle cx="632" cy="245" r="3" fill="#4e6971"/><circle cx="648" cy="245" r="3" fill="#4e6971"/>
+          <path d="M640 254 V366" stroke="#657e86" stroke-width="13"/>
+          <g id="millSwing" transform="rotate(100 640 366)">
+            <path d="M640 366 H534" stroke="#607980" stroke-width="13" stroke-linecap="round"/>
+            <path d="M640 362 H534" stroke="#cad7d9" stroke-width="4"/>
+            <g id="millHead" transform="rotate(-100 534 366)">
+              <path d="M506,346 H562 L548,392 H520 Z" fill="url(#gMetal)" stroke="#7a878b"/>
+              <rect x="562" y="348" width="24" height="18" rx="2" fill="#546770"/>
+              <g id="millRotor"><circle cx="534" cy="366" r="10" fill="none" stroke="#5b6a6f" stroke-width="2"/><path d="M524 366 H544 M534 356 V376" stroke="#5b6a6f" stroke-width="2"/></g>
+              <path d="M534 392 V411" stroke="#8b9ea2" stroke-width="15"/>
+              <path d="M534 392 V411" stroke="#dce7e7" stroke-width="8"/>
+              <g class="fx-mill" fill="#c2a56a"><circle cx="531" cy="399" r="2"/><circle cx="537" cy="402" r="2.2"/><circle cx="534" cy="407" r="2"/></g>
+            </g>
+          </g>
+          <circle cx="640" cy="366" r="10" fill="#a4b8be" stroke="#4e6872" stroke-width="3"/>
+          <g id="millCoupling" opacity="0"><path d="M514 344 H543" stroke="#36a37f" stroke-width="6"/><circle cx="548" cy="338" r="5" fill="#2ab087"/></g>
+        </g>
+        <text id="millLabel" x="628" y="219" text-anchor="middle" class="lbl">벽 부착 Mill · 대기</text>
+        <path d="M611 224 L617 235" fill="none" stroke="#607c83"/>
+        <!-- One IBC: charging position at right, receiving position below Singlepot -->
+        <g id="ibcUnit" transform="translate(251 194) scale(.6)">
+        <!-- IBC -->
+        <line x1="607" y1="335" x2="607" y2="430" stroke="#8d989c" stroke-width="5"/><line x1="684" y1="335" x2="684" y2="430" stroke="#8d989c" stroke-width="5"/><line x1="720" y1="300" x2="720" y2="410" stroke="#7f8a8e" stroke-width="5"/>
+        <polygon points="603,218 687,218 687,298 603,298" fill="#e6ecee"/>
+        <g clip-path="url(#cIbc)"><rect id="ibcFill" x="603" y="220" width="84" height="78" fill="#efe8d6"/></g>
+        <polygon points="603,218 687,218 687,298 603,298" fill="rgba(255,255,255,.25)" stroke="#8e9a9e"/>
+        <polygon points="687,218 722,202 722,284 687,298" fill="#c4ccd0" stroke="#8e9a9e"/>
+        <polygon points="603,218 638,202 722,202 687,218" fill="#f4f6f7" stroke="#8e9a9e"/>
+        <polygon points="603,298 687,298 660,334 630,334" fill="#cdd5d8" stroke="#8e9a9e"/>
+        <rect x="638" y="334" width="14" height="14" rx="2" fill="#5b6d74"/>
+        <text x="645" y="262" text-anchor="middle" font-size="20" font-weight="700" fill="#284f58">IBC</text>
+<ellipse cx="662" cy="209" rx="16" ry="6" fill="#425961" stroke="#87999f" stroke-width="3"/>
+<g fill="#435963"><circle cx="607" cy="438" r="8"/><circle cx="684" cy="438" r="8"/><circle cx="720" cy="416" r="8"/></g></g>
+        <g id="feedHose">
+          <path d="M638 402 C705 464 555 480 531 420 C505 357 539 218 452 143" stroke="#3a4a4e" stroke-width="8" fill="none" stroke-linecap="round"/>
+          <path class="flow flow-hose" d="M638 402 C705 464 555 480 531 420 C505 357 539 218 452 143" stroke="#f2cf5b" stroke-width="4" fill="none" stroke-linecap="round"/>
+          <text x="626" y="494" text-anchor="middle" class="lbl">원료 투입 위치 · 진공 이송</text>
+        </g>
+        <text id="receiveLabel" x="515" y="499" text-anchor="middle" font-size="12" fill="#235c51" font-weight="700" opacity="0">정립물 → IBC 직접 수거</text>
+        <!-- operator -->
+        <g id="op" style="transform:translate(400px,478px) scale(1)">
+          <g id="opFlip">
+            <ellipse cx="0" cy="0" rx="22" ry="5" fill="rgba(0,0,0,.22)"/>
+            <g id="opBody">
+              <g class="leg leg-b"><rect x="-9" y="-40" width="9" height="40" rx="4" fill="#dfe6e9"/><rect x="-11" y="-5" width="13" height="6" rx="2" fill="#3f6f9a"/></g>
+              <g class="arm arm-b"><rect x="-17" y="-76" width="8" height="34" rx="4" fill="#dfe6e9"/></g>
+              <g class="leg leg-f"><rect x="1" y="-40" width="9" height="40" rx="4" fill="#f4f7f8" stroke="#cfd8dc"/><rect x="-1" y="-5" width="13" height="6" rx="2" fill="#4a7eab"/></g>
+              <rect x="-15" y="-80" width="30" height="46" rx="10" fill="#fafcfc" stroke="#cbd5d9"/>
+              <line x1="2" y1="-76" x2="2" y2="-40" stroke="#d5dde0"/>
+              <rect x="5" y="-70" width="7" height="5" rx="1" fill="#2d8a5f"/>
+              <circle cx="0" cy="-92" r="15" fill="#fbfdfd" stroke="#cbd5d9"/>
+              <ellipse cx="5" cy="-91" rx="8" ry="9" fill="#f0c7a2"/>
+              <rect x="-1" y="-97" width="15" height="5" rx="2" fill="#7fb6d6"/>
+              <rect x="1" y="-90" width="13" height="8" rx="3" fill="#8ec2e6"/>
+              <g class="arm arm-f"><rect x="8" y="-76" width="8" height="34" rx="4" fill="#f4f7f8" stroke="#cfd8dc"/><circle cx="12" cy="-41" r="4.5" fill="#5b8fd6"/></g>
+            </g>
+          </g>
+        </g>
+        <g id="bubble" style="transform:translate(400px,370px)">
+          <rect id="bubbleRect" x="-60" y="-24" width="120" height="26" rx="13" fill="#15302d"/>
+          <path d="M-5,2 L0,9 L5,2 Z" fill="#15302d"/>
+          <text id="bubbleText" x="0" y="-7" text-anchor="middle" font-size="12.5" fill="#fff" font-weight="700">안녕하세요</text>
+        </g>
+      </svg>
+    </div>
+
+    <section class="hmi" aria-label="교육용 HMI 화면">
+      <div class="hmi-top"><span>PROCESS SCREEN · 교육용 재구성</span><span id="hMode">PRODUCTION · AUTOMATIC MODE</span></div>
+      <div class="hmi-grid">
+        <div class="recipe"><h3>Recipe View</h3><ol id="recipeList"></ol></div>
+        <div class="proc">
+          <div class="stepbox"><span class="no" id="hNo">—</span><span class="nm" id="hName">LOGIN</span><span class="status" id="hStatus">IDLE</span></div>
+          <div class="mimic" id="mimic">
+            <svg viewBox="0 0 140 100" aria-hidden="true">
+              <path d="M22,56 Q22,94 70,97 Q118,94 118,56" stroke="#50c83d" stroke-width="5" fill="none"/>
+              <path d="M30,24 V58 Q30,88 70,91 Q110,88 110,58 V24 Z" fill="#b7c6c6" stroke="#4f6a70"/>
+              <rect x="67" y="6" width="6" height="76" fill="#7b9095"/>
+              <g id="mImp"><ellipse cx="70" cy="80" rx="24" ry="3.5" fill="#415c61"/></g>
+              <g id="mDrop" fill="#4aa8ff"><circle cx="50" cy="34" r="3"/><circle cx="58" cy="44" r="2.5"/><circle cx="46" cy="50" r="2.5"/></g>
+              <path id="mWave" d="M84,34 q4,-5 8,0 t8,0 t8,0" stroke="#ff9a3d" stroke-width="3" fill="none"/>
+              <path id="mArrow" d="M104,86 l14,10 m0,0 l-8,1 m8,-1 l-2,-8" stroke="#f3d56b" stroke-width="3" fill="none"/>
+            </svg>
+            <div class="ml" id="mLine">설비 대기</div>
+          </div>
+          <div class="vals" id="vals"></div>
+        </div>
+      </div>
+      <div class="fkeys"><span class="fkey" id="fF2">F2 Start</span><span class="fkey">F8</span><span class="fkey">F9</span><span class="fkey">F10</span><span class="fkey">F11</span><span class="fkey">ESC Exit</span></div>
+      <div class="hmsg" id="hMsg">Description: 로그인 대기</div>
+    </section>
+  </div>
+
+  <section class="task" aria-live="polite">
+    <div><div class="code" id="tCode"></div><h2 id="tTitle"></h2><p id="tInstr"></p><div class="src" id="tSrc"></div></div>
+    <div class="work" id="tWork"></div>
+    <div class="act">
+      <div class="fb" id="fb"></div>
+      <button class="btn primary" id="runBtn" type="button">실행</button>
+      <div class="row"><button class="btn" id="prevBtn" type="button">이전 단계</button><button class="btn" id="nextBtn" type="button">다음 단계</button></div>
+    </div>
+  </section>
+
+  <nav class="rail" id="rail" aria-label="단계 선택"></nav>
+</div>
+
+<div class="modal" id="modal" hidden><div class="card" id="modalCard"></div></div>
+
+<script>
+(()=>{
+'use strict';
+const $=s=>document.querySelector(s);
+const scene=$('#scene');
+/* floor tiles */
+(()=>{let t='';for(let k=-7;k<=7;k++)t+=`<line x1="${400+k*44}" y1="250" x2="${400+k*120}" y2="500"/>`;
+[268,292,322,360,408,470].forEach(y=>{const f=(y-250)/250;t+=`<line x1="${110-110*f}" y1="${y}" x2="${690+110*f}" y2="${y}"/>`});$('#tiles').innerHTML=t;})();
+
+const RECIPE=[['INITIAL',''],['INITIALISE',''],['LOADING','DISCONTINUOUS'],['DRY MIXING',''],['WAITING',''],['WET MIXING','WITHOUT CHOPPER'],['WET MIXING','WITH CHOPPER'],['GRANULATION',''],['WAITING',''],['DRYING','VACUUM DRYING'],['DRYING','0/1/4'],['DRYING','0/2/4'],['DRYING','0/3/4'],['DRYING','0/6/4'],['DRYING','0/10/4'],['DRYING','VACUUM DRYING'],['WAITING','SAMPLE'],['WAITING','READY TO MILL'],['UNLOADING','10% OPEN'],['UNLOADING','15% OPEN'],['UNLOADING','100% OPEN'],['TERMINAL','']];
+const IDLE={mixer:0,chopper:0,power:0,temp:22,press:1013,pump:0,liquid:0,mw:0,energy:0,disc:0,mill:0,timer:null,status:'COMPLETE'};
+const H=o=>Object.assign({},IDLE,o);
+const R=(n,o)=>Object.assign({code:String(n),rno:n,name:RECIPE[n][0],sub:RECIPE[n][1],group:'recipe'},o);
+
+const STEPS=[
+{code:'P1',group:'prep',name:'가동 전',sub:'확인',title:'가동 전 현장 확인',loc:'pot',say:'점검부터 시작해요',
+ instr:'작업실을 돌며 청소·세척·안전 상태를 확인해요. 모두 체크한 뒤 순회를 시작하세요.',src:'SOP 가동 전 준비 · 세척 상태 점검 · 주의사항',
+ checks:['청소 유효기간·건조상태·온습도 확인','볼 내부·Filter·Mixer/Chopper 세척 상태','캡·배출구 안전망·Mill parking 확인','Bowl 주변 사람·물품 없음, 가동은 1.5 m 밖'],
+ run:{label:'현장 점검 순회 시작',path:['pot','sample','mill','ibc','panel'],dur:900,say:'점검 끝!'},hmi:H({status:'CHECKED'})},
+{code:'P2',group:'prep',name:'로그인',sub:'Recipe',title:'본인 계정 로그인과 Recipe 선택',loc:'panel',say:'내 계정으로 로그인',
+ instr:'OPERATOR는 정해진 Recipe로만 작업해요. 계정·설비·버전을 함께 확인하세요.',src:'기록서 1항 · SOP 접속권한·Recipe 선택',
+ q:'어떻게 시작할까요? (가상 Recipe)',opts:[['본인 OPERATOR 계정 + DEMO-600 / DEMO-v1',1,'맞아요. 본인 계정과 원팟 600용 Recipe·버전을 확인했어요.'],['선배 공용 계정 + DEMO-600 / DEMO-v1',0,'다른 사람의 ID/PASSWORD 사용과 공유는 금지예요.'],['본인 계정 + DEMO-300 / DEMO-v1',0,'원팟 300용 Recipe라 설비와 맞지 않아요.']],
+ run:{label:'Batch ID 입력 · Load recipe',anim:['panel-active'],dur:1600,say:'Recipe 로드'},hmi:H({status:'LOADED'})},
+R(0,{title:'Auto 모드 진입',loc:'panel',say:'F2로 시작',
+ instr:'Ultima → Production → Batch ID → Auto 순서로 진입해요. Batch ID는 한 번 더 확인합니다.',src:'SOP 자동 공정 진입',
+ checks:['Batch ID 재입력·일치 확인','Recipe 이름·버전 재대조'],run:{label:'Auto 시작 (F2)',anim:['panel-active','run-state'],dur:1400,say:'Start!'},hmi:H({status:'START'})}),
+R(1,{title:'초기화와 원료 투입 준비',loc:'ibc',say:'IBC 연결 확인',
+ instr:'카메라와 구성품을 확인하고, IBC를 Product feed에 연결한 뒤 IBC 밸브를 열어 투입을 준비해요.',src:'SOP Initializing',
+ checks:['카메라 ON','Bowl 닫힘·캡·안전망 확인','IBC ↔ Product feed 호스 연결','IBC 밸브 열기 (가상)'],
+ run:{label:'Initialise 확인',path:['ibc','panel'],anim:['panel-active','run-state'],dur:1300,say:'준비 완료'},hmi:H({status:'INIT OK'})}),
+R(2,{title:'IBC에서 진공으로 원료 투입',loc:'ibc',say:'내용물 대조부터',
+ instr:'IBC 내용물이 기록서와 같은지 대조한 뒤 투입 경로를 고르세요. 투입 압력은 Recipe 값을 따릅니다.',src:'기록서 2항 · SOP Charging',
+ checks:['옥수수전분(나정용) 44.46 kg','시메트로퓸브롬화물(동화) 30.90 kg','유당수화물 58.80 kg','전호전분 STA-RX 1500 18.00 kg'],
+ q:'IBC 원료는 어느 경로로 들어갈까요?',opts:[['Product feed (진공 이송)',1,'맞아요. 원료는 Product feed, 액체는 Liquid feed예요.'],['Liquid feed',0,'Liquid feed는 정제수 같은 액체 투입 경로예요.'],['Sample port',0,'Sample port는 시료 채취용이에요.']],
+ run:{label:'진공 원료 이송',path:['panel'],anim:['loading','panel-active','run-state'],dur:3400,say:'호스로 이송 중'},set:{level:.62,ibc:0},hmi:H({press:null,status:'LOADED'})}),
+R(3,{title:'건식 혼합',loc:'ibc',say:'IBC 잔량 확인',
+ instr:'IBC를 두드려 잔량이 없는지 확인한 뒤 기록서 혼합 조건을 고르세요.',src:'기록서 2항 · SOP Charging',
+ checks:['IBC 잔량 없음 확인'],q:'기록서의 혼합 조건은?',opts:[['Mixer 65 RPM · 5분 · Chopper 0 또는 600 RPM',1,'정확해요.'],['Mixer 135 RPM · 90초 · Chopper 1,500 RPM',0,'연합(Granulation) 조건과 헷갈렸어요.'],['Mixer 65 RPM · 30분 · Chopper 1,500 RPM',0,'혼합 시간은 5분, Chopper는 0/600 RPM이에요.']],
+ run:{label:'Dry mixing 실행',path:['panel'],anim:['mix-slow','run-state'],dur:3000,say:'골고루 섞는 중'},hmi:H({mixer:65,chopper:0,timer:300})}),
+R(4,{title:'정제수 투입 준비',loc:'liquid',say:'액체 라인 점검',
+ instr:'정제수를 준비하고 Liquid feed tube를 점검·연결해요. 펌프 종류별 절차는 현장에서 확인합니다.',src:'SOP 결합액 준비 · 기록서 3항',
+ checks:['정제수 32.00 kg 준비 확인','Liquid feed tube 손상 확인 후 연결'],
+ run:{label:'연결 완료, Next',path:['panel'],anim:['panel-active'],dur:1000,say:'액체 준비 끝'},hmi:H({status:'WAITING'})}),
+R(5,{title:'습윤 1: Chopper 없이',loc:'panel',say:'정제수 투입 시작',
+ instr:'정제수 투입을 시작해요. 단계 이름을 보고 Chopper 상태를 판단하세요.',src:'기록서 3항 (STEP 1·2 참조값)',
+ q:'WITHOUT CHOPPER 단계의 Chopper는?',opts:[['정지 (0 RPM), Mixer는 65~105 RPM 참조 범위',1,'맞아요. Mixer만 돌며 고르게 적셔요.'],['1,500 RPM으로 고속 회전',0,'1,500 RPM은 연합 조건이에요.']],
+ run:{label:'Wet mixing 1 실행',anim:['mix-slow','spray','run-state'],dur:3200,say:'정제수 투입 중'},set:{tone:'damp',level:.66},hmi:H({mixer:65,chopper:0,pump:60,liquid:16,timer:180})}),
+R(6,{title:'습윤 2: Chopper 함께',loc:'panel',say:'전량 투입 확인',
+ instr:'정제수 전량 투입까지의 조건을 확인해요. 펌프 %와 실제 유량(kg/min)은 다른 값이에요.',src:'기록서 3항',
+ q:'습윤 전체 조건으로 맞는 것은?',opts:[['정제수 32.00 kg · 총 6±3분 · 펌프 40~100%',1,'좋아요. 투입속도 5.0±1.5 kg/min은 참조값으로 함께 봐요.'],['정제수 32.00 kg · 총 20분 · 펌프 10%',0,'시간은 6±3분(3~9분), 펌프는 40~100%예요.'],['정제수 16 kg만 투입하고 종료',0,'정제수는 전량 32.00 kg이에요.']],
+ run:{label:'Wet mixing 2 실행',anim:['mix-fast','chop','spray','run-state'],dur:3200,say:'Chopper 가동'},set:{tone:'wet',level:.7},hmi:H({mixer:85,chopper:600,pump:60,liquid:32,timer:180})}),
+R(7,{title:'연합',loc:'panel',say:'고속 연합',
+ instr:'고속 회전으로 과립을 만드는 단계예요. 기록서 조건을 고르세요.',src:'기록서 4항 · SOP Granulation',
+ q:'연합 조건은?',opts:[['90±30초 · Mixer 135 RPM · Chopper 1,500 RPM',1,'맞아요. Mixer power 1.5±1.0 kW는 참조값이에요.'],['5분 · Mixer 65 RPM · Chopper 0 RPM',0,'건식 혼합 조건이에요.'],['10분 · Mixer 135 RPM · Chopper 0 RPM',0,'시간은 90±30초, Chopper는 1,500 RPM이에요.']],
+ run:{label:'Granulation 실행',anim:['mix-fast','chop','run-state'],dur:3000,say:'과립 만드는 중'},set:{tone:'granule',level:.74},hmi:H({mixer:135,chopper:1500,power:1.5,liquid:32,timer:90})}),
+R(8,{title:'건조 전 대기',loc:'liquid',say:'라인 분리',
+ instr:'액체 라인을 분리·캡 처리하고 과립 상태를 확인해요. 분리 시점은 현행 SOP 순서를 따릅니다.',src:'SOP Granulation 후 조치',
+ checks:['Liquid feed tube 분리·캡 확인','카메라로 과립 상태 확인'],
+ run:{label:'Drying으로 진행',path:['panel'],anim:['panel-active'],dur:1000,say:'건조로 넘어가요'},hmi:H({liquid:32,status:'WAITING'})}),
+R(9,{title:'진공 건조 시작',loc:'panel',say:'진공 건조',
+ instr:'진공으로 수분을 날리기 시작해요. 건조 종료를 무엇으로 판단하는지 확인하세요.',src:'기록서 6항 · SOP Drying',
+ q:'건조 종료는 어떻게 판단하나요?',opts:[['Sampling 후 LOD 0.95~2.54% 확인',1,'맞아요. 에너지나 시간만으로 끝내지 않아요.'],['MW 에너지 93,000 kJ 도달 시 바로 종료',0,'93,000±20,000 kJ는 참조값이에요. 반드시 LOD로 확인해요.'],['Mixer가 멈추면 종료',0,'회전 정지는 공정 종료 신호가 아니에요.']],
+ run:{label:'Vacuum drying 실행',anim:['drying','run-state'],dur:2600,say:'수증기 배출 중'},hmi:H({liquid:32,press:80,temp:30,mixer:null,chopper:null})}),
+...[[10,15000,33],[11,33000,35],[12,52000,37],[13,72000,38],[14,88000,39]].map(([n,e,t],k)=>R(n,{title:`마이크로웨이브 건조 ${k+1}/5`,loc:'panel',say:'MW 가동',
+ instr:`Recipe 표기 "${RECIPE[n][1]}"의 각 숫자가 뜻하는 파라미터는 Recipe에서 확인해요. 이 화면은 누적 에너지 흐름만 보여줘요.`,src:'Recipe View · 기록서 6항 (참조 93,000±20,000 kJ)',
+ q:n===12?'HMI의 MW kW와 kJ는 무엇이 다를까요?':undefined,opts:n===12?[['kW는 순간 출력, kJ는 누적 에너지',1,'정확해요.'],['둘 다 같은 누적값',0,'kW는 출력(Power), kJ는 누적 에너지(Energy)예요.']]:undefined,
+ run:{label:`Drying ${RECIPE[n][1]} 실행`,anim:['drying','mw','run-state'],dur:2300,say:'MW 가동 중'},hmi:H({liquid:32,press:80,temp:t,mw:4.0,energy:e,mixer:null,chopper:null})})),
+R(15,{title:'마무리 진공 건조',loc:'panel',say:'마무리 건조',
+ instr:'마이크로웨이브를 끄고 진공으로 마무리해요. 다음 단계에서 시료를 채취합니다.',src:'Recipe View · 기록서 6항',
+ run:{label:'Vacuum drying 실행',anim:['drying','run-state'],dur:2400,say:'거의 다 됐어요'},set:{tone:'dry',level:.6},hmi:H({liquid:32,press:80,temp:38,mw:0,energy:93000,mixer:null,chopper:null})}),
+R(16,{title:'시료 채취와 수분 확인',loc:'sample',say:'시료 채취',runFirst:true,
+ instr:'Sample port에서 시료를 채취하고 수분측정기(80℃)로 LOD를 확인해요. 80℃는 측정 조건이에요.',src:'기록서 6항',
+ q:'측정 결과 1.80 % LOD. 판정은?',opts:[['기준(0.95~2.54%) 적합, 다음 단계',1,'적합이에요. 3.10%처럼 초과면 절차에 따라 추가 건조·재측정, 0.80%처럼 미달이면 종료 보류 후 보고해요.'],['기준 초과, 추가 건조',0,'1.80%는 0.95~2.54% 안이에요.'],['기준 미달, 보고',0,'1.80%는 하한 0.95%보다 높아요.']],
+ run:{label:'Sampling · LOD 측정',anim:['sampling'],dur:2200,say:'결과 1.80%'},hmi:H({liquid:32,energy:93000,press:null,mixer:null,chopper:null,status:'SAMPLE'})}),
+R(17,{title:'건식 정립 준비',loc:'mill',say:'스크린 확인',
+ instr:'IBC를 Singlepot 아래 수거 위치로 옮겨요. 벽 부착형 Mill을 스윙해 본체 배출구에 결합하면, 정립물이 IBC로 바로 들어갑니다.',src:'기록서 7항',
+ checks:['스크린 표기·Serial Number 확인','IBC 이동 경로·수거 위치 확인','Mill 스윙 범위·배출구 결합 위치 확인'],
+ q:'건식 정립 조합은?',opts:[['050G 스크린 · 원형 임펠러',1,'맞아요. Speed는 기록서에 수치가 없어 승인 조건을 확인해요.'],['187S 스크린 · 사각 임펠러',0,'187S·사각은 습식 코밀 조합이에요. 이번 흐름에서는 쓰지 않아요.']],
+ run:{label:'IBC 이동 → Mill 스윙 결합',path:['ibc','mill'],anim:[],dur:4800,say:'IBC 이동 후 Mill 결합'},set:{dock:1},hmi:H({liquid:32,energy:93000,status:'READY'})}),
+R(18,{title:'배출 10% 개방',loc:'mill',say:'천천히 배출',
+ instr:'밸브를 조금만 열어 과립이 Dry Mill을 지나 IBC로 바로 들어가는지 확인해요.',src:'Recipe View · 기록서 7항',
+ checks:['Mill·배출구 결합 및 IBC 수거 위치 확인'],
+ run:{label:'Unloading 10% 실행',anim:['milling','run-state'],dur:2600,say:'흐름 확인 중'},set:{level:.42,received:.35,disc:10},hmi:H({liquid:32,energy:93000,disc:10,mill:null})}),
+R(19,{title:'배출 15% 개방',loc:'mill',say:'개도 조금 더',
+ instr:'흐름이 안정되면 개도를 조금 더 열어요. 이상이 보이면 어떻게 할지 확인하세요.',src:'Recipe View · SOP 비상상황 대처',
+ q:'Mill이 막히거나 이상음이 나면?',opts:[['정지 후 팀장에게 보고, 원인 해결 뒤 SOP대로 재개',1,'맞아요. 억지로 밀어내지 않아요.'],['개도를 100%로 올려 밀어낸다',0,'원인을 해결하지 않고 진행하면 위험해요. 먼저 정지하고 보고해요.']],
+ run:{label:'Unloading 15% 실행',anim:['milling','run-state'],dur:2400,say:'잘 나오고 있어요'},set:{level:.2,received:.66,disc:15},hmi:H({liquid:32,energy:93000,disc:15,mill:null})}),
+R(20,{title:'배출 100% 개방',loc:'mill',say:'전량 배출',runFirst:true,
+ instr:'완전히 열어 전량 배출한 뒤, Bowl 안에 남은 과립이 없는지 확인해요.',src:'Recipe View',
+ checks:['Bowl 내부 잔량 확인 (카메라)'],
+ run:{label:'Unloading 100% 실행',anim:['milling','run-state'],dur:2600,say:'잔량 확인할게요'},set:{level:0,received:1,disc:100},hmi:H({liquid:32,energy:93000,disc:100,mill:null})}),
+R(21,{title:'Recipe 종료',loc:'panel',say:'Recipe 종료',
+ instr:'밸브 닫힘과 Mill 정지를 확인하고 Recipe를 종료한 뒤 Exit 해요.',src:'SOP 리포트 출력 전 단계',
+ checks:['배출 밸브 닫힘·Mill 정지 확인'],
+ run:{label:'Recipe 종료, Exit (ESC)',anim:['panel-active'],dur:1300,say:'Recipe 종료'},set:{disc:0},hmi:H({liquid:32,energy:93000,status:'END'})}),
+{code:'R',group:'end',name:'리포트',sub:'출력',title:'Batch report 출력·첨부',loc:'panel',say:'기록 마감',
+ instr:'Exit → Process administration → Batch handling → Batch report. 작업한 Batch의 리포트인지 이중 확인해요.',src:'기록서 8항 · SOP 리포트 출력',
+ checks:['Short report 출력','Trend report 출력','작업 Batch 일치·이중 확인','제조지시기록서에 첨부'],
+ run:{label:'리포트 확인',anim:['panel-active'],dur:1200,say:'첨부 완료'},hmi:H({liquid:32,energy:93000,status:'REPORT'})},
+{code:'L',group:'end',name:'로그아웃',sub:'',title:'로그아웃',loc:'panel',say:'마지막 한 가지',
+ instr:'작업을 마치면 반드시 본인 계정에서 로그아웃해요.',src:'기록서 9항',
+ q:'작업 마감 시 마지막으로?',opts:[['본인 계정 로그아웃',1,'첫 배치 완료!'],['다음 근무자를 위해 로그인 유지',0,'로그인 상태로 두면 다른 사람이 내 계정으로 작업할 수 있어요.']],hmi:H({liquid:32,energy:93000,status:'LOGOUT'})}
+];
+const LAST=STEPS.length-1;
+const LOC={panel:{x:190,y:448,d:-1},pot:{x:268,y:452,d:1},sample:{x:258,y:414,d:1},liquid:{x:292,y:334,d:-1},ibc:{x:590,y:466,d:1},mill:{x:580,y:431,d:-1},center:{x:400,y:478,d:1}};
+const st=STEPS.map(()=>({checks:new Set(),choice:false,ran:false}));
+const doneSet=new Set();const log=[];
+let cur=0,running=false,errors=0,hold=false,fbMsg='',fbBad=false,moveToken=0,opPos={x:400,y:478,d:1};
+
+const taskOk=i=>{const s=STEPS[i],x=st[i];return (s.checks||[]).every((_,k)=>x.checks.has(k))&&(!s.q||x.choice)};
+const isDone=i=>taskOk(i)&&(!STEPS[i].run||st[i].ran);
+
+/* ---------- operator ---------- */
+const scaleAt=y=>.55+(y-250)/250*.55;
+function setOpT(){const s=scaleAt(opPos.y);$('#op').style.transform=`translate(${opPos.x}px,${opPos.y}px) scale(${s})`;$('#bubble').style.transform=`translate(${opPos.x}px,${opPos.y-118*s}px)`;}
+const flip=d=>$('#opFlip').style.transform=`scaleX(${d})`;
+function bubble(t){$('#bubbleText').textContent=t;const w=Math.min(280,t.length*12.5+26);const r=$('#bubbleRect');r.setAttribute('x',-w/2);r.setAttribute('width',w);}
+function moveTo(key,cb){const L=LOC[key],tok=++moveToken,op=$('#op');const dist=Math.hypot(L.x-opPos.x,L.y-opPos.y);const dur=Math.max(350,Math.min(1600,dist*4));
+ op.style.transitionDuration=dur+'ms';$('#bubble').style.transitionDuration=dur+'ms';
+ if(dist>4){flip(L.x<opPos.x?-1:1);op.classList.add('walking');}
+ opPos={...L};setOpT();
+ setTimeout(()=>{if(tok!==moveToken&&!cb)return;op.classList.remove('walking');flip(L.d);cb&&cb();},dist>4?dur:60);}
+function walkPath(arr,cb){let k=0;const nx=()=>k<arr.length?moveTo(arr[k++],()=>setTimeout(nx,120)):cb();nx();}
+const working=on=>$('#op').classList.toggle('working',on);
+
+/* ---------- scene ---------- */
+function sceneAt(i){const sc={level:0,tone:'powder',ibc:1,received:0,dock:0,disc:0};for(let j=0;j<i;j++)Object.assign(sc,STEPS[j].set||{});if(st[i].ran||isDone(i))Object.assign(sc,STEPS[i].set||{});return sc;}
+const TONE={powder:'#f1eee6',damp:'#e6dcc4',wet:'#d5c59f',granule:'url(#pGran)',dry:'url(#pDry)'};
+function applyScene(sc){const h=sc.level*44;const p=$('#powder');p.setAttribute('y',298-h);p.setAttribute('height',h);p.setAttribute('fill',TONE[sc.tone]);
+ const ih=78*(sc.dock>.01?sc.received:sc.ibc);const f=$('#ibcFill');f.setAttribute('y',298-ih);f.setAttribute('height',ih);f.setAttribute('fill',sc.dock>.01?'url(#pDry)':'#efe8d6');
+ const move=Math.min(1,sc.dock/.55), swing=Math.max(0,(sc.dock-.55)/.45), ease=x=>x*x*(3-2*x);
+ const x=251+(118-251)*ease(move),y=194+(228-194)*ease(move),ang=100*(1-ease(swing));
+ $('#ibcUnit').setAttribute('transform',`translate(${x} ${y}) scale(.6)`);
+ $('#millSwing').setAttribute('transform',`rotate(${ang} 640 366)`);
+ $('#millHead').setAttribute('transform',`rotate(${-ang} 534 366)`);
+ $('#millCoupling').setAttribute('opacity',swing>.98?1:0);
+ $('#feedHose').setAttribute('opacity',sc.dock>.001?0:1);
+ $('#receiveLabel').setAttribute('opacity',move>.98?1:0);
+ $('#millLabel').textContent=swing>.98?'Mill · 배출구 결합':swing>0?'Mill · 스윙 중':'벽 부착 Mill · 대기';
+ if(running&&STEPS[cur].rno===17){
+  const px=590+(445-590)*ease(move),py=466+(478-466)*ease(move);
+  opPos={x:move<1?px:580,y:move<1?py:431,d:move<1?-1:-1};setOpT();
+  $('#op').classList.toggle('walking',move<1);bubble(move<1?'IBC를 수거 위치로 이동':'Mill을 배출구에 결합');
+ }
+ $('#discLine').setAttribute('transform',`rotate(${sc.disc*.9} 478 320)`);}
+function lerp(a,b,p){const o={};for(const k in b){o[k]=(typeof a[k]==='number'&&typeof b[k]==='number')?a[k]+(b[k]-a[k])*p:(k==='tone'?(p>.5?b[k]:a[k]):b[k]);}return o;}
+
+/* ---------- HMI ---------- */
+const TILES=[['mixer','Mixer'],['chopper','Chopper'],['power','Mixer power'],['temp','TE01090'],['press','PET01090 Bowl'],['pump','Liquid pump'],['liquid','Liquid fed'],['mw','MW power'],['energy','MW energy'],['disc','Discharge'],['mill','Mill speed'],['timer','Step timer']];
+$('#vals').innerHTML=TILES.map(([k,l])=>`<div class="val" id="t-${k}">${l}<b id="v-${k}">—</b></div>`).join('');
+$('#recipeList').innerHTML=RECIPE.map((r,n)=>`<li data-r="${n}"><span>${n}</span><span>${r[0]}</span><span>${r[1]}</span></li>`).join('');
+function fmt(k,v){if(v==null)return k==='press'?'Recipe 값':k==='mill'?'승인 조건':'—';
+ switch(k){case 'mixer':case 'chopper':return Math.round(v)+' rpm';case 'power':case 'mw':return v.toFixed(1)+' kW';case 'temp':return v.toFixed(1)+' ℃';case 'press':return Math.round(v)+' mbar';
+ case 'pump':case 'disc':case 'mill':return Math.round(v)+' %';case 'liquid':return v.toFixed(2)+' kg';case 'energy':return Math.round(v).toLocaleString('en-US')+' kJ';
+ case 'timer':{const t=Math.max(0,Math.round(v));return String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0');}}}
+function hmiRest(i){const s=STEPS[i];if(st[i].ran||isDone(i))return s.hmi;const p=i>0?STEPS[i-1].hmi:IDLE;
+ return Object.assign({},p,{mixer:p.mixer==null?null:0,chopper:p.chopper==null?null:0,power:0,pump:0,mw:0,mill:0,disc:s.rno>=19?(STEPS[i-1].hmi.disc||0):0,timer:s.hmi.timer,status:s.group==='prep'&&i<2?'LOGIN':'READY'});}
+function renderHMI(v,i){const s=STEPS[i];
+ TILES.forEach(([k])=>{$('#v-'+k).textContent=fmt(k,v[k]);$('#t-'+k).classList.toggle('hot',typeof v[k]==='number'&&v[k]>0&&!['temp','press','liquid','energy','timer'].includes(k));});
+ $('#hNo').textContent=s.rno!=null?s.rno:s.code;$('#hName').textContent=s.rno!=null?(s.name+(s.sub?' · '+s.sub:'')):s.title;
+ const status=hold?'HOLD':v.status;const el=$('#hStatus');el.textContent=status;el.className='status'+(status==='RUNNING'?' run':status==='HOLD'?' hold':['COMPLETE','END','LOADED','CHECKED'].includes(status)?' done':'');
+ $$('#recipeList li').forEach(li=>{const n=+li.dataset.r;const ref=s.rno!=null?s.rno:(s.group==='end'?99:-1);li.classList.toggle('on',n===s.rno);li.classList.toggle('past',n<ref);});
+ const m=$('#mimic');m.classList.toggle('m-mix',v.mixer>0);m.classList.toggle('m-drop',v.pump>0);m.classList.toggle('m-wave',v.mw>0);m.classList.toggle('m-disc',v.disc>0);
+ $('#mLine').innerHTML=`Mixer <b>${fmt('mixer',v.mixer)}</b><br>Chopper <b>${fmt('chopper',v.chopper)}</b><br>Bowl <b>${fmt('press',v.press)}</b><br>교육용 가상값`;
+ $('#hMsg').textContent=hold?'ALARM · 가상 위험 상황 · 공정 HOLD':`Description: ${s.title}`;
+ $('#fF2').classList.toggle('lit',!!s.run&&!st[i].ran&&(s.runFirst||taskOk(i))&&!running);}
+function $$(q){return Array.from(document.querySelectorAll(q));}
+
+/* ---------- task & rail ---------- */
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function renderRail(){const groups=[['준비','prep'],['Recipe 0–21','recipe'],['마감','end']];
+ $('#rail').innerHTML=groups.map(([lab,g])=>`<div class="grp"><small>${lab}</small><div class="chips">${STEPS.map((s,i)=>s.group!==g?'':`<button type="button" class="chip ${doneSet.has(i)?'done':''} ${i===cur?'cur':''}" data-go="${i}" ${running?'disabled':''} aria-current="${i===cur?'step':'false'}"><b>${esc(s.code)}</b>${esc(s.rno!=null?s.name:s.name)}${s.sub&&s.rno!=null?'<br>'+esc(s.sub.length>11?s.sub.slice(0,10)+'…':s.sub):''}</button>`).join('')}</div></div>`).join('');
+ const c=document.querySelector('.chip.cur');c&&c.scrollIntoView({inline:'center',block:'nearest'});}
+function renderTask(){const s=STEPS[cur],x=st[cur],done=isDone(cur);const lock=running||done||(s.runFirst&&!x.ran);
+ $('#tCode').textContent=(s.rno!=null?`Recipe ${s.rno} · ${s.name}${s.sub?' '+s.sub:''}`:`${s.code} · ${s.name}${s.sub?' '+s.sub:''}`);
+ $('#tTitle').textContent=s.title;$('#tInstr').textContent=s.instr;$('#tSrc').textContent='근거: '+s.src;
+ let h='';
+ if(s.runFirst&&!x.ran)h+=`<p class="muted">먼저 오른쪽 “${esc(s.run.label)}”을 눌러 진행하세요.</p>`;
+ if(s.checks)h+=s.checks.map((c,k)=>`<button type="button" class="chk" data-chk="${k}" aria-pressed="${x.checks.has(k)}" ${lock?'disabled':''}><span class="box">${x.checks.has(k)?'✓':''}</span>${esc(c)}</button>`).join('');
+ if(s.q)h+=`<div class="q">${esc(s.q)}</div>`+s.opts.map((o,k)=>`<button type="button" class="opt ${x.choice&&o[1]?'good':''}" data-opt="${k}" ${lock?'disabled':''}>${esc(o[0])}</button>`).join('');
+ if(!s.checks&&!s.q)h+='<p class="muted">확인할 항목이 없어요. 오른쪽 실행 버튼으로 단계를 진행하세요.</p>';
+ $('#tWork').innerHTML=h;
+ const rb=$('#runBtn');if(s.run){rb.hidden=false;rb.textContent=x.ran?'실행 완료 ✓':s.run.label;rb.disabled=running||x.ran||!(s.runFirst||taskOk(cur));}else rb.hidden=true;
+ $('#prevBtn').disabled=running||cur===0;
+ const nb=$('#nextBtn');nb.disabled=running||!done;nb.textContent=cur===LAST?'결과 보기':'다음 단계';nb.classList.toggle('primary',done);
+ const fb=$('#fb');fb.textContent=fbMsg||(done?'완료했어요. 다음 단계로 이동하세요.':s.runFirst&&!x.ran?'실행 후 결과를 판단해요.':'확인 항목과 질문을 마친 뒤 실행해요.');fb.classList.toggle('bad',fbBad);
+ $('#progText').textContent=doneSet.size+' / '+STEPS.length+' 완료';$('#progBar').style.width=(doneSet.size/STEPS.length*100)+'%';}
+function render(){renderTask();renderRail();if(!running){applyScene(sceneAt(cur));renderHMI(hmiRest(cur),cur);}}
+function say(t,bad){fbMsg=t;fbBad=!!bad;}
+function afterChange(){if(isDone(cur)&&!doneSet.has(cur)){doneSet.add(cur);log.push([STEPS[cur].code,STEPS[cur].title]);if(!fbBad)fbMsg=fbMsg||'완료!';if(cur===LAST){render();setTimeout(summary,700);return;}}render();}
+function setStep(i){if(running||i<0||i>LAST)return;cur=i;fbMsg='';fbBad=false;working(false);render();const s=STEPS[i];moveTo(s.loc);bubble(s.say||s.title);}
+
+function runStep(){const i=cur,s=STEPS[i];if(running||!s.run||st[i].ran)return;if(!s.runFirst&&!taskOk(i)){say('먼저 확인 항목과 질문을 완료해 주세요.',true);render();return;}
+ const from=sceneAt(i),hFrom=hmiRest(i);running=true;say(s.run.say?`${s.run.label}…`:'진행 중…');render();
+ walkPath(s.run.path||[s.loc],()=>{working(true);bubble(s.run.say||s.title);const anim=s.run.anim||[];anim.forEach(c=>scene.classList.add(c));
+  const to=Object.assign({},from,s.set||{}),hTo=s.hmi,dur=s.run.dur||2500,t0=performance.now();
+  const frame=now=>{const p=Math.min(1,(now-t0)/dur);applyScene(lerp(from,to,p));
+   const hv=lerp(hFrom,hTo,Math.min(1,p*1.6));hv.timer=hTo.timer!=null?hTo.timer*(1-p):null;hv.status='RUNNING';if(hTo.mixer===0&&hTo.chopper===0&&!anim.length)hv.status='RUNNING';renderHMI(hv,i);
+   if(p<1)requestAnimationFrame(frame);else{anim.forEach(c=>scene.classList.remove(c));working(false);$('#op').classList.remove('walking');st[i].ran=true;running=false;
+    say(s.q&&!st[i].choice?'실행을 마쳤어요. 이제 결과를 판단하세요.':s.checks&&!taskOk(i)?'실행을 마쳤어요. 남은 확인 항목을 체크하세요.':'완료했어요. 다음 단계로 이동하세요.');afterChange();}};
+  requestAnimationFrame(frame);});}
+
+document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;
+ if(b.dataset.go!=null){setStep(+b.dataset.go);return;}
+ if(b.dataset.chk!=null){const x=st[cur],k=+b.dataset.chk;x.checks.has(k)?x.checks.delete(k):x.checks.add(k);say('');afterChange();return;}
+ if(b.dataset.opt!=null){const o=STEPS[cur].opts[+b.dataset.opt];if(o[1]){st[cur].choice=true;say(o[2]);bubble('좋아요!');}else{errors++;say(o[2],true);bubble('다시 볼까요?');}afterChange();return;}
+ if(b.id==='runBtn')return runStep();
+ if(b.id==='nextBtn'){cur===LAST?summary():setStep(cur+1);return;}
+ if(b.id==='prevBtn')return setStep(cur-1);
+ if(b.id==='drillBtn')return drill(0);
+ if(b.id==='infoBtn')return info();
+ if(b.dataset.drill!=null)return drillAnswer(+b.dataset.drill);
+ if(b.dataset.close!=null){closeModal();return;}
+ if(b.dataset.reset!=null){location.reload();return;}});
+document.getElementById('recipeList').addEventListener('click',e=>{const li=e.target.closest('li');if(!li)return;const i=STEPS.findIndex(s=>s.rno===+li.dataset.r);setStep(i);});
+
+/* ---------- modal: drill / info / summary ---------- */
+const modal=$('#modal'),card=$('#modalCard');
+function openModal(h){card.innerHTML=h;modal.hidden=false;const f=card.querySelector('button');f&&f.focus();}
+function closeModal(){modal.hidden=true;if(hold){hold=false;scene.classList.remove('alarm');render();}}
+const DRILL=[
+ {q:'가동 중 이상 소음과 위험한 움직임을 발견했어요. 가장 먼저 할 일은?',opts:[['즉시 비상 정지',1],['Next로 다음 단계 진행',0],['Restart를 반복해서 누르기',0]],bad:'원인이 해결되지 않은 상태로 진행하거나 재시작하지 않아요. 먼저 비상 정지!'},
+ {q:'공정이 정지했어요. 다음 행동은?',opts:[['팀장에게 보고하고 조치를 받기',1],['비상 정지만 풀고 바로 재시작',0]],bad:'혼자 판단해 재시작하지 않아요. 팀장에게 보고해요.'},
+ {q:'팀장 보고 후, 재시작의 전제 조건은?',opts:[['문제 해결 확인 후 비상 정지 원상복귀, 현재 공정 재시작',1],['알람만 지우고 다음 단계로 넘기기',0]],bad:'알람만 지우는 것은 해결이 아니에요. 원인 해결을 확인해야 해요.'}];
+let drillPhase=0;
+function drill(p){if(running)return;drillPhase=p;hold=true;scene.classList.add('alarm');renderHMI(hmiRest(cur),cur);moveTo('panel');bubble('위험! 멈춰야 해요');
+ const d=DRILL[p];openModal(`<h3>비상상황 훈련 ${p+1}/3</h3><p>제조 흐름과 별개인 가상 상황이에요.</p><div class="q">${d.q}</div>${d.opts.map((o,k)=>`<button type="button" class="opt" data-drill="${k}">${o[0]}</button>`).join('')}<p id="drillFb" class="muted"></p>`);}
+function drillAnswer(k){const d=DRILL[drillPhase];if(!d.opts[k][1]){errors++;$('#drillFb').textContent=d.bad;$('#drillFb').style.color='var(--warn)';return;}
+ if(drillPhase<2){if(drillPhase===0)working(true);drill(drillPhase+1);return;}
+ working(false);log.push(['훈련','비상 정지 → 팀장 보고 → 해결 확인 후 복귀']);
+ openModal('<h3>비상상황 대응 완료</h3><p>멈춤 → 보고 → 해결 확인 후 복귀 순서를 확인했어요. 알람별 상세 조치는 현행 SOP와 담당자 지시를 따릅니다.</p><button type="button" class="btn primary" data-close>훈련으로 돌아가기</button>');}
+function info(){openModal(`<h3>자료와 주의사항</h3>
+<p>SOP「과립기(One pot 300&amp;600) 가동방법」, 제조지시기록서 1~9항, Singlepot Recipe View 단계(0~21)를 바탕으로 만든 교육용 초안이에요. 실제 사진은 사용하지 않았습니다.</p>
+<ul>
+<li>습식 코밀(187S·사각 임펠러) 단계는 제외했어요. 흐름은 Recipe View 순서를 따릅니다.</li>
+<li>설비 배치는 사용자 설명을 반영한 모식도입니다. Singlepot·Mill은 벽 부착형이며, 정립 시 IBC를 아래로 옮겨 직접 수거해요. 세부 Recipe 조건은 추가 자료를 받은 뒤 맞출 예정입니다.</li>
+<li>HMI 수치 중 기록서에 없는 값(펌프 60%, 정제수 16/16 kg 분배, 온도, 80 mbar, 단계별 누적 에너지 등)은 교육용 가상값이에요.</li>
+<li>DRYING 0/1/4 ~ 0/10/4의 숫자 의미, 진공 이송 압력, Mill speed는 Recipe·승인 조건에서 확인해야 해요.</li>
+<li>Liquid feed tube 분리 시점은 현행 SOP 순서를 확인하세요.</li>
+<li>Recipe 이름·버전·제조번호는 가상 값이며, 훈련 완료는 작업 자격이나 전자서명을 뜻하지 않아요.</li>
+</ul><button type="button" class="btn primary" data-close>닫기</button>`);}
+function summary(){openModal(`<h3>첫 배치 훈련 결과</h3><p>완료 ${doneSet.size} / ${STEPS.length} · 다시 선택한 횟수 ${errors}회</p>${log.map(l=>`<div class="logrow"><span>${esc(l[0])}</span><strong>${esc(l[1])}</strong></div>`).join('')}<p style="margin-top:10px">가상 결과이며 새로 열면 사라져요. 실제 작업 전에는 담당자의 교육과 자격 확인이 필요해요.</p><div class="row"><button type="button" class="btn" data-close>닫기</button><button type="button" class="btn primary" data-reset>처음부터 다시</button></div>`);}
+modal.addEventListener('click',e=>{if(e.target===modal)closeModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!modal.hidden)closeModal();});
+
+setOpT();flip(1);
+setTimeout(()=>setStep(0),250);
+})();
+</script>
+</body>
+</html>
