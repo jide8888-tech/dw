@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>코팅실2 (SPM038) · KC-130F 3D 워크스루</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#10161a;--paper:#ffffffee;--line:#c8d0d5;--accent:#2f6f3e;--muted:#5c676e}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#e6ebee;--paper:#161b1eee;--line:#39434a;--accent:#8ec97a;--muted:#98a4ab}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#0d1114;color:var(--ink);font:15px/1.55 "IBM Plex Sans KR","Apple SD Gothic Neo",sans-serif;-webkit-tap-highlight-color:transparent}
+canvas{display:block}
+#hud{position:fixed;inset:0;pointer-events:none}
+.panel{position:absolute;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;backdrop-filter:blur(8px);pointer-events:auto;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+#top{left:14px;top:14px;max-width:min(340px,58vw)}
+#top h1{margin:0;font-size:15px;font-weight:700}
+#top p{margin:4px 0 0;font-size:12.5px;color:var(--muted)}
+#spots{right:14px;top:14px;width:190px;max-height:calc(100dvh - 28px);overflow:auto}
+#spots h2{margin:0 0 8px;font-size:12px;color:var(--muted);font-weight:600}
+#spots button{display:block;width:100%;text-align:left;border:1px solid var(--line);background:transparent;color:inherit;border-radius:7px;padding:6px 9px;margin-bottom:5px;font:inherit;font-size:13px;cursor:pointer}
+#spots button:hover,#spots button:focus-visible{background:var(--accent);color:#fff;border-color:var(--accent);outline:none}
+#info{left:14px;bottom:14px;max-width:min(430px,86vw);display:none}
+#info h3{margin:0 0 6px;font-size:15px}
+#info ul{margin:6px 0 0;padding-left:18px;font-size:13.5px}
+#info .ref{font-size:11.5px;color:var(--muted);margin-top:8px}
+#info .x{position:absolute;right:8px;top:6px;border:0;background:none;font-size:18px;cursor:pointer;color:var(--muted)}
+#cross{position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;opacity:.75}
+#cross:before,#cross:after{content:"";position:absolute;background:#fff;box-shadow:0 0 2px #000}
+#cross:before{left:8px;top:0;width:2px;height:18px}#cross:after{top:8px;left:0;height:2px;width:18px}
+#hint{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);background:#000a;color:#fff;padding:7px 14px;border-radius:20px;font-size:13px;pointer-events:none;white-space:nowrap}
+#tip{position:absolute;left:50%;top:calc(50% + 18px);transform:translateX(-50%);background:#000b;color:#fff;padding:4px 10px;border-radius:14px;font-size:12.5px;display:none;white-space:nowrap}
+#start{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0d1114;color:#e8eef1;z-index:5}
+#start .box{max-width:460px;padding:26px;text-align:center}
+#start h1{font-size:22px;margin:0 0 6px}
+#start p{color:#9fb0b8;font-size:14px;margin:6px 0}
+#start button{margin-top:16px;border:0;border-radius:8px;background:#3f8f52;color:#fff;font:inherit;font-weight:600;padding:11px 26px;cursor:pointer}
+#stick{position:absolute;left:18px;bottom:18px;width:120px;height:120px;border-radius:50%;background:#ffffff22;border:1px solid #ffffff44;pointer-events:auto;display:none;touch-action:none}
+#stick i{position:absolute;left:35px;top:35px;width:50px;height:50px;border-radius:50%;background:#ffffff66}
+.mobile #stick{display:block}
+.mobile #cross{display:none}
+@media (max-width:820px){#spots{width:150px;font-size:12px}#top{max-width:50vw}}
+</style>
+</head>
+<body>
+<div id="start"><div class="box">
+  <h1>코팅실2 (SPM038) · KC-130F</h1>
+  <p>금성코팅기가 설치된 코팅실을 1인칭으로 둘러봅니다. 장비 각 부위를 클릭하면 SOP-EQM-00003 기준 설명이 나옵니다.</p>
+  <p style="font-size:13px">PC: 클릭 후 마우스로 시선, <b>W A S D</b> 이동, <b>Shift</b> 빠르게, <b>Esc</b> 해제
+모바일: 왼쪽 조이스틱 이동, 화면 드래그로 시선</p>
+  <button id="btnStart">입장</button>
+</div></div>
+<div id="hud">
+  <div class="panel" id="top"><h1>KC-130F 코팅기 · 코팅실2</h1><p>자산번호 140003368 · 규격 80~150 kg/회</p></div>
+  <div class="panel" id="spots"><h2>이동 · 장비 구성</h2><div id="spotList"></div></div>
+  <div class="panel" id="info"><button class="x" id="infoX" aria-label="닫기">×</button><h3 id="infoT"></h3><div id="infoB"></div></div>
+  <div id="cross"></div><div id="tip"></div>
+  <div id="hint">클릭하여 시선 조작 시작</div>
+  <div id="stick"><i></i></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const isTouch = matchMedia("(pointer:coarse)").matches;
+if(isTouch) document.body.classList.add("mobile");
+
+/* ---------- scene ---------- */
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.92;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xc4cbcf);
+const camera = new THREE.PerspectiveCamera(62, innerWidth/innerHeight, 0.05, 60);
+const player = {pos:new THREE.Vector3(0.6,1.62,2.2), yaw:0, pitch:-0.06};
+
+const ROOM = {w:7.0, d:5.6, h:3.0};
+
+/* textures */
+function tex(draw,w=512,h=512,rep=[1,1]){
+  const c=document.createElement("canvas"); c.width=w; c.height=h; draw(c.getContext("2d"),w,h);
+  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(rep[0],rep[1]); t.anisotropy=8; return t;
+}
+const floorTex = tex((g,w,h)=>{ g.fillStyle="#d8dcd9"; g.fillRect(0,0,w,h);
+  for(let i=0;i<2600;i++){ g.fillStyle=`rgba(${160+Math.random()*60|0},${170+Math.random()*50|0},${168+Math.random()*50|0},.25)`; g.fillRect(Math.random()*w,Math.random()*h,2,2); }
+  g.strokeStyle="#c3c8c5"; g.lineWidth=2; g.strokeRect(0,0,w,h); },512,512,[7,5.6]);
+const wallTex = tex((g,w,h)=>{ g.fillStyle="#eef1f0"; g.fillRect(0,0,w,h);
+  g.strokeStyle="#d7dbd9"; g.lineWidth=3; for(let x=0;x<=w;x+=128){ g.beginPath(); g.moveTo(x,0); g.lineTo(x,h); g.stroke(); } },512,512,[6,3]);
+const steelTex = tex((g,w,h)=>{ const grd=g.createLinearGradient(0,0,w,0); grd.addColorStop(0,"#e3e7ea"); grd.addColorStop(.4,"#f4f6f7"); grd.addColorStop(.7,"#e0e5e8"); grd.addColorStop(1,"#eef1f3");
+  g.fillStyle=grd; g.fillRect(0,0,w,h); g.globalAlpha=.10;
+  for(let i=0;i<900;i++){ g.strokeStyle=Math.random()>.5?"#ffffff":"#b6bec4"; g.beginPath(); const y=Math.random()*h; g.moveTo(0,y); g.lineTo(w,y+(Math.random()*3-1.5)); g.stroke(); } },512,512,[1,1]);
+
+(function(){
+  const c=document.createElement("canvas"); c.width=256; c.height=128; const g=c.getContext("2d");
+  const grd=g.createLinearGradient(0,0,0,128); grd.addColorStop(0,"#ffffff"); grd.addColorStop(.42,"#e4eaed"); grd.addColorStop(.52,"#97a0a6"); grd.addColorStop(1,"#5d666c");
+  g.fillStyle=grd; g.fillRect(0,0,256,128);
+  g.fillStyle="#ffffff"; [[40,20],[150,16],[210,24]].forEach(([x,y])=>g.fillRect(x,y,44,14));
+  const t=new THREE.CanvasTexture(c); t.mapping=THREE.EquirectangularReflectionMapping;
+  const pm=new THREE.PMREMGenerator(renderer); pm.compileEquirectangularShader();
+  window.ENVMAP = pm.fromEquirectangular(t).texture; pm.dispose();
+})();
+const MAT = {
+  steel: new THREE.MeshStandardMaterial({map:steelTex, color:0xa8aeb3, metalness:.5, roughness:.3, envMapIntensity:.6}),
+  steelDark: new THREE.MeshStandardMaterial({color:0x848c92, metalness:.55, roughness:.45, envMapIntensity:.6}),
+  wall: new THREE.MeshStandardMaterial({map:wallTex, color:0xccd3d3, roughness:.95, metalness:0}),
+  floor: new THREE.MeshStandardMaterial({map:floorTex, color:0xa9b1b0, roughness:.4, metalness:.08, envMapIntensity:.4}),
+  ceil: new THREE.MeshStandardMaterial({color:0xdde1e0, roughness:.95}),
+  glass: new THREE.MeshStandardMaterial({color:0x8fa7b0, metalness:.15, roughness:.1, transparent:true, opacity:.42}),
+  dark: new THREE.MeshStandardMaterial({color:0x2a3034, roughness:.7}),
+  black: new THREE.MeshStandardMaterial({color:0x14181a, roughness:.85}),
+  blue: new THREE.MeshStandardMaterial({color:0x1958a8, roughness:.5}),
+  yellow: new THREE.MeshStandardMaterial({color:0xf2b705, roughness:.6}),
+  white: new THREE.MeshStandardMaterial({color:0xf7f9f8, roughness:.8}),
+  paper: new THREE.MeshStandardMaterial({color:0xfdfdfb, roughness:.95})
+};
+[MAT.steel,MAT.steelDark,MAT.glass].forEach(m=>{ m.envMap=window.ENVMAP; m.needsUpdate=true; });
+function box(w,h,d,mat,x,y,z,parent=scene,rot){ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat); m.position.set(x,y,z); if(rot) m.rotation.set(rot[0]||0,rot[1]||0,rot[2]||0); m.castShadow=true; m.receiveShadow=true; parent.add(m); return m; }
+function cyl(rt,rb,h,mat,x,y,z,parent=scene,rot,seg=24){ const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg),mat); m.position.set(x,y,z); if(rot) m.rotation.set(rot[0]||0,rot[1]||0,rot[2]||0); m.castShadow=true; m.receiveShadow=true; parent.add(m); return m; }
+function label(text,w,h,fs,bg,fg){ const t=tex((g,W,H)=>{ g.fillStyle=bg||"#ffffff"; g.fillRect(0,0,W,H); g.fillStyle=fg||"#111"; g.font=`700 ${fs||64}px "IBM Plex Sans KR",sans-serif`; g.textAlign="center"; g.textBaseline="middle";
+   text.split("\n").forEach((l,i,a)=>g.fillText(l,W/2,H/2+(i-(a.length-1)/2)*(fs*1.2||76))); },512,256);
+  return new THREE.MeshStandardMaterial({map:t,roughness:.6}); }
+
+/* ---------- room ---------- */
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w,ROOM.d),MAT.floor); floor.rotation.x=-Math.PI/2; floor.receiveShadow=true; scene.add(floor);
+const ceiling=new THREE.Mesh(new THREE.PlaneGeometry(ROOM.w,ROOM.d),MAT.ceil); ceiling.rotation.x=Math.PI/2; ceiling.position.y=ROOM.h; scene.add(ceiling);
+function wall(w,h,x,y,z,ry){ const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),MAT.wall); m.position.set(x,y,z); m.rotation.y=ry; m.receiveShadow=true; scene.add(m); return m; }
+wall(ROOM.w,ROOM.h,0,ROOM.h/2,-ROOM.d/2,0);
+wall(ROOM.w,ROOM.h,0,ROOM.h/2,ROOM.d/2,Math.PI);
+wall(ROOM.d,ROOM.h,-ROOM.w/2,ROOM.h/2,0,Math.PI/2);
+wall(ROOM.d,ROOM.h,ROOM.w/2,ROOM.h/2,0,-Math.PI/2);
+// coving / skirting
+box(ROOM.w,.08,.06,MAT.steelDark,0,.04,-ROOM.d/2+.03);
+box(ROOM.w,.08,.06,MAT.steelDark,0,.04,ROOM.d/2-.03);
+box(.06,.08,ROOM.d,MAT.steelDark,-ROOM.w/2+.03,.04,0);
+box(.06,.08,ROOM.d,MAT.steelDark,ROOM.w/2-.03,.04,0);
+
+/* lighting */
+scene.add(new THREE.HemisphereLight(0xf2f7fa,0x9fa8ad,.42));
+scene.add(new THREE.AmbientLight(0xffffff,.08));
+const key=new THREE.DirectionalLight(0xffffff,.62); key.position.set(2.5,4,2.5); key.castShadow=true;
+key.shadow.mapSize.set(1024,1024); key.shadow.camera.left=-6; key.shadow.camera.right=6; key.shadow.camera.top=6; key.shadow.camera.bottom=-6; scene.add(key);
+const lightMat=new THREE.MeshBasicMaterial({color:0xfdfff8});
+[[-1.8,-1.0],[1.8,-1.0],[-1.8,1.4],[1.8,1.4]].forEach(([x,z])=>{
+  const p=box(1.2,.04,.6,lightMat,x,ROOM.h-.03,z); p.castShadow=false;
+  const l=new THREE.PointLight(0xffffff,.16,8); l.position.set(x,ROOM.h-.2,z); scene.add(l);
+});
+// HEPA diffuser
+const hepa=box(1.2,.06,1.2,new THREE.MeshStandardMaterial({color:0xe9ecec,roughness:.6}),0,ROOM.h-.04,.2); 
+box(1.1,.02,1.1,new THREE.MeshStandardMaterial({color:0xd7dbdb,roughness:.5}),0,ROOM.h-.08,.2);
+// return grille (low, west wall)
+box(.05,.55,1.0,new THREE.MeshStandardMaterial({color:0xd3d8da,metalness:.4,roughness:.6}),-ROOM.w/2+.03,.5,1.0);
+// door (south)
+box(1.0,2.1,.06,MAT.white,2.2,1.05,ROOM.d/2-.04);
+box(1.06,2.16,.02,MAT.steelDark,2.2,1.05,ROOM.d/2-.08);
+box(.5,.6,.02,MAT.glass,2.2,1.6,ROOM.d/2-.06);
+
+/* ---------- machine ---------- */
+const MX=1.15, MZ=-ROOM.d/2;            // machine center x, back wall z
+const mach=new THREE.Group(); scene.add(mach);
+box(3.3,2.62,.30,MAT.steel,MX,1.31,MZ+.15,mach);                       // main panel
+box(3.4,.22,.52,MAT.steel,MX,2.53,MZ+.26,mach);                        // top cap
+box(3.34,.05,.34,MAT.steelDark,MX,2.40,MZ+.18,mach);
+box(3.3,.02,.31,MAT.steelDark,MX,1.42,MZ+.155,mach);                   // horizontal seam
+// badge
+const badge=box(.92,.3,.02,label("KeumSung   KC130F",0,0,74,"#1f5fb8","#ffffff"),MX+1.28,2.30,MZ+.31,mach);
+// exhaust hood (center top protrusion)
+box(.55,.62,.42,MAT.steel,MX+.05,2.06,MZ+.44,mach);
+box(.55,.12,.44,MAT.steel,MX+.05,2.40,MZ+.46,mach,[0.12,0,0]);
+
+/* gauge panel */
+const gp=new THREE.Group(); gp.position.set(MX-1.02,1.72,MZ+.31); mach.add(gp);
+box(.78,.92,.02,MAT.steel,0,0,0,gp);
+box(.72,.86,.005,new THREE.MeshStandardMaterial({color:0xdfe4e6,roughness:.5}),0,0,.012,gp);
+box(.7,.84,.004,label("차압계            유량계\n\n\n\n\n게이지\nFAN AIR  CAP AIR  필터",0,0,40,"#e7ebec","#2a3a6a"),0,0,.016,gp);
+cyl(.075,.075,.02,new THREE.MeshStandardMaterial({color:0x1b1b1b,roughness:.5}),-.18,.26,.02,gp,[Math.PI/2,0,0]);
+box(.09,.05,.006,new THREE.MeshStandardMaterial({color:0xf6c400,roughness:.4}),-.18,.26,.032,gp);   // 차압계 digital
+box(.055,.42,.02,MAT.glass,.13,.2,.025,gp);                                                        // 유량계 tube
+box(.03,.03,.024,new THREE.MeshStandardMaterial({color:0xcc2222}),.13,.28,.028,gp);                 // float
+[-.22,0,.22].forEach((x,i)=>{ cyl(.045,.045,.018,new THREE.MeshStandardMaterial({color:0xf2f2ee,roughness:.4}),x,-.14,.02,gp,[Math.PI/2,0,0]);
+  cyl(.035,.045,.05,MAT.black,x,-.29,.03,gp,[Math.PI/2,0,0]); });
+
+/* mouth ring + pan */
+const ring=new THREE.Group(); ring.position.set(MX+.35,1.46,MZ+.30); mach.add(ring);
+const drumIn=new THREE.Mesh(new THREE.CylinderGeometry(.62,.62,1.0,32,1,true),new THREE.MeshStandardMaterial({color:0xaeb6bb,metalness:.3,roughness:.5,side:THREE.BackSide}));
+drumIn.rotation.x=Math.PI/2; drumIn.position.z=-.55; ring.add(drumIn);
+const drumBack=cyl(.62,.62,.02,MAT.steelDark,0,0,-1.05,ring,[Math.PI/2,0,0],32);
+const baffles=new THREE.Group(); baffles.position.z=-.5; ring.add(baffles);
+for(let i=0;i<4;i++){ const b=box(.07,.5,.62,new THREE.MeshStandardMaterial({color:0xc9d0d4,metalness:.45,roughness:.32,envMap:window.ENVMAP,envMapIntensity:.6}),0,0,0,baffles);
+  b.position.set(Math.sin(i*Math.PI/2)*.42,Math.cos(i*Math.PI/2)*.42,0); b.rotation.z=-i*Math.PI/2; }
+const panLight=new THREE.PointLight(0xffffff,1.1,3.0); panLight.position.set(0,.15,-.3); ring.add(panLight);
+const guns=new THREE.Group(); guns.position.set(0,.18,-.42); ring.add(guns);
+box(.72,.05,.05,MAT.steelDark,0,.22,0,guns);
+[-.22,0,.22].forEach(x=>{ cyl(.028,.028,.2,MAT.steelDark,x,.1,0,guns,[0,0,0],12); cyl(.02,.03,.06,MAT.dark,x,-.01,0,guns,[0,0,0],12); });
+cyl(.52,.52,.10,new THREE.MeshStandardMaterial({color:0x97a0a6,metalness:.65,roughness:.24}),0,0,.04,ring,[Math.PI/2,0,0],48);
+const ringFace=new THREE.Mesh(new THREE.RingGeometry(.44,.62,48),new THREE.MeshStandardMaterial({color:0x9aa3a9,metalness:.65,roughness:.26,side:THREE.DoubleSide}));
+ringFace.position.z=.09; ring.add(ringFace);
+const glass=new THREE.Mesh(new THREE.CircleGeometry(.45,40),MAT.glass); glass.position.z=.085; ring.add(glass);
+box(.10,.16,.06,MAT.steelDark,.58,0,.02,ring);            // hinge
+box(.16,.06,.07,MAT.steelDark,-.55,-.06,.05,ring);        // clamp
+// discharge chute
+cyl(.10,.20,.22,MAT.steel,MX+.35,.99,MZ+.36,mach,[0,0,0],16);
+cyl(.09,.09,.10,MAT.steelDark,MX+.35,.86,MZ+.36,mach,[0,0,0],16);
+// exhaust flexible duct (right side)
+(function(){ const pts=[new THREE.Vector3(MX+1.05,.95,MZ+.36),new THREE.Vector3(MX+1.45,.98,MZ+.55),new THREE.Vector3(MX+1.7,.86,MZ+.4),new THREE.Vector3(MX+1.78,.8,MZ+.2)];
+  const t=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),40,.085,12),new THREE.MeshStandardMaterial({color:0x1d2124,roughness:.85})); t.castShadow=true; mach.add(t);
+  box(.34,.12,.18,MAT.steel,MX+.92,.95,MZ+.34,mach); })();
+// coiled cleaning hose (yellow)
+(function(){ const pts=[]; for(let i=0;i<=120;i++){ const t=i/120; pts.push(new THREE.Vector3(MX+.3+Math.sin(t*34)*.11, 1.0-t*.95, MZ+.55+Math.cos(t*34)*.11+t*.55)); }
+  const h=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),200,.016,8),new THREE.MeshStandardMaterial({color:0xf0b41e,roughness:.6})); h.castShadow=true; mach.add(h); })();
+// service hatch + nameplate
+box(.42,.3,.03,new THREE.MeshStandardMaterial({color:0xc9cfd3,metalness:.5,roughness:.5}),MX+.3,.62,MZ+.31,mach);
+box(.34,.14,.004,label("배출 어댑터 / 배선함",0,0,40,"#e8eaea","#333"),MX+1.5,1.62,MZ+.31,mach);
+box(.24,.16,.004,label("CE  KC130F\n자산 140003368",0,0,38,"#f2f3f2","#222"),MX-1.35,.92,MZ+.31,mach);
+// 작업표시판 (공정표시서) on wall right
+box(.42,.56,.02,MAT.white,ROOM.w/2-.06,1.55,-1.1,scene,[0,-Math.PI/2,0]);
+box(.36,.5,.004,label("공정표시서\n\n제품명 :\n생산번호 :\n작업자 :",0,0,40,"#ffffff","#333"),ROOM.w/2-.075,1.55,-1.1,scene,[0,-Math.PI/2,0]);
+
+/* ---------- control cabinet ---------- */
+const cab=new THREE.Group(); cab.position.set(-1.95,0,-1.35); cab.rotation.y=.46; scene.add(cab);
+box(.78,.92,.66,MAT.steel,0,.52,0,cab);
+[[-.3,-.24],[.3,-.24],[-.3,.24],[.3,.24]].forEach(([x,z])=>cyl(.04,.04,.06,MAT.black,x,.04,z,cab,[Math.PI/2,0,0],10));
+box(.02,.5,.44,MAT.steelDark,.4,.6,.06,cab);                                   // printer door
+box(.01,.3,.3,MAT.white,.415,.62,.06,cab);
+box(.005,.24,.24,MAT.dark,.425,.62,.06,cab);
+// console
+const con=new THREE.Group(); con.position.set(0,1.0,-.02); con.rotation.x=-.28; cab.add(con);
+box(.82,.68,.12,MAT.steel,0,.28,0,con);
+box(.78,.1,.005,label("KeumSung                 KC130F",0,0,44,"#e9ecee","#1f5fb8"),0,.56,.065,con);
+const scrCanvas=document.createElement("canvas"); scrCanvas.width=512; scrCanvas.height=384;
+const scrTex=new THREE.CanvasTexture(scrCanvas);
+const screen=box(.6,.44,.01,new THREE.MeshBasicMaterial({map:scrTex}),0,.26,.065,con);
+box(.66,.5,.02,MAT.dark,0,.26,.055,con);
+// button shelf
+const shelf=new THREE.Group(); shelf.position.set(0,.72,.16); shelf.rotation.x=-1.15; cab.add(shelf);
+box(.82,.28,.03,MAT.steel,0,0,0,shelf);
+const btnMat=c=>new THREE.MeshStandardMaterial({color:c,roughness:.45,emissive:c,emissiveIntensity:.08});
+const btns=[[-.31,0xb9bfc2],[-.19,0x2b2b2b],[-.06,0x2e9e57],[.07,0xcf3b30],[.2,0x2a5fb8]];
+btns.forEach(([x,c])=>cyl(.028,.028,.02,btnMat(c),x,.02,0,shelf,[Math.PI/2,0,0],14));
+const estop=cyl(.045,.045,.028,new THREE.MeshStandardMaterial({color:0xcf1f14,roughness:.5}),.33,.02,0,shelf,[Math.PI/2,0,0],18);
+cyl(.062,.062,.012,MAT.yellow,.33,.008,0,shelf,[Math.PI/2,0,0],18);
+// tower light
+cyl(.018,.018,1.0,MAT.steelDark,-.1,1.35,-.26,cab,null,10);
+const towers=[[0x22c04a,1.78],[0xf0a71c,1.9],[0xd8342a,2.02]].map(([c,y])=>{
+  const m=new THREE.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:.35,transparent:true,opacity:.92,roughness:.4});
+  return cyl(.055,.055,.11,m,-.1,y,-.26,cab,null,16); });
+cyl(.055,.02,.06,MAT.white,-.1,2.1,-.26,cab,null,16);
+// 코팅액 탱크 (SUS drum with liner) in front of cart
+const tank=new THREE.Group(); tank.position.set(-1.25,0,-.35); scene.add(tank);
+cyl(.3,.28,.86,MAT.steel,0,.43,0,tank,null,32);
+cyl(.31,.31,.05,MAT.steelDark,0,.87,0,tank,null,32);
+cyl(.27,.27,.5,new THREE.MeshStandardMaterial({color:0xcfd6d2,roughness:.5,transparent:true,opacity:.55}),0,1.02,0,tank,null,24);
+cyl(.26,.26,.36,new THREE.MeshStandardMaterial({color:0x8a7f63,roughness:.6}),0,.6,0,tank,null,24);
+
+/* 나정 SUS 드럼 + 문서 거치대 */
+const drum=new THREE.Group(); drum.position.set(-2.55,0,.9); scene.add(drum);
+cyl(.31,.29,.88,MAT.steel,0,.44,0,drum,null,32); cyl(.33,.33,.04,MAT.steelDark,0,.9,0,drum,null,32);
+cyl(.06,.06,.06,MAT.steelDark,0,.96,0,drum,null,12);
+const lec=new THREE.Group(); lec.position.set(-.35,0,-.85); scene.add(lec);
+cyl(.22,.22,.03,MAT.steelDark,0,.02,0,lec,null,20); cyl(.022,.022,1.05,MAT.steelDark,0,.54,0,lec,null,12);
+box(.52,.02,.36,MAT.steel,0,1.08,0,lec,[-.42,0,0]);
+box(.3,.004,.22,MAT.paper,0,1.13,.02,lec,[-.42,0,0]);
+box(.2,.06,.14,MAT.steel,.3,1.0,0,lec);
+/* 벽 게시물 */
+box(.3,.42,.006,label("코팅기 가동 및 세척\nSOP-EQM-00003\n\nDHT / CHT 표시서",0,0,34,"#ffffff","#333"),ROOM.w/2-.04,1.75,.6,scene,[0,-Math.PI/2,0]);
+
+/* env map on every metallic material */
+scene.traverse(o=>{ const m=o.material; if(m && m.isMeshStandardMaterial && m.metalness>0.12 && !m.envMap){ m.envMap=window.ENVMAP; m.envMapIntensity=.6; m.needsUpdate=true; } });
+
+/* ---------- HMI screen texture ---------- */
+const sg=scrCanvas.getContext("2d");
+function drawScreen(t){
+  const W=scrCanvas.width,H=scrCanvas.height;
+  sg.fillStyle="#c8ccc8"; sg.fillRect(0,0,W,H);
+  sg.fillStyle="#b9bdb8"; sg.fillRect(0,0,W,26);
+  sg.fillStyle="#6b8e23"; sg.fillRect(56,5,110,16); sg.fillRect(214,5,90,16); sg.fillRect(352,5,90,16);
+  sg.fillStyle="#f4ffe0"; sg.font="700 12px sans-serif";
+  sg.fillText("교육용코팅정",60,17); sg.fillText("T260917",218,17); sg.fillText("PR-OP1",356,17);
+  sg.fillStyle="#333"; sg.font="11px sans-serif"; sg.fillText("제품명",10,17); sg.fillText("생산번호",172,17); sg.fillText("담당자",310,17);
+  // ducts
+  sg.strokeStyle="#aeb4b0"; sg.lineWidth=10; sg.beginPath(); sg.moveTo(80,120); sg.lineTo(150,120); sg.lineTo(150,175); sg.stroke();
+  sg.beginPath(); sg.moveTo(430,120); sg.lineTo(360,120); sg.lineTo(360,175); sg.stroke();
+  sg.fillStyle="#e6e9e6"; sg.strokeStyle="#8a9095"; sg.lineWidth=1.5;
+  sg.fillRect(30,96,66,44); sg.strokeRect(30,96,66,44); sg.fillRect(414,96,70,44); sg.strokeRect(414,96,70,44);
+  sg.fillStyle="#3c78d8"; sg.beginPath(); sg.arc(78,118,10,0,7); sg.fill(); sg.beginPath(); sg.arc(436,118,10,0,7); sg.fill();
+  sg.fillStyle="#eef0ec"; sg.strokeRect(150,175,214,180); sg.fillRect(150,175,214,180);
+  sg.strokeStyle="#8a8f8a"; sg.lineWidth=3; sg.beginPath(); sg.arc(240,270,52,0,7); sg.stroke();
+  sg.save(); sg.translate(240,270); sg.rotate(t*.7); sg.fillStyle="#7c858a";
+  for(let i=0;i<4;i++){ sg.fillRect(-4,-46,8,18); sg.rotate(Math.PI/2); } sg.restore();
+  const box2=(x,y,w,txt,val)=>{ sg.fillStyle="#222"; sg.font="10px sans-serif"; sg.fillText(txt,x,y-4);
+    sg.fillStyle="#eef0ec"; sg.fillRect(x,y,w,16); sg.strokeStyle="#777"; sg.lineWidth=1; sg.strokeRect(x,y,w,16);
+    sg.fillStyle="#111"; sg.font="700 11px sans-serif"; sg.textAlign="right"; sg.fillText(val,x+w-4,y+12); sg.textAlign="left"; };
+  const wob=(b,a)=>(b+Math.sin(t*.6+a)*.4).toFixed(0);
+  box2(22,50,42,"배기 풍압",wob(80,1)); box2(86,50,46,"배기 팬",wob(2650,2)); box2(150,50,36,"배기 온도",wob(45,0));
+  box2(300,50,36,"급기 온도",wob(63,3)); box2(356,50,46,"급기 팬",wob(1300,4)); box2(420,50,42,"급기 풍압",wob(52,5));
+  box2(400,190,44,"액펌프 현재속도","50"); box2(400,240,44,"액 분사량","250");
+  box2(96,210,36,"건 1","3.5"); box2(96,250,36,"건 2","3.5"); box2(96,290,36,"건 3","3.5");
+  box2(286,330,42,"코팅팬 rpm","6.0");
+  // tank
+  sg.fillStyle="#eef3fb"; sg.fillRect(420,290,54,50); sg.strokeStyle="#888"; sg.strokeRect(420,290,54,50);
+  sg.fillStyle="#3a7bd5"; sg.fillRect(422,312,50,26);
+  // tabs
+  const tabs=["가동상태","운영환경","일반운전","작업주기","담당자","청소모드","알람열람","알람리셋","보고서","작업종료"];
+  tabs.forEach((s,i)=>{ const x=6+i*50; sg.fillStyle=i===0?"#8e948c":"#cfe3cf"; sg.fillRect(x,358,47,22);
+    sg.fillStyle=i===0?"#fff":"#1d3a1d"; sg.font="700 10px sans-serif"; sg.textAlign="center"; sg.fillText(s,x+23,372); sg.textAlign="left"; });
+  scrTex.needsUpdate=true;
+}
+
+/* ---------- hotspots ---------- */
+const HOTSPOTS=[
+ {id:"hmi", t:"① 조작부 (H.M.I)", p:[-1.72,1.22,-1.05], v:[-1.1,-0.25,-2.2],
+  b:`<ul><li>전원 키 스위치, COATING PAN, SPRAY ON/OFF, RESET, 비상정지 버튼이 아래 조작 선반에 배치</li>
+      <li>초기화면 진입 전 본인 ID/PASSWORD로 로그인 (ID 공유·대여 금지, Password 1회/년 교체)</li>
+      <li>Level 4 작업자는 작업 필수 항목만 접근 가능</li></ul>
+      <p class="ref">SOP-EQM-00003 3항 / 5.1.2.1.7~5.1.2.1.9</p>
+      <p><a id="lnkSim" href="#" target="_blank" rel="noopener">▶ HMI 조작 시뮬레이터 열기</a></p>`},
+ {id:"pan", t:"② 코팅팬 · 마우스링", p:[1.5,1.46,-2.42], v:[1.5,-0.45,-3.14],
+  b:`<ul><li>정제 투입·배출구. 마우스링이 열리면 알람(마우스링 열림)으로 팬이 회전하지 않음</li>
+      <li>내부 배플 4매와 스프레이건 3본. 샘플 채취 시 배플 충돌 주의</li>
+      <li>팬 회전 중 외부도어(가이드) 개방 금지, 배출 후 잔량 확인은 완전 정지 후</li></ul>
+      <p class="ref">SOP 5.1.4.7~5.1.4.11 / 5.1.3.5.4</p>`},
+ {id:"gauge", t:"④ 게이지 패널 (차압계·유량계)", p:[.13,1.72,-2.44], v:[.1,-0.5,-3.14],
+  b:`<ul><li>차압계: 집진 차압 확인 — 가동 중 주기적으로 집진기 상태 체크</li>
+      <li>유량계 및 FAN AIR / CAP AIR / 필터 압력조절기</li>
+      <li>압축공기는 0.5 MPa 이상에서 작업 시작</li></ul>
+      <p class="ref">SOP 5.1.2.1.5 / 5.1.4.3</p>`},
+ {id:"tank", t:"③ 약액탱크 · 연동펌프", p:[-1.25,.95,-.35], v:[-1.1,0.75,-2.0],
+  b:`<ul><li>코팅액 탱크를 공급관에 연결하고 스프레이건 공급압력 확인 후 분사량을 세팅</li>
+      <li>교반기를 가동해 현탁액 침강 방지</li>
+      <li>공정 완료 시 잔량 분사 방지를 위해 연동펌프와 약액라인을 분리</li></ul>
+      <p class="ref">SOP 5.1.2.2 / 5.1.4.2</p>`},
+ {id:"hose", t:"세척 호스 · WIP 라인", p:[1.45,.55,-2.15], v:[1.75,-0.35,-3.0],
+  b:`<ul><li>청소 시 후면 상수/온수 밸브를 열고 세척호스를 연결, 클램프를 정확히 체결(누수 방지)</li>
+      <li>WIP건 장착 후 팬을 천천히 돌려 배플과의 간섭을 반드시 확인</li>
+      <li>WIP 모터가 물 없이 공회전하지 않도록 급수 확인</li></ul>
+      <p class="ref">SOP 5.2.2.3 / 5.2.3</p>`},
+ {id:"duct", t:"배기 덕트 · 집진", p:[2.6,.9,-2.35], v:[2.2,-0.45,-2.9],
+  b:`<ul><li>정제 투입·배출 시 집진을 위해 배기팬을 가동</li>
+      <li>건조 시에는 급기·배기를 동시에 가동해 열교환기 부하를 방지</li>
+      <li>중량물(급배기 덕트) 취급 시 안전 주의</li></ul>
+      <p class="ref">SOP 5.1.3.1 / 5.2.3.5</p>`},
+ {id:"drum", t:"나정 SUS 드럼", p:[-2.55,.95,.9], v:[-1.75,1.05,-1.6],
+  b:`<ul><li>배기팬 가동 후 파정에 주의하며 코팅팬 내부에 나정을 투입</li>
+      <li>투입 완료 후 저장 버튼 ON → 예열 모드</li></ul>
+      <p class="ref">SOP 5.1.3.1~5.1.3.2</p>`},
+ {id:"tower", t:"경광등 · 이상상황 대응", p:[-2.06,1.95,-1.6], v:[-1.15,-0.15,-2.4],
+  b:`<ul><li>이상 상황 발생 시 작업자는 직접 조치하지 않고 비상정지 → 실선임자 보고</li>
+      <li>실선임자 조치(또는 팀장 보고) 후, 원인 해소를 확인하고 재가동</li></ul>
+      <p class="ref">SOP 5.12</p>`},
+ {id:"lectern", t:"제조지시기록서 거치대", p:[-.35,1.12,-.85], v:[-.35,0.55,-2.6],
+  b:`<ul><li>모든 코팅 조건은 제조지시기록서에 규정된 값을 따름</li>
+      <li>공정표시서 작성·부착, 작업 종료 후 기계사용/청소기록표(FORM-00252) 기록</li>
+      <li>보고서 출력물은 제조지시기록서에 첨부</li></ul>
+      <p class="ref">SOP 5.1.2.1.4 / 5.1.4.13</p>`}
+];
+const hotMeshes=[];
+const ringGeo=new THREE.TorusGeometry(.12,.012,8,28);
+HOTSPOTS.forEach(h=>{
+  const g=new THREE.Group(); g.position.set(h.p[0],h.p[1],h.p[2]); scene.add(g);
+  const m=new THREE.Mesh(ringGeo,new THREE.MeshBasicMaterial({color:0x2fbf4f,transparent:true,opacity:.85})); g.add(m);
+  const dot=new THREE.Mesh(new THREE.SphereGeometry(.035,12,12),new THREE.MeshBasicMaterial({color:0xffffff}));
+  g.add(dot);
+  const hit=new THREE.Mesh(new THREE.SphereGeometry(.2,10,10),new THREE.MeshBasicMaterial({visible:false}));
+  hit.userData.spot=h; g.add(hit); hotMeshes.push(hit); h.group=g; h.ring=m;
+});
+
+/* ---------- UI ---------- */
+const info=document.getElementById("info"), infoT=document.getElementById("infoT"), infoB=document.getElementById("infoB");
+const SIM_URL="https://claude.ai/artifact/7ynV4mXLbDsEMVqFa38yVn";
+function openSpot(h){
+  infoT.textContent=h.t; infoB.innerHTML=h.b; info.style.display="block";
+  const a=document.getElementById("lnkSim"); if(a) a.href=SIM_URL;
+}
+document.getElementById("infoX").onclick=()=>info.style.display="none";
+const list=document.getElementById("spotList");
+HOTSPOTS.forEach(h=>{ const b=document.createElement("button"); b.textContent=h.t; b.onclick=()=>{ moveTo(h); openSpot(h); }; list.appendChild(b); });
+function moveTo(h){ player.pos.set(h.v[0],1.62,h.v[1]); player.yaw=h.v[2]; player.pitch=-0.05;
+  const dx=h.p[0]-player.pos.x, dz=h.p[2]-player.pos.z; player.yaw=Math.atan2(-dx,-dz);
+  player.pitch=Math.atan2(h.p[1]-1.62, Math.hypot(dx,dz)); }
+
+/* ---------- controls ---------- */
+const keys={}; let locked=false;
+addEventListener("keydown",e=>{ keys[e.code]=true; if(e.code==="Escape") info.style.display="none"; });
+addEventListener("keyup",e=>keys[e.code]=false);
+const hint=document.getElementById("hint");
+renderer.domElement.addEventListener("click",()=>{ if(!isTouch && !locked) renderer.domElement.requestPointerLock(); });
+document.addEventListener("pointerlockchange",()=>{ locked=document.pointerLockElement===renderer.domElement;
+  hint.textContent = locked ? "W A S D 이동 · 초록 표시를 보고 클릭 · Esc 해제" : "클릭하여 시선 조작 시작"; });
+addEventListener("mousemove",e=>{ if(!locked) return;
+  player.yaw -= e.movementX*.0022; player.pitch = Math.max(-1.2,Math.min(1.2, player.pitch - e.movementY*.0022)); });
+// touch look
+let lastT=null;
+renderer.domElement.addEventListener("touchstart",e=>{ lastT=e.touches[0]; },{passive:true});
+renderer.domElement.addEventListener("touchmove",e=>{ const t=e.touches[0]; if(lastT){ player.yaw-=(t.clientX-lastT.clientX)*.005; player.pitch=Math.max(-1.2,Math.min(1.2,player.pitch-(t.clientY-lastT.clientY)*.005)); } lastT=t; },{passive:true});
+renderer.domElement.addEventListener("touchend",()=>lastT=null,{passive:true});
+// joystick
+const stick=document.getElementById("stick"), knob=stick.querySelector("i"); let jv={x:0,y:0}, jid=null;
+stick.addEventListener("touchstart",e=>{ jid=e.changedTouches[0].identifier; e.preventDefault(); },{passive:false});
+stick.addEventListener("touchmove",e=>{ for(const t of e.changedTouches){ if(t.identifier!==jid) continue;
+  const r=stick.getBoundingClientRect(); let dx=t.clientX-(r.left+r.width/2), dy=t.clientY-(r.top+r.height/2);
+  const d=Math.min(1,Math.hypot(dx,dy)/48); const a=Math.atan2(dy,dx); dx=Math.cos(a)*d; dy=Math.sin(a)*d;
+  jv={x:dx,y:dy}; knob.style.transform=`translate(${dx*44}px,${dy*44}px)`; } e.preventDefault(); },{passive:false});
+stick.addEventListener("touchend",()=>{ jid=null; jv={x:0,y:0}; knob.style.transform=""; },{passive:true});
+
+/* pick */
+const ray=new THREE.Raycaster(); const center=new THREE.Vector2(0,0);
+const tip=document.getElementById("tip");
+function pick(nx,ny){ ray.setFromCamera(new THREE.Vector2(nx,ny),camera); const hits=ray.intersectObjects(hotMeshes,false); return hits[0]; }
+renderer.domElement.addEventListener("pointerdown",e=>{
+  let h;
+  if(locked) h=pick(0,0);
+  else { const nx=(e.clientX/innerWidth)*2-1, ny=-(e.clientY/innerHeight)*2+1; h=pick(nx,ny); }
+  if(h){ openSpot(h.object.userData.spot); moveTo(h.object.userData.spot); }
+});
+
+/* collision boxes (x,z half-extents) */
+const BLOCKERS=[
+ {x:MX,z:-2.62,hx:1.75,hz:.35},          // machine wall
+ {x:-1.95,z:-1.35,hx:.55,hz:.5},         // cabinet
+ {x:-1.25,z:-.35,hx:.34,hz:.34},         // tank
+ {x:-2.55,z:.9,hx:.36,hz:.36},           // drum
+ {x:-.35,z:-.85,hx:.28,hz:.28}           // lectern
+];
+function collide(p){
+  for(const b of BLOCKERS){ const dx=p.x-b.x, dz=p.z-b.z;
+    if(Math.abs(dx)<b.hx+.32 && Math.abs(dz)<b.hz+.32){
+      if((b.hx+.32-Math.abs(dx)) < (b.hz+.32-Math.abs(dz))) p.x = b.x + Math.sign(dx||1)*(b.hx+.32);
+      else p.z = b.z + Math.sign(dz||1)*(b.hz+.32); } }
+  p.x=Math.max(-ROOM.w/2+.35,Math.min(ROOM.w/2-.35,p.x));
+  p.z=Math.max(-ROOM.d/2+.35,Math.min(ROOM.d/2-.35,p.z));
+}
+
+/* ---------- loop ---------- */
+const clock=new THREE.Clock(); let bob=0;
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),.05), t=clock.elapsedTime;
+  let f=0,s=0;
+  if(keys.KeyW||keys.ArrowUp) f+=1; if(keys.KeyS||keys.ArrowDown) f-=1;
+  if(keys.KeyA||keys.ArrowLeft) s-=1; if(keys.KeyD||keys.ArrowRight) s+=1;
+  f-=jv.y; s+=jv.x;
+  const sp=(keys.ShiftLeft||keys.ShiftRight?2.6:1.35)*dt;
+  if(f||s){ const len=Math.hypot(f,s)||1; f/=len; s/=len;
+    player.pos.x += (Math.sin(player.yaw)*-f + Math.cos(player.yaw)*s)*sp*2;
+    player.pos.z += (Math.cos(player.yaw)*-f - Math.sin(player.yaw)*s)*sp*2;
+    collide(player.pos); bob+=sp*6; }
+  camera.position.set(player.pos.x, player.pos.y+Math.sin(bob)*.012, player.pos.z);
+  camera.rotation.set(0,0,0,"YXZ"); camera.rotation.order="YXZ"; camera.rotation.y=player.yaw; camera.rotation.x=player.pitch;
+  baffles.rotation.z += dt*.55;
+  HOTSPOTS.forEach((h,i)=>{ h.group.lookAt(camera.position); h.ring.scale.setScalar(1+Math.sin(t*2+i)*.08); });
+  towers[0].material.emissiveIntensity=.6; towers[1].material.emissiveIntensity=.12; towers[2].material.emissiveIntensity=.12;
+  drawScreen(t);
+  const h=locked?pick(0,0):null; tip.style.display = h?"block":"none"; if(h) tip.textContent=h.object.userData.spot.t;
+  renderer.render(scene,camera);
+}
+addEventListener("resize",()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+document.getElementById("btnStart").onclick=()=>{ document.getElementById("start").style.display="none"; if(!isTouch) renderer.domElement.requestPointerLock(); };
+animate();
+</script>
+</body></html>
