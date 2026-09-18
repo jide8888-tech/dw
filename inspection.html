@@ -1,0 +1,814 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PLANET EV-TC 선별 첫 배치 시뮬레이터</title>
+<style>
+:root{--bg:#e8eaee;--surface:#fbfcfd;--ink:#1a2a38;--sub:#5d6b78;--line:#d2d8de;--accent:#1f4f7a;--on:#fff;--soft:#dde8f2;--warn:#a8322b;--warnsoft:#fbe7e2}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101820;--surface:#18242e;--ink:#e3ecf2;--sub:#a4b4c0;--line:#2d414f;--accent:#8fc4ea;--on:#0f2331;--soft:#1f3442;--warn:#ff9f95;--warnsoft:#3b2427}}
+:root[data-theme="dark"]{--bg:#101820;--surface:#18242e;--ink:#e3ecf2;--sub:#a4b4c0;--line:#2d414f;--accent:#8fc4ea;--on:#0f2331;--soft:#1f3442;--warn:#ff9f95;--warnsoft:#3b2427}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.45 'Pretendard','Noto Sans KR','Malgun Gothic',system-ui,sans-serif}
+button{font:inherit;color:inherit;cursor:pointer}
+button:disabled{cursor:default;opacity:.5}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.app{display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;height:100vh;min-height:800px;max-width:1580px;margin:0 auto;padding:10px;gap:8px}
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 14px}
+.top h1{font-size:18px;margin:0;letter-spacing:-.4px}
+.top .meta{color:var(--sub);font-size:12px}
+.top .grow{flex:1}
+.prog{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--sub)}
+.bar{width:140px;height:7px;background:var(--line);border-radius:5px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .4s}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:8px 13px;font-weight:650}
+.btn:not(:disabled):hover{background:var(--soft)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on)}
+.btn.danger{border-color:var(--warn);color:var(--warn)}
+.main{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(326px,.9fr);gap:8px;min-height:0}
+.scene{position:relative;background:#e3e7ea;border:1px solid var(--line);border-radius:12px;overflow:hidden;min-height:0}
+.scene svg{display:block;width:100%;height:100%}
+.tag{position:absolute;left:10px;top:10px;background:rgba(255,255,255,.85);color:#33505f;border-radius:6px;padding:3px 8px;font-size:11px}
+.hmi{background:#2f3438;border:5px solid #17191b;border-radius:8px;display:grid;grid-template-rows:auto auto auto auto minmax(0,1fr);overflow:hidden;font-family:'Malgun Gothic',Arial,sans-serif;color:#e9edf0;min-height:0}
+.hstat{display:flex;justify-content:space-between;padding:4px 9px;font-size:10.5px;background:#2a2f33}
+.hstat b{color:#5fe07a;font-weight:700}
+.hstat b.ng{color:#ff6a6a}
+.tools{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;padding:6px 6px 4px}
+.tool{text-align:center;font-size:8.5px;line-height:1.25;color:#cfd6da}
+.tool i{width:28px;height:28px;border-radius:50%;margin:0 auto 2px;display:grid;place-items:center;font-size:12px;font-style:normal;background:#4a5157;color:#fff}
+.tool.on i{box-shadow:0 0 0 2px #f3d56b}
+.tool.batch i{background:#6b7177}.tool.start i{background:#3f7fd0}.tool.stop i{background:#d04a4a}
+.tool.img i{background:#3faa63}.tool.set i{background:#3f7fd0}.tool.exit i{background:#6b7177}
+.panes{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:0 6px}
+.pane{background:#3a4045;border:1px solid #4d545a}
+.pane h4{background:#d9a08a;color:#2a1f1a;font-size:9.5px;text-align:center;padding:1px;margin:0;font-weight:700}
+.defrow,.definfo{display:flex;justify-content:space-between;font-size:9px;padding:1px 5px;color:#ff9ec4}
+#defImgBox{height:70px;display:grid;place-items:center;position:relative}
+#defTab{width:46px;height:46px;border-radius:50%;background:#cfc6dd;position:relative;opacity:.25;transition:opacity .3s}
+#defTab.on{opacity:1}
+#defBox{position:absolute;border:1px solid #3a6ff0;width:54px;height:54px;left:-5px;top:-5px}
+#defSpot{position:absolute;border:1px solid #e04a4a;width:12px;height:12px;left:16px;top:16px}
+table.inf{width:100%;border-collapse:collapse;font-size:9.5px}
+table.inf td{border:1px solid #4d545a;padding:2px 4px}
+table.inf td:first-child{background:#2f4f9e;text-align:center;width:44%;font-weight:700}
+table.inf td.g{background:#2f7f6e;text-align:center;font-weight:700}
+table.inf td:last-child{text-align:center;background:#454b51}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:5px 6px}
+.cbox{background:#312d5c;border:1px solid #4a4a86;padding:4px;display:flex;align-items:center;justify-content:center;gap:4px}
+.cbox .lg{font-size:8px;line-height:1.6;color:#dfe4f0}
+.cbox .lg i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:3px;font-style:normal}
+#trendWrap{padding:0 6px 6px;min-height:0;display:flex;flex-direction:column;justify-content:flex-end}
+#trendWrap .t{font-size:9px;text-align:center;color:#cfd6da;padding:2px}
+canvas{display:block;width:100%;height:58px;background:#241f4a;border:1px solid #4a4a86}
+.hfoot{display:flex;justify-content:space-between;padding:3px 2px 0;font-size:9.5px;color:#9fb7c6}
+.task{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1.55fr) minmax(232px,.8fr);gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 14px;min-height:174px}
+.code{font-size:12px;color:var(--sub);font-weight:700}
+.task h2{font-size:18px;margin:2px 0 5px;letter-spacing:-.4px}
+.task p{margin:0 0 6px;color:var(--sub);font-size:12.5px;max-width:62ch}
+.src{font-size:11px;color:var(--sub)}
+.work{min-width:0;max-height:186px;overflow:auto;padding-right:2px}
+.chk{display:inline-flex;gap:7px;align-items:center;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 10px;margin:0 6px 6px 0;font-size:12px;text-align:left}
+.chk .box{width:16px;height:16px;border:1px solid var(--sub);border-radius:4px;display:grid;place-items:center;font-size:11px;flex:none}
+.chk[aria-pressed="true"]{background:var(--soft);border-color:var(--accent)}
+.chk[aria-pressed="true"] .box{background:var(--accent);border-color:var(--accent);color:var(--on)}
+.q{font-weight:700;margin:4px 0 5px;font-size:13px}
+.opt{display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 10px;margin-bottom:5px;font-size:12.5px}
+.opt.good{background:var(--soft);border-color:var(--accent);font-weight:700}
+.opt:not(:disabled):hover{border-color:var(--accent)}
+.muted{color:var(--sub);font-size:12px}
+.act{display:flex;flex-direction:column;gap:8px}
+.fb{background:var(--soft);border-radius:10px;padding:9px 11px;font-size:12.5px;flex:1;min-height:62px}
+.fb.bad{background:var(--warnsoft);color:var(--warn)}
+.row{display:flex;gap:6px}
+.row .btn{flex:1}
+.rail{display:flex;gap:10px;overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:7px 10px}
+.grp{display:flex;flex-direction:column;gap:3px}
+.grp small{color:var(--sub);font-size:10.5px;padding-left:2px}
+.chips{display:flex;gap:4px}
+.chip{min-width:56px;border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:4px 5px;font-size:9.5px;line-height:1.2;text-align:center}
+.chip b{display:block;font-size:12px}
+.chip.done{background:var(--soft);border-color:var(--accent)}
+.chip.done b::after{content:" ✓"}
+.chip.cur{background:var(--accent);color:var(--on);border-color:var(--accent)}
+.modal{position:fixed;inset:0;background:rgba(8,16,24,.52);display:grid;place-items:center;z-index:20;padding:12px}
+.modal[hidden]{display:none}
+.card{background:var(--surface);color:var(--ink);width:min(600px,100%);max-height:88vh;overflow:auto;border-radius:14px;padding:18px 20px;border:1px solid var(--line)}
+.card h3{margin:0 0 8px;font-size:19px}
+.card p,.card li{color:var(--sub);font-size:13px}
+.logrow{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding:5px 0;font-size:12px}
+table.res{width:100%;border-collapse:collapse;font-size:12px;margin:6px 0}
+table.res th,table.res td{border:1px solid var(--line);padding:4px 6px;text-align:center}
+table.res th{background:var(--soft)}
+td.ng{background:var(--warnsoft);color:var(--warn);font-weight:700}
+td.okc{background:var(--soft);font-weight:700}
+.leg,.arm{transform-box:fill-box;transform-origin:50% 5%}
+#op{transition:transform 1.3s ease-in-out}
+#bubble{transition:transform 1.3s ease-in-out}
+#opFlip{transition:transform .3s}
+#op.walking .leg-f,#op.walking .arm-b{animation:swA .42s ease-in-out infinite alternate}
+#op.walking .leg-b,#op.walking .arm-f{animation:swB .42s ease-in-out infinite alternate}
+@keyframes swA{from{transform:rotate(24deg)}to{transform:rotate(-24deg)}}
+@keyframes swB{from{transform:rotate(-24deg)}to{transform:rotate(24deg)}}
+#op.working .arm-f{animation:press .45s ease-in-out infinite alternate}
+@keyframes press{from{transform:rotate(-105deg)}to{transform:rotate(-70deg)}}
+#opBody{animation:breathe 2.4s ease-in-out infinite}
+#op.walking #opBody{animation:bob .21s ease-in-out infinite alternate}
+@keyframes bob{to{transform:translateY(-3px)}}
+@keyframes breathe{50%{transform:translateY(-1px)}}
+@keyframes blink{50%{opacity:.3}}
+.panel-active #hmiFace{fill:#1f3b6b}
+.laser line{opacity:.12}
+.running .laser line{opacity:.85;animation:blink .9s steps(2) infinite}
+.alarm #sigBar{fill:#ff3b30;animation:blink .5s steps(2) infinite}
+.alarm #lampR{fill:#ff3b30;animation:blink .5s steps(2) infinite}
+.lbl{font-size:11px;fill:#3f5260;font-weight:700}
+.lbl.s{font-size:9.5px;font-weight:400;fill:#5d6b78}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+@media (max-width:1140px){.app{height:auto;min-height:0}.main{grid-template-columns:1fr}.scene{aspect-ratio:8/5}.hmi{min-height:660px}.task{grid-template-columns:1fr}.work{max-height:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div><h1>PLANET EV-TC 선별 첫 배치 시뮬레이터</h1><div class="meta">교육용 가상 배치 TRAIN-EV-001 · 동화A / 선별실1(SPM044) · 실설비 연동 없음</div></div>
+    <div class="grow"></div>
+    <div class="prog"><span id="progText">0 / 0 완료</span><div class="bar"><i id="progBar"></i></div></div>
+    <button class="btn danger" id="drillBtn" type="button">비상상황 훈련</button>
+    <button class="btn" id="infoBtn" type="button">자료·주의</button>
+  </header>
+
+  <div class="main">
+    <div class="scene">
+      <span class="tag">교육용 3D 모식도 · 실제 치수·배치와 다를 수 있음</span>
+      <svg id="scene" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet" role="img" aria-label="선별실 모식도와 작업자">
+        <defs>
+          <linearGradient id="gMetal" x1="0" x2="1"><stop offset="0" stop-color="#8e9ba0"/><stop offset=".32" stop-color="#f2f5f6"/><stop offset=".6" stop-color="#c2cbcf"/><stop offset="1" stop-color="#7c898e"/></linearGradient>
+          <linearGradient id="gWall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3f6f7"/><stop offset="1" stop-color="#dde3e6"/></linearGradient>
+          <linearGradient id="gFloor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bcc7cc"/><stop offset="1" stop-color="#d6dee1"/></linearGradient>
+          <linearGradient id="gDisc" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4a4f55"/><stop offset=".5" stop-color="#2c3035"/><stop offset="1" stop-color="#4a4f55"/></linearGradient>
+          <clipPath id="cWin"><rect x="258" y="148" width="284" height="132" rx="6"/></clipPath>
+          <clipPath id="cHop"><path d="M296,58 L370,58 L356,102 L310,102 Z"/></clipPath>
+        </defs>
+        <polygon points="0,0 800,0 690,22 110,22" fill="#f6f8f9"/>
+        <polygon points="110,22 690,22 690,250 110,250" fill="url(#gWall)"/>
+        <polygon points="0,0 110,22 110,250 0,340" fill="#d2dadd"/>
+        <polygon points="800,0 690,22 690,250 800,340" fill="#ccd4d7"/>
+        <polygon points="110,250 690,250 800,500 0,500" fill="url(#gFloor)"/>
+        <g id="tiles" stroke="#adb9be" stroke-width="1" opacity=".45"></g>
+        <rect x="240" y="5" width="100" height="9" rx="3" fill="#fff"/><rect x="470" y="5" width="100" height="9" rx="3" fill="#fff"/>
+        <text x="400" y="40" text-anchor="middle" class="lbl s">선별실1 (SPM044) · 온도 18~26℃ / 습도 50%RH 이하</text>
+
+        <path d="M296,58 L370,58 L356,102 L310,102 Z" fill="#cfd6da" stroke="#6f7c82" stroke-width="1.5"/>
+        <g clip-path="url(#cHop)"><rect id="hopFill" x="296" y="62" width="74" height="40" fill="#e7e0cf"/></g>
+        <path d="M296,58 L370,58 L356,102 L310,102 Z" fill="rgba(255,255,255,.2)" stroke="#6f7c82" stroke-width="1.5"/>
+        <rect x="322" y="102" width="20" height="16" fill="#b6bfc4" stroke="#6f7c82"/>
+        <text x="333" y="50" text-anchor="middle" class="lbl s">호퍼 · 스크류 피더</text>
+
+        <ellipse cx="400" cy="414" rx="170" ry="16" fill="rgba(0,0,0,.12)"/>
+        <rect x="234" y="116" width="332" height="296" rx="16" fill="#d9dde0" stroke="#9aa3a8" stroke-width="3"/>
+        <rect x="248" y="128" width="304" height="12" rx="6" id="sigBar" fill="#3fd14a"/>
+        <rect x="248" y="288" width="304" height="118" rx="6" fill="#26292c"/>
+        <rect x="248" y="144" width="304" height="140" rx="6" fill="#1d2023"/>
+        <rect x="258" y="148" width="284" height="132" rx="6" fill="#2a3035"/>
+        <g clip-path="url(#cWin)">
+          <g transform="translate(318,224)">
+            <ellipse cx="0" cy="0" rx="54" ry="20" fill="#1b1e21"/>
+            <ellipse cx="0" cy="-6" rx="54" ry="20" fill="url(#gDisc)" stroke="#5a6067"/>
+            <g id="discOuter"><ellipse cx="0" cy="-6" rx="46" ry="16" fill="none" stroke="#7b838a" stroke-width="2" stroke-dasharray="7 9"/></g>
+            <ellipse cx="0" cy="-8" rx="30" ry="11" fill="#3a4047" stroke="#6b737a"/>
+            <g id="discInner"><ellipse cx="0" cy="-8" rx="24" ry="8.5" fill="none" stroke="#8b939a" stroke-width="2" stroke-dasharray="5 7"/></g>
+            <text x="0" y="17" text-anchor="middle" font-size="7" fill="#8fa3ae">원심력 피더</text>
+          </g>
+          <rect x="372" y="208" width="86" height="12" rx="5" fill="#cfd6da" stroke="#7b838a"/>
+          <rect id="belt1" x="372" y="208" width="86" height="12" fill="none" stroke="#9aa6ad" stroke-width="2" stroke-dasharray="6 8"/>
+          <text x="415" y="232" text-anchor="middle" font-size="7" fill="#8fa3ae">트랜스퍼 1</text>
+          <rect x="452" y="184" width="80" height="12" rx="5" fill="#cfd6da" stroke="#7b838a"/>
+          <rect id="belt2" x="452" y="184" width="80" height="12" fill="none" stroke="#9aa6ad" stroke-width="2" stroke-dasharray="6 8"/>
+          <text x="492" y="178" text-anchor="middle" font-size="7" fill="#8fa3ae">트랜스퍼 2</text>
+          <g fill="#14171a" stroke="#4a5158">
+            <rect x="384" y="160" width="20" height="14" rx="2"/><rect x="418" y="160" width="20" height="14" rx="2"/>
+            <rect x="466" y="158" width="20" height="14" rx="2"/><rect x="500" y="158" width="20" height="14" rx="2"/>
+          </g>
+          <g class="laser" stroke="#ff3b30" stroke-width="1.5">
+            <line x1="394" y1="174" x2="394" y2="208"/><line x1="428" y1="174" x2="428" y2="208"/>
+            <line x1="476" y1="172" x2="476" y2="184"/><line x1="510" y1="172" x2="510" y2="184"/>
+          </g>
+          <text x="452" y="258" text-anchor="middle" font-size="7" fill="#7d8f9a">정제 12대 카메라 (3D 2 + 2D 10)</text>
+          <g id="parts"></g>
+        </g>
+        <rect x="258" y="148" width="284" height="132" rx="6" fill="none" stroke="#44494d" stroke-width="2"/>
+        <text x="498" y="302" text-anchor="middle" font-size="11" font-style="italic" font-weight="900" fill="#c8402c" letter-spacing="1">ENCLONY</text>
+        <text x="300" y="302" class="lbl s" fill="#93a5af">안전커버 임의 Open 금지</text>
+        <g>
+          <rect x="262" y="320" width="98" height="40" rx="5" fill="#15181a" stroke="#4a5158"/>
+          <circle id="lampR" cx="282" cy="334" r="8" fill="#7a2a2a" stroke="#2a2a2a"/>
+          <rect x="298" y="329" width="12" height="9" rx="2" fill="#6b7177"/>
+          <circle cx="328" cy="334" r="6" fill="#3f7fd0"/>
+          <circle id="lampG" cx="346" cy="334" r="6" fill="#2b5b35"/>
+          <text x="282" y="354" text-anchor="middle" font-size="6" fill="#aab6bc">E-STOP</text>
+          <text x="328" y="354" text-anchor="middle" font-size="6" fill="#aab6bc">START</text>
+          <text x="346" y="354" text-anchor="middle" font-size="6" fill="#aab6bc">LIGHT</text>
+        </g>
+        <g>
+          <rect x="570" y="146" width="10" height="26" fill="#9aa5a9"/>
+          <rect x="578" y="138" width="62" height="120" rx="5" fill="#26292c" stroke="#4a5158" stroke-width="2"/>
+          <rect id="hmiFace" x="584" y="144" width="50" height="108" rx="2" fill="#2f3438"/>
+          <rect x="588" y="150" width="42" height="4" fill="#9aa6ad"/>
+          <rect x="588" y="158" width="26" height="4" fill="#5fe07a"/>
+          <rect x="588" y="168" width="42" height="24" fill="#312d5c"/>
+          <rect x="588" y="198" width="42" height="36" fill="#3a4045"/>
+          <text x="609" y="272" text-anchor="middle" class="lbl s">HMI 모니터</text>
+        </g>
+        <g id="bins"></g>
+        <g>
+          <rect x="116" y="300" width="72" height="54" rx="6" fill="url(#gMetal)" stroke="#78858a"/>
+          <circle cx="152" cy="327" r="15" fill="#c9ced5" stroke="#4d5a62" stroke-width="2"/>
+          <g id="blowerFan"><path d="M152,315 L158,327 L152,339 L146,327 Z" fill="#7d8a92"/></g>
+          <rect x="124" y="360" width="56" height="16" rx="3" fill="#dbe1e4" stroke="#78858a"/>
+          <rect id="filtClog" x="126" y="362" width="0" height="12" fill="#b08a5a"/>
+          <text x="152" y="372" text-anchor="middle" font-size="7.5" fill="#33454f" font-weight="700">FILTER</text>
+          <text x="152" y="294" text-anchor="middle" class="lbl s">링브로워 · 음압</text>
+          <path d="M188,320 C216,320 228,272 248,264" stroke="#8d989c" stroke-width="5" fill="none"/>
+        </g>
+        <g id="op" style="transform:translate(400px,466px) scale(1)">
+          <g id="opFlip">
+            <ellipse cx="0" cy="0" rx="22" ry="5" fill="rgba(0,0,0,.2)"/>
+            <g id="opBody">
+              <g class="leg leg-b"><rect x="-9" y="-40" width="9" height="40" rx="4" fill="#dfe6e9"/><rect x="-11" y="-5" width="13" height="6" rx="2" fill="#3f6f9a"/></g>
+              <g class="arm arm-b"><rect x="-17" y="-76" width="8" height="34" rx="4" fill="#dfe6e9"/></g>
+              <g class="leg leg-f"><rect x="1" y="-40" width="9" height="40" rx="4" fill="#f4f7f8" stroke="#cfd8dc"/><rect x="-1" y="-5" width="13" height="6" rx="2" fill="#4a7eab"/></g>
+              <rect x="-15" y="-80" width="30" height="46" rx="10" fill="#fafcfc" stroke="#cbd5d9"/>
+              <line x1="2" y1="-76" x2="2" y2="-40" stroke="#d5dde0"/>
+              <rect x="5" y="-70" width="7" height="5" rx="1" fill="#2d8a5f"/>
+              <circle cx="0" cy="-92" r="15" fill="#fbfdfd" stroke="#cbd5d9"/>
+              <ellipse cx="5" cy="-91" rx="8" ry="9" fill="#f0c7a2"/>
+              <rect x="-1" y="-97" width="15" height="5" rx="2" fill="#7fb6d6"/>
+              <rect x="1" y="-90" width="13" height="8" rx="3" fill="#8ec2e6"/>
+              <g class="arm arm-f"><rect x="8" y="-76" width="8" height="34" rx="4" fill="#f4f7f8" stroke="#cfd8dc"/><circle cx="12" cy="-41" r="4.5" fill="#5b8fd6"/></g>
+            </g>
+          </g>
+        </g>
+        <g id="bubble" style="transform:translate(400px,358px)">
+          <rect id="bubbleRect" x="-60" y="-24" width="120" height="26" rx="13" fill="#1a2a38"/>
+          <path d="M-5,2 L0,9 L5,2 Z" fill="#1a2a38"/>
+          <text id="bubbleText" x="0" y="-7" text-anchor="middle" font-size="12.5" fill="#fff" font-weight="700">안녕하세요</text>
+        </g>
+      </svg>
+    </div>
+
+    <section class="hmi" aria-label="교육용 HMI 화면">
+      <div class="hstat"><span>시스템 상태 <b id="sysState">대기</b></span><span id="hClock">현재 시각 --</span></div>
+      <div class="tools">
+        <div class="tool batch" id="tBatch"><i>▤</i>배치 입력</div>
+        <div class="tool start" id="tStart"><i>▶</i>검사 시작</div>
+        <div class="tool stop" id="tStop"><i>■</i>검사 중지</div>
+        <div class="tool img" id="tImg"><i>▣</i>이미지 보기</div>
+        <div class="tool set" id="tSet"><i>⚙</i>설정</div>
+        <div class="tool exit" id="tExit"><i>✕</i>나가기</div>
+      </div>
+      <div class="panes">
+        <div class="pane">
+          <h4>불량 정보</h4>
+          <div class="definfo"><span>No. <b id="defNo">—</b></span><span id="defCam">CAM - —</span></div>
+          <div class="defrow"><span>불량 종류:</span><b id="defType">—</b></div>
+          <div class="defrow"><span>불량 크기:</span><b id="defSize">—</b></div>
+          <div id="defImgBox"><div id="defTab"><div id="defBox"></div><div id="defSpot"></div></div></div>
+        </div>
+        <div class="pane">
+          <h4>검사 정보</h4>
+          <table class="inf">
+            <tr><td>품 명</td><td id="iName">—</td></tr>
+            <tr><td>LOT</td><td id="iLot">—</td></tr>
+            <tr><td class="g">검사속도</td><td id="iSpeed">0 T/H</td></tr>
+            <tr><td class="g">수율</td><td id="iYield">—</td></tr>
+            <tr><td class="g">경과 시간</td><td id="iTime">0분 0초</td></tr>
+          </table>
+          <h4 style="margin-top:3px">수량 정보</h4>
+          <table class="inf">
+            <tr><td>전체</td><td id="qAll">0</td></tr>
+            <tr><td>양품</td><td id="qGood" style="color:#5fe07a">0</td></tr>
+            <tr><td>불량</td><td id="qBad" style="color:#ff6a6a">0</td></tr>
+            <tr><td>미검사</td><td id="qUn" style="color:#f3d56b">0</td></tr>
+          </table>
+        </div>
+      </div>
+      <div class="charts">
+        <div class="cbox">
+          <svg width="74" height="74" viewBox="0 0 42 42" aria-hidden="true">
+            <circle cx="21" cy="21" r="15.9" fill="#241f4a"/>
+            <circle id="arcGood" cx="21" cy="21" r="15.9" fill="none" stroke="#4ad06a" stroke-width="10" stroke-dasharray="0 100" transform="rotate(-90 21 21)"/>
+            <circle id="arcBad" cx="21" cy="21" r="15.9" fill="none" stroke="#e04a4a" stroke-width="10" stroke-dasharray="0 100" transform="rotate(-90 21 21)"/>
+            <circle id="arcUn" cx="21" cy="21" r="15.9" fill="none" stroke="#f3d56b" stroke-width="10" stroke-dasharray="0 100" transform="rotate(-90 21 21)"/>
+          </svg>
+          <div class="lg"><i style="background:#4ad06a"></i>양품 <span id="lgG">—</span><br><i style="background:#e04a4a"></i>불량 <span id="lgB">—</span><br><i style="background:#f3d56b"></i>미검사 <span id="lgU">—</span></div>
+        </div>
+        <div class="cbox"><div class="lg" id="defDist" style="font-size:7.5px;line-height:1.7">불량 유형별 분포<br><span style="color:#8f9bb5">검사 시작 후 표시</span></div></div>
+      </div>
+      <div id="trendWrap">
+        <div class="t">검사 속도 (Tablet/Hour)</div>
+        <canvas id="trend" width="320" height="58"></canvas>
+        <div class="hfoot"><span>검사 속도 ≫</span><b id="fSpeed" style="color:#5fe07a">0 T/H</b></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="task" aria-live="polite">
+    <div><div class="code" id="tCode"></div><h2 id="tTitle"></h2><p id="tInstr"></p><div class="src" id="tSrc"></div></div>
+    <div class="work" id="tWork"></div>
+    <div class="act">
+      <div class="fb" id="fb"></div>
+      <button class="btn primary" id="runBtn" type="button">실행</button>
+      <div class="row"><button class="btn" id="prevBtn" type="button">이전 단계</button><button class="btn" id="nextBtn" type="button">다음 단계</button></div>
+    </div>
+  </section>
+  <nav class="rail" id="rail" aria-label="단계 선택"></nav>
+</div>
+<div class="modal" id="modal" hidden><div class="card" id="modalCard"></div></div>
+
+<script>
+(()=>{
+'use strict';
+const $=s=>document.querySelector(s);
+const $$=s=>Array.from(document.querySelectorAll(s));
+const scene=$('#scene');
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const cl=(v,a,b)=>Math.min(b,Math.max(a,v));
+const NS='http://www.w3.org/2000/svg';
+
+(()=>{let t='';for(let k=-7;k<=7;k++)t+=`<line x1="${400+k*44}" y1="250" x2="${400+k*120}" y2="500"/>`;
+[268,292,322,360,408,470].forEach(y=>{const f=(y-250)/250;t+=`<line x1="${110-110*f}" y1="${y}" x2="${690+110*f}" y2="${y}"/>`});$('#tiles').innerHTML=t;})();
+
+/* 수거함 */
+const BINS=[['양품','#4ad06a',600],['언리젝트','#6fa8dc',646],['불량','#e04a4a',692],['미검사','#f3d56b',738]];
+(()=>{let h='';BINS.forEach(([n,c,x],i)=>{
+ h+=`<rect x="${x-20}" y="398" width="40" height="44" rx="3" fill="#eef3f5" stroke="#6f8a9c" stroke-width="2"/>
+     <rect id="bin${i}" x="${x-18}" y="440" width="36" height="0" fill="${c}" opacity=".75"/>
+     <rect x="${x-20}" y="398" width="40" height="44" rx="3" fill="none" stroke="#6f8a9c" stroke-width="2"/>
+     <text x="${x}" y="456" text-anchor="middle" font-size="9" fill="#445764" font-weight="700">${n}</text>`;});
+ h+=`<path d="M566,380 L756,380" stroke="#aab4b8" stroke-width="7" stroke-linecap="round"/>`;
+ $('#bins').innerHTML=h;})();
+
+/* ───── 상태 ───── */
+const IDLE={name:'—',lot:'—',transfer:0,outer:0,inner:0,vib:0,grade:'표준',
+ all:0,good:0,bad:0,un:0,elapsed:0,state:'대기',running:false,batch:false};
+const H=o=>Object.assign({},IDLE,o);
+const THPR=580;                    // 트랜스퍼 1RPM 당 시간당 처리량
+const speedTH=v=>Math.round(v.transfer*THPR);
+const ratioOf=v=>v.transfer>0?v.outer/v.transfer:0.75;
+function rates(v){
+  if(v.transfer<1) return {un:0,bad:0};
+  const dev=Math.abs(ratioOf(v)-0.75);
+  const un = 0.25 + Math.max(0,v.transfer-60)*0.055 + dev*58;
+  const gf = v.grade==='느슨'?0.72:(v.grade==='엄격'?1.38:1);
+  return {un:cl(un,0,60), bad:2.05*gf};
+}
+const DEFTYPES=[['속면 이물',43.98],['이흠',20.35],['얼룩',10.15],['외형파손',9.65],['모서리 얼룩',6.70],['모서리 파손',5.14],['혹 불량',2.49],['기타',1.54]];
+
+/* ───── 단계 ───── */
+const S=o=>o;
+const STEPS=[
+S({code:'P1',group:'prep',name:'사전점검',title:'검사 전 장비 점검',loc:'mach',say:'점검부터 시작해요',
+ instr:'선별 전에 장비 내부와 체인지 파트 상태를 확인합니다. 링브로워 필터 막힘은 음압 부족 알람의 1순위 원인입니다.',
+ src:'매뉴얼 제5장 점검 사항(검사 전) · SOP-EQM-00299',
+ checks:['장비 내부(호퍼·스크류 피더·원심력 피더)와 수거함에 전 제품 잔류 없음','가이드가 바르게 장착되어 있는지 확인','체인지 파트가 안정적으로 고정되어 있는지 확인','중간 호퍼 높이가 적절한지 확인','외측 디스크·트랜스퍼 실리콘 벨트 균일 장착 확인','대기 위치에서 외측 디스크를 손으로 돌려 간섭 없음 확인','링브로워 필터 막힘 여부 확인'],
+ run:{label:'현장 순회 점검',path:['mach','blower','bins','panel'],dur:1200,say:'점검 끝!'},
+ hmi:H({state:'점검 완료'})}),
+S({code:'P2',group:'prep',name:'로그인',title:'로그인과 접속 등급',loc:'panel',say:'내 계정으로 로그인',
+ instr:'지정된 ID/PW로 본인이 직접 로그인합니다. 접속 등급에 따라 가능한 작업이 다릅니다.',
+ src:'SOP-EQM-00299 3.1 접속등급에 따른 권한 · 5.1.21 계정 관리방법',
+ q:'일반 작업자(작업원) 계정으로 할 수 없는 것은?',
+ opts:[['작업자 등록·삭제, 비밀번호 변경, 관리자 메뉴',1,'맞아요. 작업자 관리와 관리자 메뉴는 관리자(품질경영팀) 전용입니다. 기계 세팅과 이미지 촬영은 상급 작업자 이상이 수행합니다.'],
+       ['제품 정보 입력과 정제 테스트',0,'신규 정제 입력·정제명 변경·정제 테스트는 일반 작업자도 가능합니다.'],
+       ['검사 시작과 검사 이력 관리',0,'검사와 검사 이력 관리는 일반 작업자도 가능합니다.']],
+ run:{label:'로그인 · 제품 호출',anim:['panel-active'],dur:1400,say:'로그인 완료'},
+ hmi:H({state:'로그인',name:'동화A',lot:'DWA-2609A'})}),
+S({code:'1',group:'set',name:'제품정보',title:'제품 정보 입력 — 기존 정제 호출',loc:'panel',say:'기존 정제 검색',
+ instr:'이미 등록된 제품은 [기존정제]에서 검색해 호출합니다. 신규 등록 시에는 품명·종류·모양·크기·색상·각인·분할선을 입력합니다.',
+ src:'SOP-EQM-00299 5.1.2 검사 전 세팅',
+ q:'신규 정제 등록 시 [정제 색상]을 정확히 입력해야 하는 이유는?',
+ opts:[['입력된 색상 값에 의해 촬영 밝기 값이 설정되기 때문',1,'맞아요. SOP에 명시되어 있습니다. 실제 정제와 가장 유사한 색을 선택해야 이미지가 제대로 잡힙니다.'],
+       ['보고서 인쇄 색상을 맞추기 위해',0,'색상 값은 카메라 촬영 밝기 설정에 쓰입니다. 인쇄와 무관합니다.'],
+       ['불량 판정 기준값이 색으로 정해지기 때문',0,'판정 기준은 등급 설정에서 정합니다. 색상은 촬영 조건 설정용입니다.']],
+ run:{label:'기존 정제 호출',anim:['panel-active'],dur:1200,say:'제품 호출'},
+ hmi:H({state:'제품 호출',name:'동화A',lot:'DWA-2609A'})}),
+S({code:'2',group:'set',name:'기계 세팅',title:'체인지 파트 교체와 기계 세팅',loc:'mach',say:'파트 교체할게요',
+ instr:'화면 상단의 체인지 파트 정보와 세팅 값에 맞춰 부품을 교체합니다. 교체가 끝나면 [나가기]를 누릅니다.',
+ src:'SOP-EQM-00299 5.1.3 기계세팅',
+ checks:['고정 가이드 교체','게이트1 교체','게이트2 교체','호퍼 레벨 조정','외측 디스크 교체'],
+ run:{label:'체인지 파트 교체',path:['mach'],dur:1600,say:'교체 완료'},
+ hmi:H({state:'기계 세팅',name:'동화A',lot:'DWA-2609A'})}),
+S({code:'3',group:'set',name:'정제 테스트',title:'정제 테스트와 수치 제어',loc:'mach',say:'안착 상태 확인',runFirst:true,
+ instr:'장비를 가동하며 정제가 트랜스퍼 정확한 위치에 안착하는지 확인합니다. 안착하지 않으면 수치 제어로 간격을 조절합니다.',
+ src:'SOP-EQM-00299 5.1.4 정제테스트',
+ q:'정제가 트랜스퍼 벨트 중앙에 안착하지 않습니다. 조절 순서로 맞는 것은?',
+ opts:[['피더–디스크 간격과 피더 센터 보정 → 게이트 틈새 크기 → 트랜스퍼 사이 간격',1,'맞아요. SOP의 수치 제어 순서입니다. 트랜스퍼 사이 간격이 너무 멀거나 좁으면 제품이 이송되지 못하고 떨어집니다.'],
+       ['검사 등급을 낮춰 통과시킨다',0,'등급은 불량 검출 강도입니다. 안착 불량을 등급으로 덮으면 미검사와 오판정이 늘어납니다.'],
+       ['트랜스퍼 속도를 최대로 올려 밀어 넣는다',0,'속도를 올리면 미검사가 오히려 늘어납니다. 물리적 간격을 먼저 맞춰야 합니다.']],
+ run:{label:'정제 테스트 가동',anim:['running'],dur:2400,say:'안착 확인 중'},
+ hmi:H({state:'정제 테스트',name:'동화A',lot:'DWA-2609A',transfer:20,outer:15,inner:16,vib:40,running:true})}),
+S({code:'4',group:'set',name:'이미지 촬영',title:'이미지 촬영 1차·2차',loc:'panel',say:'이미지 촬영',
+ instr:'제품 특징을 추출하기 위해 이미지를 촬영합니다. 1차와 2차는 목적과 조명 설정이 다릅니다.',
+ src:'SOP-EQM-00299 5.1.5 이미지 촬영',
+ q:'1차 촬영과 2차 촬영의 차이는?',
+ opts:[['1차는 12대 카메라로 각 100장(평균 이미지 추출), 2차는 조명을 바꿔 전·후면 2D 카메라로 각 100장(각인 추출)',1,'정확해요. 2차는 각인이 잘 보이도록 조명 설정을 변경해 촬영합니다.'],
+       ['1차는 앞면, 2차는 뒷면 촬영',0,'1차에서 이미 12대 카메라가 전 방향을 촬영합니다. 2차는 각인 추출용 조명 변경 촬영입니다.'],
+       ['1차는 양품, 2차는 불량품 촬영',0,'불량품 촬영 단계가 아닙니다. 둘 다 정상 제품의 특징 추출용입니다.']],
+ run:{label:'1차·2차 촬영 실행',anim:['panel-active','running'],dur:2600,say:'촬영 중'},
+ hmi:H({state:'이미지 촬영',name:'동화A',lot:'DWA-2609A',transfer:20,outer:15,inner:16,vib:40,running:true})}),
+S({code:'5',group:'set',name:'특징·학습',title:'특징 추출과 1·2차 학습',loc:'panel',say:'특징 추출',
+ instr:'평균 모양 추출 → 각인 추출(마스킹) → 기타 정보 추출 순으로 진행한 뒤 학습을 수행합니다.',
+ src:'SOP-EQM-00299 5.1.6~5.1.8',
+ checks:['평균 모양 추출(2D) 완료','앞면 각인 마스킹 — 실제 각인보다 살짝 두껍게 선 설정','기타 정보(분할선) 추출','1차 학습 실행','2차 학습 — 카메라 1~12 초록 박스 안에 제품 위치 확인'],
+ run:{label:'특징 추출 · 학습',anim:['panel-active'],dur:2200,say:'학습 완료'},
+ hmi:H({state:'학습 완료',name:'동화A',lot:'DWA-2609A'})}),
+S({code:'6',group:'speed',name:'속도 설정',title:'속도 설정 — 트랜스퍼 기준',loc:'panel',say:'속도 설정',
+ instr:'속도는 트랜스퍼 → 외측 디스크 → 내측 디스크 → 바이브레이터 순으로 잡습니다. 트랜스퍼 속도가 처리 용량의 기준입니다.',
+ src:'SOP-EQM-00299 5.1.9 · 매뉴얼 제5장 속도 설정',
+ q:'포켓 가이드 사용 시 트랜스퍼 60 RPM이면 외측 디스크는?',
+ opts:[['45 RPM (트랜스퍼 대비 ±5% 범위 내 일치)',1,'맞아요. 매뉴얼의 기준값입니다. 속도가 어긋나면 정제가 포켓 가이드에 걸려 자세가 틀어지거나 낙하합니다.'],
+       ['60 RPM (트랜스퍼와 같은 RPM)',0,'RPM 수치가 아니라 이송 속도가 같아야 합니다. 포켓 가이드 기준은 60:45입니다.'],
+       ['90 RPM (트랜스퍼보다 빠르게)',0,'외측이 빠르면 제품 간격이 좁아져 붙은 정제·미검사가 늘어납니다.']],
+ run:{label:'트랜스퍼 60 / 외측 45 설정',anim:['panel-active','running'],dur:2400,say:'60 : 45'},
+ hmi:H({state:'속도 설정',name:'동화A',lot:'DWA-2609A',transfer:60,outer:45,inner:47,vib:55,running:true})}),
+S({code:'7',group:'speed',name:'등급 설정',title:'불량별 검사 등급 설정',loc:'panel',say:'등급 설정',
+ instr:'불량 종류별로 검사 강도를 설정합니다. 검사 종료 조건과 구간 수율 한계치도 함께 지정합니다.',
+ src:'SOP-EQM-00299 5.1.10 등급 설정',
+ q:'같은 제품인데 지난 배치의 등급 설정을 그대로 써도 될까요?',
+ opts:[['안 됩니다 — 같은 제품이라도 Batch마다 세팅치가 상이해 등급 조정이 필요합니다',1,'맞아요. SOP 5.1.10.6에 명시되어 있습니다. 과립·타정 조건 차이로 정제 표면 상태가 배치마다 달라집니다.'],
+       ['됩니다 — 제품이 같으면 등급도 같습니다',0,'SOP는 Batch마다 등급 조정이 필요하다고 규정합니다.'],
+       ['됩니다 — 챌린지 테스트에서 걸러집니다',0,'챌린지 테스트는 확인 수단이지, 등급 조정을 생략하는 근거가 아닙니다.']],
+ run:{label:'등급 · 종료조건 · 수율한계 설정',anim:['panel-active'],dur:1800,say:'등급 설정 완료'},
+ hmi:H({state:'등급 설정',name:'동화A',lot:'DWA-2609A',transfer:60,outer:45,inner:47,vib:55})}),
+S({code:'8',group:'speed',name:'챌린지',title:'불량표준품 챌린지 테스트',loc:'mach',say:'챌린지 테스트',
+ instr:'검사 전 불량표준품 20T로 선별기 성능을 테스트합니다. 제품명에 "챌린지 Test", 수량 20T로 3회 수행합니다.',
+ src:'SOP-EQM-00299 5.1.11 불량표준품 테스트',
+ checks:['불량표준품 20T · 3회 수행','결과 적합 확인','불량표준품 회수','정제선별기 불량 배출 점검표(FORM-00543)에 기재'],
+ q:'챌린지 테스트 결과가 부적합이면?',
+ opts:[['등급 조정을 다시 수행한 후 테스트를 재수행한다',1,'맞아요. 연속 작업의 경우 첫 Batch만 시행합니다.'],
+       ['그대로 본검사를 진행하고 결과로 판단한다',0,'검출 성능이 입증되지 않은 상태로 본검사를 하면 불량이 양품으로 흘러갑니다.'],
+       ['불량표준품을 바꿔서 다시 한다',0,'표준품이 아니라 등급 설정을 조정해야 합니다.']],
+ run:{label:'챌린지 Test 20T × 3회',anim:['running'],dur:2600,say:'적합 확인'},
+ hmi:H({state:'챌린지 Test',name:'챌린지 Test',lot:'—',transfer:60,outer:45,inner:47,vib:55,running:true})}),
+S({code:'9',group:'run',name:'검사 시작',title:'배치 입력과 검사 시작',loc:'panel',say:'검사 시작',
+ instr:'[검사] → [배치 입력]으로 LOT과 검사 조건을 입력한 뒤 검사를 시작합니다.',
+ src:'SOP-EQM-00299 5.1.12 검사 시작',
+ checks:['LOT · 생산 단위 입력','검사 종료 조건 선택','구간 수율 한계 확인','카메라 12대 활성 확인'],
+ run:{label:'배치 입력 · 검사 시작',anim:['panel-active','running'],dur:2600,say:'검사 시작!'},
+ set:{hop:1},
+ hmi:H({state:'검사 중',name:'동화A',lot:'DWA-2609A',transfer:60,outer:45,inner:47,vib:55,running:true,batch:true,
+  all:42800,good:41880,bad:872,un:48,elapsed:2640})}),
+S({code:'10',group:'run',name:'검사 중 감시',title:'검사 중 감시 항목',loc:'mach',say:'상태 감시',
+ instr:'검사 중에는 정해진 항목을 계속 확인합니다. 이상 발생 시 공정 담당자에게 보고합니다.',
+ src:'매뉴얼 제5장 점검 사항(검사 중)',
+ checks:['기계부 에어 공급·바이브레이션 피더 진동 상태 정상','트랜스퍼 위 제품 안착 상태 확인','스크류·원심력 피더에 제품 안정 공급 확인','미검사 과다 발생 여부 확인','나정 검사 시 분진 문제 여부 확인'],
+ run:{label:'순회 감시',path:['mach','bins','panel'],anim:['running'],dur:2600,say:'정상 진행'},
+ hmi:H({state:'검사 중',name:'동화A',lot:'DWA-2609A',transfer:60,outer:45,inner:47,vib:55,running:true,batch:true,
+  all:98400,good:96180,bad:2118,un:102,elapsed:6180})}),
+S({code:'11',group:'run',name:'미검 상승',title:'미검률 상승 — 원인 판단',loc:'panel',say:'미검이 늘었어요',runFirst:true,
+ instr:'미검사 비율이 오르고 있습니다. HMI의 미검사 정보를 보니 "붙은 정제"가 가장 많습니다.',
+ src:'매뉴얼 제6장 미검사 정보 · 제5장 속도 설정',
+ q:'"붙은 정제" 미검사가 늘었습니다. 조치는?',
+ opts:[['원심력 피더 속도를 조금 낮추거나 트랜스퍼 속도를 높인다',1,'맞아요. 원심력 피더가 트랜스퍼보다 상대적으로 빠를 때 생깁니다. 다만 트랜스퍼를 낮출 때는 원심력 피더도 함께 낮춰야 공급 트러블과 미검사가 안 생깁니다.'],
+       ['검사 등급을 느슨하게 조정한다',0,'미검사는 검출 강도 문제가 아니라 이송·간격 문제입니다. 등급을 낮추면 불량이 양품으로 흘러갑니다.'],
+       ['미검사 통을 비우고 계속 진행한다',0,'통을 비우는 건 수량 한계 알람 대응이지 원인 조치가 아닙니다.']],
+ run:{label:'미검사 정보 확인',path:['panel'],anim:['running'],dur:2200,say:'붙은 정제 다수'},
+ hmi:H({state:'미검 상승',name:'동화A',lot:'DWA-2609A',transfer:60,outer:56,inner:58,vib:70,running:true,batch:true,
+  all:132600,good:126900,bad:2880,un:2820,elapsed:9600})}),
+S({code:'12',group:'run',name:'속도 보정',title:'속도 보정과 안정화',loc:'panel',say:'속도 되돌리기',
+ instr:'외측 디스크 속도를 기준 비율로 되돌려 미검률을 낮춥니다. 보정 후 안정화를 확인합니다.',
+ src:'SOP-EQM-00299 5.1.9.7 · 매뉴얼 제5장',
+ checks:['외측 디스크 56 → 45 RPM 보정','내측 디스크 동반 조정','미검사 발생하지 않는 지점을 최대 속도로 설정','보정 내용 기록'],
+ run:{label:'속도 보정 후 안정화',anim:['panel-active','running'],dur:2600,say:'안정됐어요'},
+ hmi:H({state:'검사 중',name:'동화A',lot:'DWA-2609A',transfer:60,outer:45,inner:47,vib:55,running:true,batch:true,
+  all:176280,good:172211,bad:3970,un:99,elapsed:13041})}),
+S({code:'13',group:'run',name:'수율 판단',title:'수율 판단 — 관리수율 대비',loc:'panel',say:'수율 확인',
+ instr:'검사가 진행되며 수율이 97.75%로 표시됩니다. 제조지시·기록서의 선별 공정 관리수율은 98.5~100.0%입니다.',
+ src:'제조지시·기록서 공정별 관리수율 · 지시사항 1항',
+ q:'수율 97.75%. 어떻게 할까요?',
+ opts:[['관리수율 미달 → 생산팀장에게 보고하고 사유·조치사항을 기록한다',1,'맞아요. 기록서 지시사항 1항이 명시합니다. 불량 유형 분포(속면 이물 44%)를 함께 보고하면 전 공정 원인 추적이 빨라집니다.'],
+       ['98%에 가까우니 반올림해서 진행한다',0,'관리수율은 반올림 대상이 아닙니다. 벗어나면 보고·기록 대상입니다.'],
+       ['등급을 느슨하게 바꿔 수율을 올린다',0,'검출 강도를 낮춰 수율을 맞추는 것은 품질 데이터 조작에 해당합니다.']],
+ run:{label:'불량 분포 확인 · 보고',path:['panel'],anim:['running'],dur:2200,say:'팀장 보고'},
+ hmi:H({state:'검사 중',name:'동화A',lot:'DWA-2609A',transfer:60,outer:45,inner:47,vib:55,running:true,batch:true,
+  all:176280,good:172211,bad:3970,un:99,elapsed:13041})}),
+S({code:'E1',group:'end',name:'미선별',title:'검사 종료와 미선별 재선별',loc:'bins',say:'미선별 처리',
+ instr:'미선별 통에 있는 정제를 재투입해 다시 선별합니다. 재선별 횟수에는 제한이 있습니다.',
+ src:'SOP-EQM-00299 5.1.13 검사 종료',
+ q:'1회 미선별 재선별 후에도 미선별 정제가 또 나왔습니다. 어떻게 할까요?',
+ opts:[['불량 정제와 함께 전량 폐기하고, 무게를 확인해 불량의약품 보관/처리 기록서(FORM-00605)에 기재',1,'맞아요. 미선별 재선별은 2회 이상 수행하지 않습니다. 미선별 수량은 검사기록서에서 제외됩니다.'],
+       ['한 번 더 재선별해 최대한 회수한다',0,'2회 이상 재선별은 SOP 위반입니다. 반복 이송은 정제 손상 위험도 있습니다.'],
+       ['양품 통에 합쳐 수율을 맞춘다',0,'검사되지 않은 정제를 양품에 섞는 것은 명백한 품질 위반입니다.']],
+ run:{label:'미선별 재선별 1회 · 폐기 처리',path:['bins'],dur:2400,say:'폐기 기록'},
+ hmi:H({state:'검사 종료',name:'동화A',lot:'DWA-2609A',batch:true,all:176280,good:172211,bad:3970,un:99,elapsed:13041})}),
+S({code:'E2',group:'end',name:'재선별',title:'불량 재선별 판단',loc:'panel',say:'재선별 판단',
+ instr:'이송 불안정으로 양품이 과검출된 정황이 있습니다. 불량정제통의 정제를 재투입할지 판단합니다.',
+ src:'SOP-EQM-00299 5.1.14 재선별',
+ q:'불량 재선별을 언제 수행할 수 있나요?',
+ opts:[['이송불안정 사유로 양품이 과검출됐을 때, 생산팀장의 판단 하에 수행',1,'맞아요. 작업자가 임의로 결정하지 않습니다. 재선별 후에도 결과 보고서를 출력해 첨부합니다.'],
+       ['불량률이 높으면 작업자 판단으로 언제든 수행',0,'재선별은 생산팀장 판단 사항입니다. 임의 재선별은 불량을 양품으로 되돌리는 결과가 될 수 있습니다.'],
+       ['재선별은 어떤 경우에도 금지',0,'이송불안정에 의한 과검출은 SOP가 인정하는 재선별 사유입니다.']],
+ run:{label:'팀장 보고 · 재선별 수행',anim:['panel-active','running'],dur:2400,say:'재선별 완료'},
+ hmi:H({state:'재선별',name:'동화A',lot:'DWA-2609A',batch:true,all:176280,good:172211,bad:3970,un:99,elapsed:13041})}),
+S({code:'E3',group:'end',name:'리포트',title:'결과 보고서 출력과 데이터 정본',loc:'panel',say:'기록 마감',
+ instr:'[검사 이력 관리]에서 결과 보고서를 출력합니다. 선별 완료 후 가동 데이터(Batch data) 출력본이 정본입니다.',
+ src:'SOP-EQM-00299 5.1.13.5 · 5.1.20 데이터 정본',
+ checks:['검사 이력 관리에서 결과 보고서 출력','Batch data 출력본을 정본으로 첨부','검체 채취(QC) 및 ERP 시험의뢰 확인','제조지시·기록서에 Raw Data 첨부'],
+ run:{label:'보고서 출력 · 첨부',anim:['panel-active'],dur:1800,say:'첨부 완료'},
+ hmi:H({state:'리포트',name:'동화A',lot:'DWA-2609A',batch:true,all:176280,good:172211,bad:3970,un:99,elapsed:13041})}),
+S({code:'E4',group:'end',name:'클리닝',title:'클리닝 상태 전환과 세척',loc:'mach',say:'세척합니다',
+ instr:'검사 후 장비를 [클리닝] 상태로 두고 세척합니다. 나정과 코팅정·캡슐의 세척 방법이 다릅니다.',
+ src:'SOP-EQM-00299 5.2 세척 · 매뉴얼 제5장 점검 사항(검사 후)',
+ q:'나정(裸錠) 세척에만 추가로 적용되는 절차는?',
+ opts:[['미온수 30분 침적 → 중성세제 세척 → 온수 거품 제거 → 정제수 린싱 → Air Gun 물기 제거',1,'맞아요. 코팅정·캡슐은 70% 에탄올과 정제수·와이퍼만 사용합니다. 나정은 분진이 많아 습식 세척이 추가됩니다.'],
+       ['70% 에탄올 분무 후 무진 와이퍼로 닦기',0,'이건 나정·코팅정 공통 절차입니다.'],
+       ['조명 모듈을 물에 담가 세척',0,'조명 모듈은 절대 물에 잠기게 해서는 안 됩니다. 정제수에 적신 와이퍼로 겉면만 닦습니다.']],
+ run:{label:'클리닝 전환 · 세척',path:['mach','blower'],dur:2400,say:'세척 완료'},
+ hmi:H({state:'클리닝',name:'—',lot:'—'})}),
+S({code:'E5',group:'end',name:'로그아웃',title:'로그아웃',loc:'panel',say:'마지막 한 가지',
+ instr:'모든 절차를 마친 후 본인 계정에서 로그아웃합니다.',
+ src:'SOP-EQM-00299 5.1.1.3 프로그램 절차 · 5.1.21 계정 관리방법',
+ q:'작업 마감 시 마지막으로?',
+ opts:[['본인 계정 로그아웃',1,'첫 배치 완료!'],
+       ['다음 근무자를 위해 로그인 유지',0,'로그인 정보를 공유하거나 노출해서는 안 됩니다. 감사 추적이 실제 작업자를 가리키지 못하게 됩니다.']],
+ hmi:H({state:'로그아웃',name:'—',lot:'—'})})
+];
+const LAST=STEPS.length-1;
+const GROUPS=[['준비','prep'],['세팅·학습','set'],['속도·등급','speed'],['검사','run'],['마감','end']];
+const LOC={panel:{x:214,y:452,d:1},mach:{x:330,y:462,d:1},bins:{x:600,y:478,d:-1},blower:{x:160,y:420,d:1},center:{x:400,y:466,d:1}};
+const st=STEPS.map(()=>({checks:new Set(),choice:false,ran:false}));
+const doneSet=new Set(); const log=[];
+let cur=0,running=false,errors=0,hold=false,fbMsg='',fbBad=false,moveTok=0;
+let opPos={x:400,y:466,d:1};
+let live=Object.assign({},IDLE);
+let spin=0,beltPhase=0,hist=[];
+
+const taskOk=i=>{const s=STEPS[i],x=st[i];return (s.checks||[]).every((_,k)=>x.checks.has(k))&&(!s.q||x.choice)};
+const isDone=i=>taskOk(i)&&(!STEPS[i].run||st[i].ran);
+
+/* 작업자 */
+const scaleAt=y=>.55+(y-250)/250*.55;
+function setOpT(){const s=scaleAt(opPos.y);$('#op').style.transform=`translate(${opPos.x}px,${opPos.y}px) scale(${s})`;$('#bubble').style.transform=`translate(${opPos.x}px,${opPos.y-118*s}px)`;}
+const flip=d=>$('#opFlip').style.transform=`scaleX(${d})`;
+function bubble(t){$('#bubbleText').textContent=t;const w=Math.min(290,t.length*12.5+26);const r=$('#bubbleRect');r.setAttribute('x',-w/2);r.setAttribute('width',w);}
+function moveTo(key,cb){const L=LOC[key]||LOC.center,tok=++moveTok,op=$('#op');
+ const dist=Math.hypot(L.x-opPos.x,L.y-opPos.y);const dur=Math.max(340,Math.min(1600,dist*4));
+ op.style.transitionDuration=dur+'ms';$('#bubble').style.transitionDuration=dur+'ms';
+ if(dist>4){flip(L.x<opPos.x?-1:1);op.classList.add('walking');}
+ opPos={...L};setOpT();
+ setTimeout(()=>{if(tok!==moveTok&&!cb)return;op.classList.remove('walking');flip(L.d);cb&&cb();},dist>4?dur:60);}
+function walkPath(arr,cb){let k=0;const nx=()=>k<arr.length?moveTo(arr[k++],()=>setTimeout(nx,110)):cb();nx();}
+const working=on=>$('#op').classList.toggle('working',on);
+
+/* 정제 파티클 (피더 → 트랜스퍼1 → 트랜스퍼2 → 배출) */
+const P=[];const pg=$('#parts');
+function spawn(){
+  if(P.length>46) return;
+  const e=document.createElementNS(NS,'circle');
+  e.setAttribute('r',3.1);e.setAttribute('fill','#efe7d6');e.setAttribute('stroke','#b9ae93');
+  pg.appendChild(e);
+  P.push({e,t:0,cls:Math.random()});
+}
+function pathAt(t){
+  if(t<.30){const u=t/.30,a=-Math.PI*0.9+u*Math.PI*1.5;return [318+44*Math.cos(a),218+15*Math.sin(a)];}
+  if(t<.62){const u=(t-.30)/.32;return [372+u*86,214];}
+  if(t<.72){const u=(t-.62)/.10;return [458+u*(452-458),214+u*(190-214)];}
+  if(t<.95){const u=(t-.72)/.23;return [452+u*80,190];}
+  const u=(t-.95)/.05;return [532+u*18,190+u*40];
+}
+function stepParts(dt){
+  const sp=live.running? cl(live.transfer/60,0,2)*0.42 : 0;
+  for(let i=P.length-1;i>=0;i--){
+    const p=P[i];p.t+=sp*dt;
+    if(p.t>=1){p.e.remove();P.splice(i,1);continue;}
+    const [x,y]=pathAt(p.t);
+    p.e.setAttribute('cx',x);p.e.setAttribute('cy',y);
+    p.e.setAttribute('opacity', p.t>.93?(1-p.t)*14:1);
+    const r=rates(live);
+    if(p.t>.72){
+      const bad=p.cls<r.bad/100, un=p.cls>1-r.un/100;
+      p.e.setAttribute('fill', bad?'#e88':(un?'#f3d56b':'#efe7d6'));
+    }
+  }
+}
+let spawnAcc=0;
+function raf(now){
+  const dt=Math.min(.05,(now-(raf.last||now))/1000); raf.last=now;
+  spin+=(live.running?live.outer:0)*dt*6; beltPhase-=(live.running?live.transfer:0)*dt*0.9;
+  $('#discOuter').setAttribute('transform',`rotate(${spin} 0 -6)`);
+  $('#discInner').setAttribute('transform',`rotate(${-spin*1.15} 0 -8)`);
+  $('#belt1').setAttribute('stroke-dashoffset',beltPhase);
+  $('#belt2').setAttribute('stroke-dashoffset',beltPhase);
+  $('#blowerFan').setAttribute('transform',`rotate(${live.running?spin*2:0} 152 327)`);
+  if(live.running){spawnAcc+=dt*cl(live.transfer/6,0,14);while(spawnAcc>1){spawn();spawnAcc-=1;}}
+  stepParts(dt);
+  requestAnimationFrame(raf);
+}
+requestAnimationFrame(raf);
+
+/* HMI 렌더 */
+function fmtT(s){const m=Math.floor(s/60),ss=Math.round(s%60);const h=Math.floor(m/60);
+ return h>0?`${h}시간 ${m%60}분 ${ss}초`:`${m}분 ${ss}초`;}
+function drawTrend(v){
+  const c=$('#trend'),x=c.getContext('2d'),W=c.width,H=c.height;
+  x.fillStyle='#241f4a';x.fillRect(0,0,W,H);
+  x.strokeStyle='#3a3570';x.lineWidth=1;
+  for(let i=1;i<4;i++){x.beginPath();x.moveTo(0,H/4*i);x.lineTo(W,H/4*i);x.stroke();}
+  if(hist.length>1){
+    x.strokeStyle='#cfd6ff';x.lineWidth=1.6;x.beginPath();
+    hist.forEach((h,i)=>{const px=i/(hist.length-1)*W, py=H-cl(h/90000,0,1)*(H-6)-3;
+      i?x.lineTo(px,py):x.moveTo(px,py);});
+    x.stroke();
+  }
+}
+function renderHMI(v,i){
+  live=v;
+  const d=new Date();
+  $('#hClock').textContent='현재 시각 '+d.toTimeString().slice(0,8);
+  $('#sysState').textContent=hold?'알람':v.state;
+  $('#sysState').className=hold?'ng':'';
+  $('#iName').textContent=v.name;$('#iLot').textContent=v.lot;
+  const th=speedTH(v);
+  $('#iSpeed').textContent=th.toLocaleString('en-US')+' T/H';
+  $('#fSpeed').textContent=th.toLocaleString('en-US')+' T/H';
+  const y=v.all>0?(v.good/v.all*100):0;
+  $('#iYield').textContent=v.all>0?y.toFixed(2)+' %':'—';
+  $('#iTime').textContent=fmtT(v.elapsed);
+  $('#qAll').textContent=Math.round(v.all).toLocaleString('en-US');
+  $('#qGood').textContent=Math.round(v.good).toLocaleString('en-US');
+  $('#qBad').textContent=Math.round(v.bad).toLocaleString('en-US');
+  $('#qUn').textContent=Math.round(v.un).toLocaleString('en-US');
+  const gp=v.all>0?v.good/v.all*100:0, bp=v.all>0?v.bad/v.all*100:0, up=v.all>0?v.un/v.all*100:0;
+  $('#arcGood').setAttribute('stroke-dasharray',`${gp} ${100-gp}`);
+  $('#arcBad').setAttribute('stroke-dasharray',`${bp} ${100-bp}`);
+  $('#arcBad').setAttribute('stroke-dashoffset',`${-gp}`);
+  $('#arcUn').setAttribute('stroke-dasharray',`${up} ${100-up}`);
+  $('#arcUn').setAttribute('stroke-dashoffset',`${-(gp+bp)}`);
+  $('#lgG').textContent=v.all?gp.toFixed(2)+'%':'—';
+  $('#lgB').textContent=v.all?bp.toFixed(2)+'%':'—';
+  $('#lgU').textContent=v.all?up.toFixed(2)+'%':'—';
+  if(v.bad>0){
+    $('#defDist').innerHTML='불량 유형별 분포<br>'+DEFTYPES.map(([n,p])=>
+      `<span style="color:#cfd6ff">${n}</span> <b>${Math.round(v.bad*p/100).toLocaleString('en-US')}</b> <span style="color:#8f9bb5">${p}%</span>`).join('<br>');
+  } else $('#defDist').innerHTML='불량 유형별 분포<br><span style="color:#8f9bb5">검사 시작 후 표시</span>';
+  const on=v.bad>0;
+  $('#defTab').classList.toggle('on',on);
+  $('#defNo').textContent=on?Math.round(v.all-15).toLocaleString('en-US'):'—';
+  $('#defCam').textContent=on?'CAM - 11':'CAM - —';
+  $('#defType').textContent=on?'일반 영역 혹 불량':'—';
+  $('#defSize').textContent=on?'0.53mm':'—';
+  ['tBatch','tStart','tStop','tImg','tSet','tExit'].forEach(id=>$('#'+id).classList.remove('on'));
+  if(v.running)$('#tStart').classList.add('on');
+  else if(v.batch)$('#tStop').classList.add('on');
+  if(hold)$('#tStop').classList.add('on');
+  scene.classList.toggle('running',!!v.running&&!hold);
+  $('#sigBar').setAttribute('fill', hold?'#ff3b30':(v.running?'#3fd14a':'#8e979c'));
+  $('#lampG').setAttribute('fill', v.running&&!hold?'#48e062':'#2b5b35');
+  // 수거함
+  const tot=176280;
+  const fills=[v.good/tot, v.good/tot*0.012, v.bad/tot, v.un/tot];
+  fills.forEach((f,k)=>{const h=cl(f,0,1)*42;const el=$('#bin'+k);if(el){el.setAttribute('height',h);el.setAttribute('y',440-h);}});
+  $('#hopFill').setAttribute('height', String(cl(40-(v.all/tot)*26,6,40)));
+  $('#filtClog').setAttribute('width', String(cl((v.elapsed/13041)*22,0,52)));
+  hist.push(th); if(hist.length>70)hist.shift();
+  drawTrend(v);
+}
+
+/* 과제 패널 */
+function renderTask(){
+ const s=STEPS[cur],x=st[cur],done=isDone(cur);
+ const lock=running||done||(s.runFirst&&!x.ran);
+ $('#tCode').textContent=`${s.code} · ${s.name}`;
+ $('#tTitle').textContent=s.title;$('#tInstr').textContent=s.instr;$('#tSrc').textContent='근거: '+s.src;
+ let h='';
+ if(s.runFirst&&!x.ran)h+=`<p class="muted">먼저 오른쪽 “${esc(s.run.label)}”을 눌러 진행하세요.</p>`;
+ if(s.checks)h+=s.checks.map((c,k)=>`<button type="button" class="chk" data-chk="${k}" aria-pressed="${x.checks.has(k)}" ${lock?'disabled':''}><span class="box">${x.checks.has(k)?'✓':''}</span>${esc(c)}</button>`).join('');
+ if(s.q)h+=`<div class="q">${esc(s.q)}</div>`+s.opts.map((o,k)=>`<button type="button" class="opt ${x.choice&&o[1]?'good':''}" data-opt="${k}" ${lock?'disabled':''}>${esc(o[0])}</button>`).join('');
+ if(!s.checks&&!s.q)h+='<p class="muted">확인 항목이 없습니다. 오른쪽 실행 버튼으로 진행하세요.</p>';
+ $('#tWork').innerHTML=h;
+ const rb=$('#runBtn');
+ if(s.run){rb.hidden=false;rb.textContent=x.ran?'실행 완료 ✓':s.run.label;rb.disabled=running||x.ran||!(s.runFirst||taskOk(cur));}else rb.hidden=true;
+ $('#prevBtn').disabled=running||cur===0;
+ const nb=$('#nextBtn');nb.disabled=running||!done;nb.textContent=cur===LAST?'결과 보기':'다음 단계';nb.classList.toggle('primary',done);
+ const fb=$('#fb');
+ fb.textContent=fbMsg||(done?'완료했어요. 다음 단계로 이동하세요.':(s.runFirst&&!x.ran)?'실행 후 결과를 판단해요.':'확인 항목과 질문을 마친 뒤 실행해요.');
+ fb.classList.toggle('bad',fbBad);
+ $('#progText').textContent=doneSet.size+' / '+STEPS.length+' 완료';
+ $('#progBar').style.width=(doneSet.size/STEPS.length*100)+'%';
+}
+function renderRail(){
+ $('#rail').innerHTML=GROUPS.map(([lab,g])=>`<div class="grp"><small>${lab}</small><div class="chips">${
+  STEPS.map((s,i)=>s.group!==g?'':`<button type="button" class="chip ${doneSet.has(i)?'done':''} ${i===cur?'cur':''}" data-go="${i}" ${running?'disabled':''} aria-current="${i===cur?'step':'false'}"><b>${esc(s.code)}</b>${esc(s.name)}</button>`).join('')
+ }</div></div>`).join('');
+ const c=document.querySelector('.chip.cur');c&&c.scrollIntoView({inline:'center',block:'nearest'});
+}
+function hmiRest(i){const s=STEPS[i];if(isDone(i))return s.hmi;
+ const p=i>0?STEPS[i-1].hmi:IDLE;
+ return Object.assign({},p,{running:false,state:i<2?'대기':'준비'});}
+function render(){renderTask();renderRail();if(!running)renderHMI(hmiRest(cur),cur);}
+function say(t,bad){fbMsg=t;fbBad=!!bad;}
+function afterChange(){
+ if(isDone(cur)&&!doneSet.has(cur)){doneSet.add(cur);log.push([STEPS[cur].code,STEPS[cur].title]);
+  if(!fbBad)fbMsg=fbMsg||'완료!';
+  if(cur===LAST){render();setTimeout(summary,700);return;}}
+ render();}
+function setStep(i){if(running||i<0||i>LAST)return;cur=i;fbMsg='';fbBad=false;working(false);render();
+ const s=STEPS[i];moveTo(s.loc);bubble(s.say||s.title);}
+function lerp(a,b,p){const o={};for(const k in b){o[k]=(typeof a[k]==='number'&&typeof b[k]==='number')?a[k]+(b[k]-a[k])*p:b[k];}return o;}
+
+function runStep(){
+ const i=cur,s=STEPS[i];if(running||!s.run||st[i].ran)return;
+ if(!s.runFirst&&!taskOk(i)){say('먼저 확인 항목과 질문을 완료해 주세요.',true);render();return;}
+ const hFrom=hmiRest(i);
+ running=true;say(`${s.run.label}…`);render();
+ walkPath(s.run.path||[s.loc],()=>{
+   working(true);bubble(s.run.say||s.title);
+   const anim=s.run.anim||[];anim.forEach(c=>scene.classList.add(c));
+   const hTo=s.hmi,dur=s.run.dur||2200,t0=performance.now();
+   const frame=now=>{
+     const p=Math.min(1,(now-t0)/dur);
+     const hv=lerp(hFrom,hTo,Math.min(1,p*1.25));
+     hv.state=hTo.state;hv.name=hTo.name;hv.lot=hTo.lot;hv.running=hTo.running||anim.includes('running');hv.batch=hTo.batch;
+     renderHMI(hv,i);
+     if(p<1)requestAnimationFrame(frame);
+     else{anim.forEach(c=>scene.classList.remove(c));working(false);st[i].ran=true;running=false;
+      say(s.q&&!st[i].choice?'실행을 마쳤어요. 이제 결과를 판단하세요.':(s.checks&&!taskOk(i))?'실행을 마쳤어요. 남은 확인 항목을 체크하세요.':'완료했어요. 다음 단계로 이동하세요.');
+      afterChange();}};
+   requestAnimationFrame(frame);});
+}
+
+document.addEventListener('click',e=>{
+ const b=e.target.closest('button');if(!b||b.disabled)return;
+ if(b.dataset.go!=null){setStep(+b.dataset.go);return;}
+ if(b.dataset.chk!=null){const x=st[cur],k=+b.dataset.chk;x.checks.has(k)?x.checks.delete(k):x.checks.add(k);say('');afterChange();return;}
+ if(b.dataset.opt!=null){const o=STEPS[cur].opts[+b.dataset.opt];
+   if(o[1]){st[cur].choice=true;say(o[2]);bubble('좋아요!');}else{errors++;say(o[2],true);bubble('다시 볼까요?');}
+   afterChange();return;}
+ if(b.id==='runBtn')return runStep();
+ if(b.id==='nextBtn'){cur===LAST?summary():setStep(cur+1);return;}
+ if(b.id==='prevBtn')return setStep(cur-1);
+ if(b.id==='drillBtn')return drill(0);
+ if(b.id==='infoBtn')return info();
+ if(b.dataset.drill!=null)return drillAnswer(+b.dataset.drill);
+ if(b.dataset.close!=null){closeModal();return;}
+ if(b.dataset.reset!=null){location.reload();return;}
+});
+
+const modal=$('#modal'),card=$('#modalCard');
+function openModal(h){card.innerHTML=h;modal.hidden=false;const f=card.querySelector('button');f&&f.focus();}
+function closeModal(){modal.hidden=true;if(hold){hold=false;scene.classList.remove('alarm');render();}}
+modal.addEventListener('click',e=>{if(e.target===modal)closeModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!modal.hidden)closeModal();});
+
+const DRILL=[
+ {q:'검사 중 "트랜스퍼의 음압이 부족합니다. 필터를 청소하여 주세요." 알람이 뜨며 기계가 멈췄습니다. 첫 조치는?',
+  opts:[['링브로워 필터를 청소하고 배기 배관 막힘 여부를 확인한다',1],['알람 리셋만 누르고 검사를 재시작한다',0],['음압 센서 설정값을 낮춰 알람이 안 뜨게 한다',0]],
+  bad:'알람 리셋만 누르거나 설정값을 낮추는 것은 원인 조치가 아닙니다. 필터 막힘이 1순위 원인이며, 배기 배관과 음압 센서 배관도 함께 점검합니다.'},
+ {q:'필터를 청소했는데도 같은 알람이 다시 발생합니다. 다음 행동은?',
+  opts:[['생산팀장에게 보고하고 A/S를 요청한다 (가동 시 음압 센서 수치 정보 확보)',1],['필터를 빼고 운전한다',0]],
+  bad:'필터 없이 운전하면 링브로워와 카메라부에 분진이 유입됩니다. 재차 발생 시 A/S 요청이 SOP 절차이며, 음압 센서 수치 정보를 함께 전달해야 합니다.'},
+ {q:'조치 후 재개할 때 확인할 것은?',
+  opts:[['정지 구간 정제의 처리 방침 확인 후 검사 재시작, 조치내용 기록',1],['바로 최대 속도로 복귀',0]],
+  bad:'정지 중 이송 경로에 남은 정제의 처리 방침을 먼저 정해야 하고, 조치내용은 기록으로 남깁니다.'}];
+let drillPhase=0;
+function drill(p){
+ if(running)return;
+ drillPhase=p;hold=true;scene.classList.add('alarm');renderHMI(hmiRest(cur),cur);
+ moveTo('blower');bubble('음압 부족! 정지');
+ const d=DRILL[p];
+ openModal(`<h3>비상상황 훈련 ${p+1}/3</h3><p>제조 흐름과 별개인 가상 상황이에요.</p>
+  <div class="q">${d.q}</div>${d.opts.map((o,k)=>`<button type="button" class="opt" data-drill="${k}">${o[0]}</button>`).join('')}
+  <p id="drillFb" class="muted"></p>`);
+}
+function drillAnswer(k){
+ const d=DRILL[drillPhase];
+ if(!d.opts[k][1]){errors++;$('#drillFb').textContent=d.bad;$('#drillFb').style.color='var(--warn)';return;}
+ if(drillPhase<2){if(drillPhase===0)working(true);drill(drillPhase+1);return;}
+ working(false);log.push(['훈련','음압 부족 알람 → 필터 청소 → 재발 시 보고·A/S → 기록 후 재개']);
+ openModal('<h3>비상상황 대응 완료</h3><p>원인 조치 → 재발 시 보고 → 기록 후 재개 순서를 확인했어요. 알람별 상세 조치는 사내 <b>EV 선별기 이상대응 DB</b>와 현행 SOP를 따릅니다.</p><button type="button" class="btn primary" data-close>훈련으로 돌아가기</button>');
+}
+function info(){
+ openModal(`<h3>자료와 주의사항</h3>
+ <p>사내 <b>SOP-EQM-00299 「자동정제캡슐선별기(EV) 가동 및 세척」</b>, 제조사 매뉴얼 제2·3·5·6·10장, 제조지시·기록서 선별 공정, 설비 현장 사진을 근거로 만든 교육용 초안입니다.</p>
+ <ul>
+ <li>HMI는 실기 메인 검사 화면(툴바 6개·불량 정보·검사 정보·수량 정보·불량 분포·검사 속도 트렌드) 구조를 재구성한 것으로, 실제 화면과 배치·표기가 다를 수 있습니다.</li>
+ <li>트랜스퍼 60 RPM : 외측 디스크 45 RPM(±5%), 불량표준품 20T·3회, 미선별 재선별 2회 이상 금지, 접속등급별 권한은 <b>SOP·매뉴얼 기재값</b>입니다.</li>
+ <li>수량·수율(176,280 / 97.75%)과 불량 유형 분포는 실기 화면에서 관찰된 값을 교육용 시나리오로 재현한 것이며 특정 배치의 실측 기록이 아닙니다.</li>
+ <li>검사속도·미검률·불량률의 변화는 교육용 근사 모델입니다. 실제 설비 거동과 다를 수 있습니다.</li>
+ <li>SOP는 현재 <b>Draft</b> 상태이며, 시행 후 확정 내용으로 교정이 필요합니다. 품명·LOT는 가상 값입니다.</li>
+ <li>훈련 완료는 작업 자격이나 전자서명을 뜻하지 않습니다.</li>
+ </ul><button type="button" class="btn primary" data-close>닫기</button>`);
+}
+function summary(){
+ openModal(`<h3>첫 배치 훈련 결과</h3>
+ <p>완료 ${doneSet.size} / ${STEPS.length} · 다시 선택한 횟수 ${errors}회</p>
+ ${log.map(l=>`<div class="logrow"><span>${esc(l[0])}</span><strong>${esc(l[1])}</strong></div>`).join('')}
+ <p style="margin-top:10px">가상 결과이며 새로 열면 사라집니다. 실제 작업 전에는 담당자의 교육과 자격 확인이 필요합니다.</p>
+ <div class="row"><button type="button" class="btn" data-close>닫기</button><button type="button" class="btn primary" data-reset>처음부터 다시</button></div>`);
+}
+
+setOpT();flip(1);
+setTimeout(()=>setStep(0),250);
+})();
+</script>
+</body>
+</html>
