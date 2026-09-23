@@ -1,0 +1,959 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>KC130F 코팅 첫 배치 시뮬레이터</title>
+<style>
+:root{--bg:#e8eaee;--surface:#fbfcfd;--ink:#1a2a38;--sub:#5d6b78;--line:#d2d8de;--accent:#1f4f7a;--on:#fff;--soft:#dde8f2;--warn:#a8322b;--warnsoft:#fbe7e2}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101820;--surface:#18242e;--ink:#e3ecf2;--sub:#a4b4c0;--line:#2d414f;--accent:#8fc4ea;--on:#0f2331;--soft:#1f3442;--warn:#ff9f95;--warnsoft:#3b2427}}
+:root[data-theme="dark"]{--bg:#101820;--surface:#18242e;--ink:#e3ecf2;--sub:#a4b4c0;--line:#2d414f;--accent:#8fc4ea;--on:#0f2331;--soft:#1f3442;--warn:#ff9f95;--warnsoft:#3b2427}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.45 'Pretendard','Noto Sans KR','Malgun Gothic',system-ui,sans-serif}
+button{font:inherit;color:inherit;cursor:pointer}
+button:disabled{cursor:default;opacity:.5}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.app{display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;height:100vh;min-height:800px;max-width:1600px;margin:0 auto;padding:10px;gap:8px}
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 14px}
+.top h1{font-size:18px;margin:0;letter-spacing:-.4px}
+.top .meta{color:var(--sub);font-size:12px}
+.top .grow{flex:1}
+.prog{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--sub)}
+.bar{width:140px;height:7px;background:var(--line);border-radius:5px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .4s}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:8px 13px;font-weight:650}
+.btn:not(:disabled):hover{background:var(--soft)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on)}
+.btn.danger{border-color:var(--warn);color:var(--warn)}
+.main{display:grid;grid-template-columns:minmax(0,1.22fr) minmax(470px,1fr);gap:8px;min-height:0}
+.scene{position:relative;background:#e3e7ea;border:1px solid var(--line);border-radius:12px;overflow:hidden;min-height:0}
+.scene svg{display:block;width:100%;height:100%}
+.tag{position:absolute;left:10px;top:10px;background:rgba(255,255,255,.85);color:#33505f;border-radius:6px;padding:3px 8px;font-size:11px}
+
+/* ── CIMON 일반운전 화면 재구성 ── */
+.hmi{background:#b9bcc2;border:6px solid #5d646c;border-radius:8px;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto auto;overflow:hidden;font-family:'Malgun Gothic',Arial,sans-serif;color:#1d2328;min-height:0}
+.chd{display:flex;align-items:center;gap:6px;padding:4px 6px;background:#c9ccd1;font-size:10px}
+.chd .f{display:flex;align-items:center;gap:4px}
+.chd .v{background:#3d6b3d;color:#e6ffd9;padding:1px 7px;font:700 10.5px Tahoma,Arial;min-width:78px;border:1px solid #2a4a2a}
+.chd .t{margin-left:auto;background:#e8e9ec;border:1px solid #8a8f96;padding:1px 6px;font-size:9.5px}
+.cmsg{background:#fdfdf2;border-top:1px solid #8a8f96;border-bottom:1px solid #8a8f96;font-size:10px;padding:2px 7px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cmsg.al{background:#c00;color:#fff;font-weight:700}
+.cgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:minmax(0,auto);gap:5px;padding:5px;align-content:start;min-height:0;overflow:auto}
+.cp{background:#dfe1e4;border:1px solid #8f959c;border-radius:3px;padding:3px 5px 5px;position:relative;min-width:0}
+.cp h5{margin:0 0 3px;font-size:10px;text-align:center;font-weight:700;display:flex;align-items:center;justify-content:center;gap:5px}
+.lamp{width:10px;height:10px;border-radius:50%;background:#5a5f64;border:1px solid #333;display:inline-block;flex:none}
+.lamp.on{background:#3fe060;box-shadow:0 0 5px #3fe060}
+.r{display:flex;align-items:center;gap:3px;font-size:9px;margin:2px 0;white-space:nowrap}
+.r .k{width:30px;flex:none;color:#333}
+.bx{background:#f3efcf;border:1px solid #7d8187;padding:0 3px;font:700 9.5px Tahoma,Arial;min-width:30px;text-align:right;font-variant-numeric:tabular-nums}
+.bx.w{background:#fff}
+.u{font-size:8.5px;color:#444}
+.trk{flex:1;height:7px;background:#fff;border:1px solid #888;position:relative;min-width:24px}
+.trk i{position:absolute;left:0;top:0;bottom:0;background:#2a56c8;transition:width .2s}
+.trk.p i{background:#e27a8a}
+.cbtn{display:inline-block;background:#e9eaec;border:2px solid;border-color:#fff #7a7f86 #7a7f86 #fff;font-size:9px;padding:2px 5px;text-align:center}
+.mstrip{height:4px;margin-bottom:2px;background:#6a6f75}
+.mstrip.on{background:#3fe060}
+.cbot{display:grid;grid-template-columns:1fr 3fr;gap:5px;padding:0 5px 5px}
+.sk{display:grid;grid-template-columns:repeat(10,1fr);gap:3px;padding:4px 5px 6px;background:#b1b4ba}
+.sk span{background:#d6e8cc;border:2px solid;border-color:#fff #6d7278 #6d7278 #fff;font-size:8.5px;text-align:center;padding:4px 1px;line-height:1.15}
+.sk span.cur{background:#9aa0a6;color:#fff}
+
+/* 과제 패널 */
+.task{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1.55fr) minmax(232px,.8fr);gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 14px;min-height:174px}
+.code{font-size:12px;color:var(--sub);font-weight:700}
+.task h2{font-size:18px;margin:2px 0 5px;letter-spacing:-.4px}
+.task p{margin:0 0 6px;color:var(--sub);font-size:12.5px;max-width:62ch}
+.src{font-size:11px;color:var(--sub)}
+.work{min-width:0;max-height:186px;overflow:auto;padding-right:2px}
+.chk{display:inline-flex;gap:7px;align-items:center;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 10px;margin:0 6px 6px 0;font-size:12px;text-align:left}
+.chk .box{width:16px;height:16px;border:1px solid var(--sub);border-radius:4px;display:grid;place-items:center;font-size:11px;flex:none}
+.chk[aria-pressed="true"]{background:var(--soft);border-color:var(--accent)}
+.chk[aria-pressed="true"] .box{background:var(--accent);border-color:var(--accent);color:var(--on)}
+.q{font-weight:700;margin:4px 0 5px;font-size:13px}
+.opt{display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 10px;margin-bottom:5px;font-size:12.5px}
+.opt.good{background:var(--soft);border-color:var(--accent);font-weight:700}
+.opt.badpick{border-color:var(--warn);background:var(--warnsoft)}
+.opt:not(:disabled):hover{border-color:var(--accent)}
+.muted{color:var(--sub);font-size:12px}
+.act{display:flex;flex-direction:column;gap:8px}
+.fb{background:var(--soft);border-radius:10px;padding:9px 11px;font-size:12.5px;flex:1;min-height:62px}
+.fb.bad{background:var(--warnsoft);color:var(--warn)}
+.row{display:flex;gap:6px}
+.row .btn{flex:1}
+.rail{display:flex;gap:10px;overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:7px 10px}
+.grp{display:flex;flex-direction:column;gap:3px}
+.grp small{color:var(--sub);font-size:10.5px;padding-left:2px}
+.chips{display:flex;gap:4px}
+.chip{min-width:56px;border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:4px 5px;font-size:9.5px;line-height:1.2;text-align:center}
+.chip b{display:block;font-size:12px}
+.chip.done{background:var(--soft);border-color:var(--accent)}
+.chip.done b::after{content:" ✓"}
+.chip.cur{background:var(--accent);color:var(--on);border-color:var(--accent)}
+.modal{position:fixed;inset:0;background:rgba(8,16,24,.52);display:grid;place-items:center;z-index:20;padding:12px}
+.modal[hidden]{display:none}
+.card{background:var(--surface);color:var(--ink);width:min(600px,100%);max-height:88vh;overflow:auto;border-radius:14px;padding:18px 20px;border:1px solid var(--line)}
+.card h3{margin:0 0 8px;font-size:19px}
+.card p,.card li{color:var(--sub);font-size:13px}
+.logrow{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding:5px 0;font-size:12px}
+.modal.side{background:transparent;pointer-events:none;place-items:end center;padding:10px}
+.modal.side .card{pointer-events:auto;width:min(1220px,100%);max-height:268px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:16px;padding:12px 16px;box-shadow:0 10px 32px rgba(0,0,0,.35)}
+.modal.side .card h3{font-size:16px;margin:0 0 4px}
+.tsit{background:var(--warnsoft);color:var(--warn);border-radius:9px;padding:7px 10px;font-size:12.5px;margin:6px 0}
+.tsItems{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.tsitem{display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:9px;padding:7px 10px}
+.tsitem:hover{border-color:var(--accent)}
+.tsitem b{display:block;font-size:12.5px}.tsitem span{font-size:10.5px;color:var(--sub)}
+.badge{display:inline-block;font-size:10px;padding:1px 6px;border-radius:6px;margin-right:5px;background:var(--soft);color:var(--accent)}
+.halo{fill:none;stroke-width:3.2;opacity:0;pointer-events:none}
+.halo.ok{opacity:1;stroke:#16c35a;fill:rgba(22,195,90,.16);animation:hb .5s steps(2) infinite}
+.halo.bad{opacity:1;stroke:#ff3b30;fill:rgba(255,59,48,.16);animation:hb .5s steps(2) infinite}
+@keyframes hb{50%{opacity:.18}}
+.hsOk{outline:3px solid #16c35a!important;outline-offset:1px;animation:hso .5s steps(2) infinite}
+.hsBad{outline:3px solid #ff3b30!important;outline-offset:1px;animation:hso .5s steps(2) infinite}
+@keyframes hso{50%{outline-color:transparent}}
+
+/* 씬 애니메이션 */
+.leg,.arm{transform-box:fill-box;transform-origin:50% 5%}
+#op{transition:transform 1.3s ease-in-out}
+#bubble{transition:transform 1.3s ease-in-out}
+#opFlip{transition:transform .3s}
+#op.walking .leg-f,#op.walking .arm-b{animation:swA .42s ease-in-out infinite alternate}
+#op.walking .leg-b,#op.walking .arm-f{animation:swB .42s ease-in-out infinite alternate}
+@keyframes swA{from{transform:rotate(24deg)}to{transform:rotate(-24deg)}}
+@keyframes swB{from{transform:rotate(-24deg)}to{transform:rotate(24deg)}}
+#op.working .arm-f{animation:press .45s ease-in-out infinite alternate}
+@keyframes press{from{transform:rotate(-105deg)}to{transform:rotate(-70deg)}}
+#opBody{animation:breathe 2.4s ease-in-out infinite}
+#op.walking #opBody{animation:bob .21s ease-in-out infinite alternate}
+@keyframes bob{to{transform:translateY(-3px)}}
+@keyframes breathe{50%{transform:translateY(-1px)}}
+@keyframes blink{50%{opacity:.3}}
+#mist{opacity:0;transition:opacity .4s}
+.spraying #mist{opacity:.75}
+.flow{stroke-dasharray:5 9;opacity:0}
+.spraying .flow{opacity:1;animation:dash .7s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-28}}
+.alarm #lampR{fill:#ff3b30;animation:blink .5s steps(2) infinite}
+.panel-active #cabScreen{fill:#dfe8ef}
+.lbl{font-size:10.5px;fill:#3f5260;font-weight:700}
+.lbl.s{font-size:9px;font-weight:400;fill:#5d6b78}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+@media (max-width:1180px){.app{height:auto;min-height:0}.main{grid-template-columns:1fr}.scene{aspect-ratio:8/5}.hmi{min-height:560px}.task{grid-template-columns:1fr}.work{max-height:none}.modal.side .card{grid-template-columns:1fr;max-height:58vh}.tsItems{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div><h1>KC130F 코팅 첫 배치 시뮬레이터</h1><div class="meta">교육용 가상 배치 TRAIN-KC-001 · 동화C(필름코팅정) / 코팅실2(SPM038) · 실설비 연동 없음</div></div>
+    <div class="grow"></div>
+    <div class="prog"><span id="progText">0 / 0 완료</span><div class="bar"><i id="progBar"></i></div></div>
+    <button class="btn" id="troubleBtn" type="button">트러블슈팅</button>
+    <button class="btn danger" id="drillBtn" type="button">비상상황 훈련</button>
+    <button class="btn" id="infoBtn" type="button">자료·주의</button>
+  </header>
+
+  <div class="main">
+    <div class="scene">
+      <span class="tag">교육용 3D 모식도 · 벽 관통형 설치 · 실제 치수와 다를 수 있음</span>
+      <svg id="scene" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet" role="img" aria-label="코팅실 모식도와 작업자">
+        <defs>
+          <linearGradient id="gMetal" x1="0" x2="1"><stop offset="0" stop-color="#8e9ba0"/><stop offset=".32" stop-color="#f2f5f6"/><stop offset=".6" stop-color="#c2cbcf"/><stop offset="1" stop-color="#7c898e"/></linearGradient>
+          <linearGradient id="gPlate" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e9edef"/><stop offset=".5" stop-color="#cfd6da"/><stop offset="1" stop-color="#e2e7ea"/></linearGradient>
+          <linearGradient id="gWall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3f6f7"/><stop offset="1" stop-color="#dde3e6"/></linearGradient>
+          <linearGradient id="gFloor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c2ccd0"/><stop offset="1" stop-color="#dfe5e8"/></linearGradient>
+          <radialGradient id="gDoorGlass"><stop offset="0" stop-color="#34414a"/><stop offset="1" stop-color="#1a2127"/></radialGradient>
+          <clipPath id="cDoor"><circle cx="548" cy="128" r="52"/></clipPath>
+          <clipPath id="cDrum"><rect x="30" y="392" width="54" height="58"/></clipPath>
+          <clipPath id="cTank"><rect x="95" y="306" width="46" height="66"/></clipPath>
+        </defs>
+        <polygon points="0,0 800,0 690,22 110,22" fill="#f6f8f9"/>
+        <polygon points="110,22 690,22 690,250 110,250" fill="url(#gWall)"/>
+        <polygon points="0,0 110,22 110,250 0,340" fill="#d2dadd"/>
+        <polygon points="800,0 690,22 690,250 800,340" fill="#ccd4d7"/>
+        <polygon points="110,250 690,250 800,500 0,500" fill="url(#gFloor)"/>
+        <g id="tiles" stroke="#b3bec3" stroke-width="1" opacity=".45"></g>
+        <rect x="240" y="5" width="100" height="9" rx="3" fill="#fff"/><rect x="470" y="5" width="100" height="9" rx="3" fill="#fff"/>
+        <text x="270" y="40" text-anchor="middle" class="lbl s">코팅실2 (SPM038) · 온·습도는 제조지시기록서 기준</text>
+
+        <!-- 벽 뒤 기계실 (급기 AHU · 집진기) -->
+        <g>
+          <rect x="662" y="36" width="130" height="166" rx="6" fill="rgba(255,255,255,.55)" stroke="#8a98a0" stroke-dasharray="5 4"/>
+          <text x="727" y="50" text-anchor="middle" class="lbl s">기계실 (벽 뒤)</text>
+          <rect x="670" y="58" width="56" height="70" rx="4" fill="url(#gMetal)" stroke="#6f7c82"/>
+          <rect x="676" y="66" width="10" height="54" fill="#d9c98a" stroke="#8a7a3a"/><rect x="690" y="66" width="10" height="54" fill="#cfd8a0" stroke="#7a8a3a"/><rect x="704" y="66" width="12" height="54" fill="#f4f6f7" stroke="#7a8790"/>
+          <text x="681" y="130" text-anchor="middle" font-size="7" fill="#445">P</text><text x="695" y="130" text-anchor="middle" font-size="7" fill="#445">M</text><text x="710" y="130" text-anchor="middle" font-size="7" fill="#445">H</text>
+          <text x="698" y="142" text-anchor="middle" class="lbl s">급기 AHU·필터</text>
+          <rect x="734" y="58" width="50" height="94" rx="4" fill="url(#gMetal)" stroke="#6f7c82"/>
+          <g fill="#e9e4d7" stroke="#8d8570"><rect x="740" y="64" width="9" height="56" rx="3"/><rect x="754" y="64" width="9" height="56" rx="3"/><rect x="768" y="64" width="9" height="56" rx="3"/></g>
+          <rect x="740" y="126" width="38" height="18" fill="#bfae8d" stroke="#6f6450"/>
+          <text x="759" y="164" text-anchor="middle" class="lbl s">집진기</text>
+          <text x="759" y="174" text-anchor="middle" font-size="7" fill="#5d6b78">백필터·Dust box</text>
+          <path d="M698,58 V30 H620 V46" stroke="#8d989c" stroke-width="5" fill="none"/>
+          <path d="M759,58 V26 H604 V46" stroke="#a7b0b5" stroke-width="5" fill="none" stroke-dasharray="3 2"/>
+        </g>
+
+        <!-- 벽 관통형 코팅기 본체 -->
+        <rect x="372" y="44" width="278" height="208" rx="4" fill="#dfe4e7" stroke="#8d989c" stroke-width="2"/>
+        <rect x="384" y="54" width="254" height="184" rx="2" fill="url(#gPlate)" stroke="#9aa5aa"/>
+        <rect x="384" y="236" width="254" height="16" fill="#c8cfd3" stroke="#9aa5aa"/>
+        <rect x="574" y="50" width="62" height="14" rx="2" fill="#1d5cc8"/>
+        <text x="605" y="60" text-anchor="middle" font-size="8" font-weight="900" fill="#fff" font-style="italic">KeumSung KC130F</text>
+        <!-- 게이지 유니트 -->
+        <g>
+          <rect x="394" y="64" width="64" height="94" rx="3" fill="#dfe5e8" stroke="#2b4f9e" stroke-width="1.6"/>
+          <circle cx="410" cy="82" r="10" fill="#f2c318" stroke="#333"/>
+          <rect x="403" y="78" width="14" height="8" fill="#200" /><text id="dpText" x="410" y="85" text-anchor="middle" font-size="7" font-weight="700" fill="#ff3b30">0</text>
+          <rect x="436" y="68" width="9" height="42" rx="2" fill="#f7fbff" stroke="#667"/><circle id="flowBall" cx="440.5" cy="106" r="3" fill="#222"/>
+          <text x="410" y="99" text-anchor="middle" font-size="6" fill="#223">차압계</text><text x="441" y="116" text-anchor="middle" font-size="6" fill="#223">유량계</text>
+          <g fill="#fff" stroke="#556"><circle cx="405" cy="130" r="6.5"/><circle cx="424" cy="130" r="6.5"/><circle cx="443" cy="130" r="6.5"/></g>
+          <g stroke="#2a56c8" stroke-width="1.4"><line id="gFan" x1="405" y1="130" x2="402" y2="126"/><line id="gCap" x1="424" y1="130" x2="427" y2="125"/><line id="gPmp" x1="443" y1="130" x2="446" y2="126"/></g>
+          <g fill="#1d2226"><circle cx="405" cy="148" r="4"/><circle cx="424" cy="148" r="4"/><circle cx="443" cy="148" r="4"/></g>
+          <text x="414" y="141" text-anchor="middle" font-size="5.5" fill="#223">FAN · CAP</text><text x="443" y="141" text-anchor="middle" font-size="5.5" fill="#223">펌프</text>
+        </g>
+        <!-- 도어(마우스링)와 코팅팬 내부 -->
+        <circle cx="548" cy="128" r="62" fill="#e7ecef" stroke="#8f9ba1" stroke-width="3"/>
+        <circle cx="548" cy="128" r="56" fill="none" stroke="#c3cbcf" stroke-width="7"/>
+        <circle cx="548" cy="128" r="52" fill="url(#gDoorGlass)"/>
+        <g clip-path="url(#cDoor)">
+          <g id="panG">
+            <circle cx="548" cy="128" r="48" fill="none" stroke="#55636b" stroke-width="2" stroke-dasharray="4 7"/>
+            <g stroke="#6e7d85" stroke-width="3"><line x1="548" y1="82" x2="548" y2="96"/><line x1="594" y1="128" x2="580" y2="128"/><line x1="548" y1="174" x2="548" y2="160"/><line x1="502" y1="128" x2="516" y2="128"/><line x1="580" y1="96" x2="570" y2="106"/><line x1="516" y1="160" x2="526" y2="150"/></g>
+          </g>
+          <g id="bedG"></g>
+          <path id="mist" d="M536,110 L512,150 Q540,160 566,148 Z" fill="rgba(220,235,255,.8)"/>
+          <path d="M612,64 L566,98" stroke="#b9c3c8" stroke-width="5" stroke-linecap="round"/>
+          <rect x="530" y="98" width="16" height="11" rx="2" fill="#cfd6da" stroke="#556"/>
+        </g>
+        <path d="M530,190 L566,190 L560,206 L536,206 Z" fill="#c8d0d4" stroke="#6f7c82"/>
+        <rect x="543" y="206" width="10" height="8" fill="#8d989c"/>
+        <path d="M596,172 q-8,6 0,12 q8,6 0,12 q-8,6 0,12 q8,6 0,12 q-8,6 0,12" stroke="#e8b21a" stroke-width="3" fill="none"/>
+        <g><rect x="598" y="232" width="18" height="10" rx="2" fill="#6b7780"/><circle cx="607" cy="237" r="3.4" fill="#e04a2a"/></g>
+        <circle cx="644" cy="150" r="3.2" fill="#e0b64a" stroke="#6f5a2a"/>
+        <text x="512" y="264" text-anchor="middle" class="lbl">금성코팅기 KC130F · 자산번호 140003368</text>
+
+        <!-- 약액 라인 -->
+        <path d="M118,372 C130,392 196,392 210,344 M226,322 C300,322 330,250 384,214" stroke="#9aa6ad" stroke-width="4" fill="none"/>
+        <path class="flow" d="M118,372 C130,392 196,392 210,344 M226,322 C300,322 330,250 384,214" stroke="#d98ca0" stroke-width="3" fill="none"/>
+
+        <!-- 조작 캐비닛 (CIMON HMI + 스위치) -->
+        <g>
+          <rect x="196" y="120" width="8" height="30" fill="#9aa5a9"/>
+          <rect id="lampR" x="194" y="96" width="12" height="9" rx="2" fill="#6d2a2a"/>
+          <rect id="lampY" x="194" y="105" width="12" height="9" rx="2" fill="#6b5a26"/>
+          <rect id="lampG" x="194" y="114" width="12" height="9" rx="2" fill="#2b5b35"/>
+          <rect x="148" y="150" width="106" height="112" rx="4" fill="#dfe4e7" stroke="#8d989c"/>
+          <rect x="150" y="152" width="40" height="8" fill="#1d5cc8"/><text x="170" y="158.5" text-anchor="middle" font-size="5.5" fill="#fff" font-weight="700">KeumSung</text>
+          <rect x="158" y="162" width="88" height="70" rx="3" fill="#707a82"/>
+          <rect id="cabScreen" x="164" y="167" width="76" height="58" fill="#c8cfd4"/>
+          <g fill="#aab4ba"><rect x="168" y="172" width="20" height="18"/><rect x="192" y="172" width="20" height="8"/><rect x="216" y="172" width="20" height="8"/><rect x="192" y="184" width="44" height="6"/></g>
+          <rect x="150" y="234" width="102" height="26" fill="#e9edef"/>
+          <circle cx="164" cy="247" r="5.5" fill="#b9c1c6" stroke="#556"/><rect x="163" y="243" width="2" height="8" fill="#333"/>
+          <circle cx="184" cy="247" r="5.5" fill="#222"/><rect x="183" y="242" width="2" height="7" fill="#fff" transform="rotate(35 184 247)"/>
+          <circle cx="204" cy="247" r="5.5" fill="#47c8a8" stroke="#2a7a66"/>
+          <circle cx="222" cy="247" r="5.5" fill="#f08a96" stroke="#a04a56"/>
+          <circle cx="242" cy="247" r="6.5" fill="#f3d000"/><circle cx="242" cy="247" r="4.5" fill="#d42020"/>
+          <text x="164" y="239" text-anchor="middle" font-size="4.5" fill="#223">POWER</text><text x="184" y="239" text-anchor="middle" font-size="4.5" fill="#223">PAN</text><text x="213" y="239" text-anchor="middle" font-size="4.5" fill="#223">SPRAY ON/OFF</text><text x="242" y="239" text-anchor="middle" font-size="4.5" fill="#223">E.M.S</text>
+          <rect x="150" y="262" width="102" height="112" fill="url(#gMetal)" stroke="#8d989c"/>
+          <rect x="188" y="280" width="56" height="62" rx="4" fill="#dfe8ee" stroke="#6f7c82"/>
+          <circle cx="216" cy="310" r="17" fill="#c9d1d6" stroke="#556"/>
+          <g id="pumpRot"><circle cx="216" cy="298" r="3.4" fill="#556"/><circle cx="216" cy="322" r="3.4" fill="#556"/><circle cx="204" cy="310" r="3.4" fill="#556"/><circle cx="228" cy="310" r="3.4" fill="#556"/></g>
+          <text x="216" y="354" text-anchor="middle" font-size="7" fill="#223">연동펌프</text>
+          <text x="201" y="386" text-anchor="middle" class="lbl">조작부 · CIMON HMI</text>
+        </g>
+
+        <!-- 약액탱크 + 교반기 -->
+        <g>
+          <rect x="112" y="280" width="12" height="14" rx="2" fill="#5b6d74"/>
+          <line x1="118" y1="294" x2="118" y2="352" stroke="#8d989c" stroke-width="2"/>
+          <g id="agit"><path d="M108,352 L128,352 M118,346 L118,358" stroke="#8d989c" stroke-width="3"/></g>
+          <path d="M95,306 H141 V372 H95 Z" fill="url(#gMetal)" stroke="#6f7c82" opacity=".55"/>
+          <g clip-path="url(#cTank)"><rect id="tankFill" x="95" y="318" width="46" height="54" fill="#e7a8b7" opacity=".85"/></g>
+          <path d="M95,306 H141 V372 H95 Z" fill="none" stroke="#6f7c82" stroke-width="1.5"/>
+          <ellipse cx="118" cy="306" rx="23" ry="5" fill="#e8edf0" stroke="#6f7c82"/>
+          <text x="118" y="398" text-anchor="middle" class="lbl s">약액탱크·교반기</text>
+        </g>
+
+        <!-- SUS 드럼 (나정) -->
+        <g>
+          <g clip-path="url(#cDrum)"><rect x="30" y="392" width="54" height="58" fill="#eef3f5"/><rect id="drumFill" x="30" y="450" width="54" height="0" fill="#f3efe6"/></g>
+          <rect x="30" y="392" width="54" height="58" rx="3" fill="none" stroke="#6f8a9c" stroke-width="2"/>
+          <ellipse cx="57" cy="392" rx="27" ry="6" fill="rgba(255,255,255,.45)" stroke="#6f8a9c" stroke-width="2"/>
+          <text x="57" y="466" text-anchor="middle" class="lbl s">SUS 드럼</text>
+        </g>
+
+        <!-- 핫스팟 -->
+        <g id="halos">
+          <circle class="halo" id="h-power" data-nm="POWER 키" cx="164" cy="247" r="9"/>
+          <circle class="halo" id="h-panSw" data-nm="COATING PAN 스위치" cx="184" cy="247" r="9"/>
+          <circle class="halo" id="h-sprayOn" data-nm="SPRAY ON" cx="204" cy="247" r="9"/>
+          <circle class="halo" id="h-sprayOff" data-nm="SPRAY OFF" cx="222" cy="247" r="9"/>
+          <circle class="halo" id="h-ems" data-nm="E.M.S 비상정지" cx="242" cy="247" r="10"/>
+          <circle class="halo" id="h-stack" data-nm="경광등" cx="200" cy="110" r="16"/>
+          <circle class="halo" id="h-pump" data-nm="연동펌프" cx="216" cy="310" r="22"/>
+          <circle class="halo" id="h-tank" data-nm="약액탱크·교반기" cx="118" cy="336" r="32"/>
+          <circle class="halo" id="h-gauge" data-nm="스프레이 FAN·CAP 레귤레이터" cx="424" cy="140" r="26"/>
+          <circle class="halo" id="h-dp" data-nm="차압계" cx="410" cy="82" r="14"/>
+          <circle class="halo" id="h-door" data-nm="마우스링(도어)" cx="548" cy="128" r="66"/>
+          <circle class="halo" id="h-gun" data-nm="스프레이건" cx="538" cy="104" r="16"/>
+          <circle class="halo" id="h-pan" data-nm="코팅팬 정제 베드" cx="548" cy="160" r="24"/>
+          <circle class="halo" id="h-disch" data-nm="배출구" cx="548" cy="200" r="14"/>
+          <circle class="halo" id="h-air" data-nm="압축공기 밸브" cx="607" cy="237" r="12"/>
+          <circle class="halo" id="h-bearing" data-nm="롤러 베어링 구리스 주입구(우측)" cx="644" cy="150" r="10"/>
+          <circle class="halo" id="h-ahu" data-nm="급기 필터(프리→미디움→헤파)" cx="698" cy="93" r="32"/>
+          <circle class="halo" id="h-dust" data-nm="집진기 백필터" cx="759" cy="100" r="30"/>
+        </g>
+        <g id="hsTags"></g>
+
+        <!-- 작업자 -->
+        <g id="op" style="transform:translate(400px,470px) scale(1)">
+          <g id="opFlip">
+            <ellipse cx="0" cy="0" rx="22" ry="5" fill="rgba(0,0,0,.2)"/>
+            <g id="opBody">
+              <g class="leg leg-b"><rect x="-9" y="-40" width="9" height="40" rx="4" fill="#dfe6e9"/><rect x="-11" y="-5" width="13" height="6" rx="2" fill="#3f6f9a"/></g>
+              <g class="arm arm-b"><rect x="-17" y="-76" width="8" height="34" rx="4" fill="#dfe6e9"/></g>
+              <g class="leg leg-f"><rect x="1" y="-40" width="9" height="40" rx="4" fill="#f4f7f8" stroke="#cfd8dc"/><rect x="-1" y="-5" width="13" height="6" rx="2" fill="#4a7eab"/></g>
+              <rect x="-15" y="-80" width="30" height="46" rx="10" fill="#fafcfc" stroke="#cbd5d9"/>
+              <line x1="2" y1="-76" x2="2" y2="-40" stroke="#d5dde0"/>
+              <rect x="5" y="-70" width="7" height="5" rx="1" fill="#2d8a5f"/>
+              <circle cx="0" cy="-92" r="15" fill="#fbfdfd" stroke="#cbd5d9"/>
+              <ellipse cx="5" cy="-91" rx="8" ry="9" fill="#f0c7a2"/>
+              <rect x="-1" y="-97" width="15" height="5" rx="2" fill="#7fb6d6"/>
+              <rect x="1" y="-90" width="13" height="8" rx="3" fill="#8ec2e6"/>
+              <g class="arm arm-f"><rect x="8" y="-76" width="8" height="34" rx="4" fill="#f4f7f8" stroke="#cfd8dc"/><circle cx="12" cy="-41" r="4.5" fill="#5b8fd6"/></g>
+            </g>
+          </g>
+        </g>
+        <g id="bubble" style="transform:translate(400px,362px)">
+          <rect id="bubbleRect" x="-60" y="-24" width="120" height="26" rx="13" fill="#1a2a38"/>
+          <path d="M-5,2 L0,9 L5,2 Z" fill="#1a2a38"/>
+          <text id="bubbleText" x="0" y="-7" text-anchor="middle" font-size="12.5" fill="#fff" font-weight="700">안녕하세요</text>
+        </g>
+      </svg>
+    </div>
+
+    <section class="hmi" aria-label="교육용 HMI 화면 (CIMON 일반운전 재구성)">
+      <div class="chd">
+        <span class="f">제품명<span class="v" id="hName">—</span></span>
+        <span class="f">생산번호<span class="v" id="hLot">—</span></span>
+        <span class="f">담당자<span class="v" id="hOp">—</span></span>
+        <span class="t" id="hClock">--</span>
+      </div>
+      <div class="cmsg" id="cMsg">대기 중</div>
+      <div class="cgrid">
+        <div class="cp" id="pnFan"><h5>코팅 팬 <span class="lamp" id="lFan"></span></h5>
+          <div class="r" style="justify-content:center">코팅팬 속도 <span class="bx w" id="vPan">0</span></div>
+          <svg viewBox="0 0 70 70" width="66" height="66" style="display:block;margin:0 auto" aria-hidden="true">
+            <circle cx="35" cy="35" r="31" fill="#f6f1dd" stroke="#555" stroke-width="2"/>
+            <g font-size="6.5" fill="#333" text-anchor="middle"><text x="35" y="12">5</text><text x="56" y="22">7</text><text x="62" y="40">9</text><text x="14" y="22">3</text><text x="9" y="40">1</text><text x="20" y="58">0</text><text x="50" y="58">10</text></g>
+            <line id="dialNeedle" x1="35" y1="35" x2="35" y2="12" stroke="#2a56c8" stroke-width="2.4" stroke-linecap="round" transform="rotate(-135 35 35)"/>
+            <circle cx="35" cy="35" r="3" fill="#333"/>
+          </svg>
+          <div style="display:flex;gap:4px;justify-content:space-between;margin-top:2px">
+            <div><div class="mstrip" id="mNorm"></div><span class="cbtn">정상모드</span></div>
+            <div><div class="mstrip" id="mDisc"></div><span class="cbtn">배출모드</span></div>
+          </div>
+        </div>
+        <div class="cp" id="pnExh"><h5>배기 팬 <span class="lamp" id="lExh"></span></h5>
+          <div class="r"><span class="k">회전수</span><span class="trk"><i id="bExh"></i></span><span class="bx" id="vExh">0</span><span class="u">rpm</span></div>
+          <div class="r"><span class="k">하한</span><span class="trk p"><i id="bExhLo"></i></span><span class="bx" id="vExhLo">0</span><span class="u">℃</span></div>
+          <div class="r"><span class="k">현재</span><span class="trk p"><i id="bExhNow"></i></span><span class="bx w" id="vExhNow">0</span><span class="u">℃</span></div>
+          <div class="r"><span class="k">설정</span><span class="trk p"><i id="bExhSet"></i></span><span class="bx" id="vExhSet">0</span><span class="u">℃</span></div>
+        </div>
+        <div class="cp" id="pnSup"><h5>급기 팬 <span class="lamp" id="lSup"></span></h5>
+          <div class="r"><span class="k">회전수</span><span class="trk"><i id="bSup"></i></span><span class="bx" id="vSup">0</span><span class="u">rpm</span></div>
+          <div class="r"><span class="k">상한</span><span class="trk p"><i id="bSupHi"></i></span><span class="bx" id="vSupHi">0</span><span class="u">℃</span></div>
+          <div class="r"><span class="k">현재</span><span class="trk p"><i id="bSupNow"></i></span><span class="bx w" id="vSupNow">0</span><span class="u">℃</span></div>
+        </div>
+        <div class="cp" id="pnPump"><h5>액펌프 <span class="lamp" id="lPump"></span></h5>
+          <div class="r"><span class="k">설정</span><span class="trk"><i id="bPump"></i></span><span class="bx" id="vPump">0</span><span class="u">rpm</span></div>
+          <div class="r"><span class="k">현재</span><span class="bx w" id="vPumpNow">0</span><span class="u">rpm</span></div>
+          <svg viewBox="0 0 80 34" width="100%" height="30" aria-hidden="true"><rect x="1" y="1" width="78" height="32" fill="#f6f1dd" stroke="#555"/><path d="M10,30 A30,30 0 0 1 70,30" fill="none" stroke="#999"/><line id="pumpNeedle" x1="40" y1="30" x2="40" y2="6" stroke="#333" stroke-width="1.6" transform="rotate(-70 40 30)"/></svg>
+          <div class="r" style="justify-content:space-between"><span class="cbtn">교반기</span><span class="lamp" id="lAgit"></span></div>
+        </div>
+        <div class="cp" id="pnSpray"><h5>스프레이 <span class="lamp" id="lSpray"></span></h5>
+          <div class="r"><span class="k">메인압력</span><span class="bx w" id="vMainP">0</span><span class="k" style="width:auto">하한</span><span class="bx" id="vLoP">5</span></div>
+          <div class="r"><span class="k">건 1</span><span class="bx w" id="vG1">0</span><span class="k" style="width:auto">건 2</span><span class="bx w" id="vG2">0</span></div>
+          <div class="r"><span class="k">건 3</span><span class="bx w" id="vG3">0</span></div>
+        </div>
+        <div class="cp" id="pnDp"><h5>차압설정 <span class="lamp" id="lDp"></span></h5>
+          <div class="r" style="justify-content:center;color:#555">일반운전</div>
+          <div class="r"><span class="k">기계측</span><span class="bx w" id="vDpM">0</span><span class="k" style="width:auto">배기측</span><span class="bx w" id="vDpE">0</span></div>
+          <div class="r"><span class="k">하한</span><span class="bx" id="vDpLo">1</span><span class="k" style="width:auto">상한</span><span class="bx" id="vDpHi">150</span></div>
+        </div>
+        <div class="cp" id="pnSteam"><h5>스팀밸브 <span class="lamp" id="lSteam"></span></h5>
+          <div class="r" style="justify-content:center"><span class="cbtn">스팀 밸브</span></div>
+          <div class="r"><span class="k">급기풍압</span><span class="bx w" id="vAir">0</span></div>
+          <div class="r"><span class="k">하한풍압</span><span class="bx" id="vAirLo">50</span></div>
+        </div>
+        <div class="cp" id="pnTank"><h5>액탱크 <span class="lamp" id="lTank"></span></h5>
+          <div class="r"><span class="k">현재</span><span class="trk p"><i id="bTank"></i></span><span class="bx w" id="vTank">0</span></div>
+          <div class="r"><span class="k">설정</span><span class="trk p"><i></i></span><span class="bx">0</span></div>
+          <div class="r" style="color:#666">자켓탱크 사용 시</div>
+        </div>
+      </div>
+      <div class="cbot">
+        <div class="cp" id="pnPre"><h5>예열모드 <span class="lamp" id="lPre"></span></h5>
+          <div class="r"><span id="preChk">☐</span> 예열모드 적용</div>
+          <div class="r"><span class="k">설정회수</span><span class="bx" id="vPreSet">0</span><span class="k" style="width:auto">작동</span><span class="bx" id="vPreOn">0</span></div>
+          <div class="r"><span class="k">경과회수</span><span class="bx w" id="vPreCnt">0</span><span class="k" style="width:auto">대기</span><span class="bx" id="vPreOff">0</span></div>
+        </div>
+        <div class="cp" id="pnTime"><h5>분사 설정 · 가동 시간 <span class="lamp" id="lTime"></span></h5>
+          <div class="r" style="gap:8px"><span class="k" style="width:auto">분사시간</span><span class="bx" id="vSprH">0</span><span class="u">시간</span><span class="bx" id="vSprM">0</span><span class="u">분</span>
+            <span style="margin-left:10px" id="sprApply">스프레이 적용 ○</span>
+            <span style="margin-left:auto">가동시간 <span class="bx w" id="vRun">0:00:00</span></span></div>
+          <div class="r" style="gap:10px"><span>코팅 진행률</span><span class="trk"><i id="bCoat"></i></span><span class="bx w" id="vCoat">0 %</span><span class="u">(교육용 표시)</span></div>
+        </div>
+      </div>
+      <div class="sk">
+        <span id="sk-stat">가동상태</span><span id="sk-env">운영 환경</span><span id="sk-run" class="cur">일반 운전</span><span id="sk-cycle">작업 주기 설정</span><span id="sk-user">담당자 등록</span><span id="sk-clean">청소 모드</span><span id="sk-alarm">알람상황 열람</span><span id="sk-reset">알람 리셋</span><span id="sk-report">보고서</span><span id="sk-end">작업종료</span>
+      </div>
+    </section>
+  </div>
+
+  <section class="task" aria-live="polite">
+    <div><div class="code" id="tCode"></div><h2 id="tTitle"></h2><p id="tInstr"></p><div class="src" id="tSrc"></div></div>
+    <div class="work" id="tWork"></div>
+    <div class="act">
+      <div class="fb" id="fb"></div>
+      <button class="btn primary" id="runBtn" type="button">실행</button>
+      <div class="row"><button class="btn" id="prevBtn" type="button">이전 단계</button><button class="btn" id="nextBtn" type="button">다음 단계</button></div>
+    </div>
+  </section>
+  <nav class="rail" id="rail" aria-label="단계 선택"></nav>
+</div>
+<div class="modal" id="modal" hidden><div class="card" id="modalCard"></div></div>
+
+<script>
+(()=>{
+'use strict';
+const $=s=>document.querySelector(s);
+const $$=s=>Array.from(document.querySelectorAll(s));
+const scene=$('#scene');
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const cl=(v,a,b)=>Math.min(b,Math.max(a,v));
+const NS='http://www.w3.org/2000/svg';
+
+(()=>{let t='';for(let k=-7;k<=7;k++)t+=`<line x1="${400+k*44}" y1="250" x2="${400+k*120}" y2="500"/>`;
+[268,292,322,360,408,470].forEach(y=>{const f=(y-250)/250;t+=`<line x1="${110-110*f}" y1="${y}" x2="${690+110*f}" y2="${y}"/>`});$('#tiles').innerHTML=t;})();
+
+/* 정제 베드 */
+(()=>{const g=$('#bedG');let h='';
+ for(let i=0;i<46;i++){const a=Math.PI*(0.18+0.64*Math.random()),rr=30+Math.random()*16;
+  const x=548+Math.cos(a)*rr*-1, y=128+Math.sin(a)*rr;
+  h+=`<ellipse class="tab" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="3.6" ry="2.4" fill="#f5f2ea" stroke="#b8b1a0" stroke-width=".6"/>`;}
+ g.innerHTML=h;})();
+
+/* ───── 상태 스냅샷 ───── */
+const IDLE={name:'—',lot:'—',op:'—',power:false,msg:'대기 중',
+ pan:0,mode:'정상',exh:0,exhLo:0,exhNow:22,exhSet:0,sup:0,supHi:0,supNow:22,
+ pump:0,pumpNow:0,agit:false,mainP:0,loP:5,g:0,dpM:0,dpE:0,dpLo:1,dpHi:150,air:0,airLo:50,steam:false,
+ pre:false,preSet:0,preOn:0,preOff:0,preCnt:0,sprH:0,sprM:0,sprayOn:false,sprApply:false,run:0,coat:0,
+ drum:1,bed:0,tank:.8,save:false};
+const H=o=>Object.assign({},IDLE,o);
+const B={name:'동화C',lot:'DWC-2609A',op:'OP-01',power:true};   // 이름 정보는 가상값
+const RUNSET={exh:2650,exhLo:44,exhSet:45,sup:1300,supHi:65,loP:5,dpLo:1,dpHi:150,airLo:50}; // 현장 화면 관찰값(교육용 예시)
+
+const S=o=>o;
+const STEPS=[
+S({code:'P1',group:'prep',name:'작업 전 점검',title:'작업 전 점검',loc:'mach',say:'점검부터 시작해요',
+ instr:'작업 환경과 설비 상태가 제조지시기록서 기준에 맞는지 확인하고 공정표시서를 붙입니다.',
+ src:'SOP-EQM-00003 5.1.2.1 작업 전 점검 사항',
+ checks:['온도·습도·청소상태가 제조지시기록서 기준에 적합','코팅기 외관·코팅팬 청소상태 육안 확인','스프레이건·펌프·코팅액 공급 호스 연결부 상태 확인','공정표시서 작성 후 작업장 표시판에 부착'],
+ run:{label:'현장 순회 점검',path:['mach','door','tank','panel'],dur:1200,say:'점검 끝!'},
+ hmi:H({msg:'점검 완료'})}),
+S({code:'P2',group:'prep',name:'압축공기·전원',title:'압축공기와 전원 투입',loc:'air',say:'에어부터 확인',
+ instr:'압축공기 밸브를 열고 압력을 확인한 뒤, 장비 후면 주 전원과 조작부 POWER를 켭니다.',
+ src:'SOP-EQM-00003 5.1.2.1.5~5.1.2.1.7',
+ q:'압축공기 밸브를 연 뒤 확인해야 할 압력 기준은?',
+ opts:[['0.5 MPa 이상',1,'맞아요. SOP 기준입니다. 압력이 부족하면 "에어 부족" 알람이 뜨고 스프레이건 실린더도 동작하지 않습니다.'],
+       ['0.2 MPa 이상',0,'SOP 기준은 0.5 MPa 이상입니다. 낮으면 에어 부족 알람과 분사 불량이 생깁니다.'],
+       ['압력은 스프레이 시작 후에 확인',0,'공급 압력은 가동 전에 확인하는 항목입니다. 분사 중 부족하면 스프레이가 멈춥니다.']],
+ run:{label:'밸브 OPEN · 주전원 · POWER ON',path:['air','panel'],anim:['panel-active'],dur:1600,say:'전원 ON'},
+ hmi:H({power:true,msg:'POWER ON · 로그인 대기',mainP:6.2})}),
+S({code:'P3',group:'prep',name:'로그인',title:'로그인과 제품 정보 입력',loc:'panel',say:'내 계정으로',
+ instr:'초기화면 진입 전 본인 ID와 PASSWORD로 로그인하고, 제품명과 배치번호를 입력한 뒤 OK를 누릅니다.',
+ src:'SOP-EQM-00003 5.1.2.1.8~9 · 접속권한별 작업내용',
+ q:'Level 4(작업자) 권한으로 할 수 없는 것은?',
+ opts:[['주기 운전 설정·저장(레시피 생성·저장)',1,'맞아요. 레시피 생성·저장은 Level 2(팀장) 이상, 배기 온도 등 교정(밸리데이션)은 Level 3 이상입니다.'],
+       ['보고서 인쇄',0,'보고서 인쇄는 모든 레벨이 가능합니다.'],
+       ['알람 해제',0,'알람 해제는 모든 레벨이 가능합니다. 단, 원인 확인이 먼저입니다.']],
+ run:{label:'로그인 · 제품명·배치번호 입력',anim:['panel-active'],dur:1600,say:'정보 입력 완료'},
+ hmi:H(Object.assign({},B,{msg:'로그인 완료 · 일반운전 화면',mainP:6.2}))}),
+S({code:'1',group:'set',name:'약액 준비',title:'약액 연결과 교반',loc:'tank',say:'약액 연결',
+ instr:'장비 후면의 코팅액 공급관과 코팅액 탱크를 연결하고, 교반기를 켜서 약액을 균일하게 유지합니다.',
+ src:'SOP-EQM-00003 5.1.2.2.1 · KC170FS 매뉴얼 2.3.3 액탱크',
+ checks:['코팅액 공급관 ↔ 코팅액 탱크 연결','탱크 하부 볼밸브: 분사·펌핑 시 개방','교반기 작동 (에어모터, 레귤레이터로 속도 조절)','스프레이건 공급 압력 확인'],
+ run:{label:'연결 · 교반기 ON',path:['tank','panel'],dur:1600,say:'교반 중'},
+ hmi:H(Object.assign({},B,{msg:'교반기 작동',mainP:6.2,agit:true}))}),
+S({code:'2',group:'set',name:'분사량',title:'코팅액 분사량 셋팅',loc:'panel',say:'분사량 맞추기',
+ instr:'일반 운전 모드로 전환하고 스프레이 펌프 속도를 조정해, 실제 분사량이 제조지시기록서의 분사량과 같도록 설정합니다.',
+ src:'SOP-EQM-00003 5.1.2.2.2',
+ q:'분사량을 맞췄다고 판단하는 기준은?',
+ opts:[['펌프 속도를 조정하며 실제 분사량을 측정해 기록서 분사량과 같아졌을 때',1,'맞아요. SOP가 "실제 분사량"을 맞추라고 규정합니다. 튜브 상태·약액 점도에 따라 같은 RPM이라도 분사량이 달라집니다.'],
+       ['펌프 설정 RPM을 지난 배치와 같은 값으로 넣었을 때',0,'RPM이 같아도 튜브 마모·약액 점도에 따라 실제 분사량이 달라집니다. 실측으로 맞춰야 합니다.'],
+       ['코팅을 시작한 뒤 정제 외관을 보고 조정',0,'분사량은 코팅 시작 전에 맞추는 값입니다. 시작 후 조정하면 초기 정제가 과습·얼룩 위험에 노출됩니다.']],
+ run:{label:'펌프 속도 조정 · 실측',anim:['panel-active'],dur:2000,say:'분사량 일치'},
+ hmi:H(Object.assign({},B,{msg:'분사량 셋팅 완료',mainP:6.2,agit:true,pump:30,pumpNow:30}))}),
+S({code:'3',group:'set',name:'스프레이 에어',title:'스프레이 FAN·CAP 에어 조정',loc:'gauge',say:'게이지 확인',
+ instr:'기계 정면 좌측 상부 게이지 유니트의 레귤레이터로 스프레이 에어를 조정합니다.',
+ src:'KC170FS 매뉴얼 게이지 유니트 · 스프레이건 작동 원리',
+ q:'FAN AIR와 CAP AIR 레귤레이터는 각각 무엇을 조절하나요?',
+ opts:[['FAN AIR = 분사각, CAP AIR = 분사입자(분사압력)',1,'맞아요. 분사각이 너무 넓으면 팬 벽에 묻고, 입자가 굵으면 정제 표면이 젖어 얼룩·쌍둥이 정제가 생깁니다.'],
+       ['FAN AIR = 분사량, CAP AIR = 분사각',0,'분사량은 액펌프 속도로 정합니다. FAN은 분사각, CAP은 분사입자입니다.'],
+       ['둘 다 코팅팬 차압 조절용',0,'차압은 급기·배기 풍량으로 형성됩니다. FAN·CAP은 스프레이건 에어입니다.']],
+ run:{label:'레귤레이터 조정',path:['gauge'],dur:1600,say:'분사각·입자 OK'},
+ hmi:H(Object.assign({},B,{msg:'스프레이 에어 조정',mainP:6.2,agit:true,pump:30,pumpNow:0,g:3.5}))}),
+S({code:'4',group:'set',name:'급·배기 기동',title:'배기팬·급기팬 기동과 온도 설정',loc:'panel',say:'배기부터',
+ instr:'배기팬과 급기팬을 기동하고 배기 설정온도·하한, 급기 상한을 입력합니다. 코팅기 온도는 배기 설정온도에 맞춰 유지됩니다.',
+ src:'KC170FS 매뉴얼 3.1 배기홴·급기홴·스팀밸브 · 현장 운전 영상',
+ checks:['배기 설정온도·하한온도 입력(제조지시기록서 기준)','급기 상한온도 입력·적용','스팀밸브 ON — 배기 설정온도에 따라 자동 개폐'],
+ q:'배기팬과 급기팬 중 먼저 켜는 것은?',
+ opts:[['배기팬 먼저',1,'맞아요. 팬 내부를 음압으로 유지해 분진이 코팅실로 새지 않게 합니다. SOP도 정제 투입·배출 시 "집진을 위해 배기팬을 가동"하도록 합니다.'],
+       ['급기팬 먼저',0,'급기가 먼저 들어가면 팬 내부가 양압이 되어 분진·열풍이 도어 틈으로 샐 수 있습니다.'],
+       ['순서는 상관없다',0,'순서가 집진과 차압 형성에 영향을 줍니다. 배기가 먼저입니다.']],
+ run:{label:'배기팬 → 급기팬 ON',anim:['panel-active'],dur:2400,say:'급·배기 가동'},
+ hmi:H(Object.assign({},B,RUNSET,{msg:'급·배기 가동 · 스팀밸브 자동',mainP:6.2,agit:true,pump:30,g:3.5,exhNow:23,supNow:25,steam:true,dpM:0,dpE:1,air:62}))}),
+S({code:'5',group:'load',name:'나정 투입',title:'나정 투입',loc:'drum',say:'정제 투입',
+ instr:'집진을 위해 배기팬을 가동한 상태에서, SUS 드럼에 보관된 정제를 파정에 주의하며 코팅팬 내부에 투입합니다.',
+ src:'SOP-EQM-00003 5.1.2.2.3 · 적용 범위(규격)',
+ checks:['배기팬 가동 중 확인','드럼 정제의 제품명·제조번호 대조','파정에 주의하며 투입','투입량이 규격(80~150 kg/회, KC130F) 범위 내'],
+ run:{label:'SUS 드럼 → 코팅팬 투입',path:['drum','door'],dur:2600,say:'투입 완료'},
+ hmi:H(Object.assign({},B,RUNSET,{msg:'정제 투입 완료',mainP:6.2,agit:true,pump:30,g:3.5,exhNow:24,supNow:30,steam:true,dpE:1,air:62,drum:0,bed:1}))}),
+S({code:'6',group:'load',name:'예열',title:'저장 ON과 예열',loc:'panel',say:'예열 시작',
+ instr:'정제 투입 후 초기 화면의 저장 버튼을 누르고, 예열모드로 제조지시기록서에 규정된 배기 온도가 될 때까지 예열합니다. 설정 후 코팅팬 스위치를 ON 하면 예열모드가 작동합니다.',
+ src:'SOP-EQM-00003 5.1.2.2.4 · KC170FS 매뉴얼 3.1 예열모드',
+ q:'예열모드의 작동시간·대기시간은 어떻게 설정하나요?',
+ opts:[['작동시간은 짧게, 대기시간은 길게',1,'맞아요. 매뉴얼 원문입니다. 예열 중 팬이 계속 돌면 코팅 전 나정이 마모·파손됩니다. 간헐 회전으로 정제 손상을 막습니다.'],
+       ['작동시간은 길게, 대기시간은 짧게',0,'나정은 코팅 전이라 마모에 약합니다. 오래 굴리면 모서리 마모·분진이 생깁니다.'],
+       ['예열 중에는 팬을 계속 고속으로 돌린다',0,'예열 목적은 온도 도달이지 혼합이 아닙니다. 연속 고속 회전은 정제 손상 원인입니다.']],
+ run:{label:'저장 ON · 코팅팬 스위치 ON(예열)',path:['panel'],anim:['panel-active'],dur:3200,say:'배기 45℃ 도달'},
+ hmi:H(Object.assign({},B,RUNSET,{msg:'예열모드 작동 · 저장 중',mainP:6.2,agit:true,pump:30,g:3.5,exhNow:45,supNow:62,steam:true,dpM:30,dpE:1,air:62,drum:0,bed:1,pan:.5,pre:true,preSet:0,preOn:18,preOff:25,preCnt:4,save:true}))}),
+S({code:'7',group:'load',name:'건 위치',title:'스프레이건 위치 조정',loc:'door',say:'건 위치 맞추기',
+ instr:'코팅액이 정제 표면에 균질하게 분사되도록 스프레이건과 제품 사이 거리를 조정합니다.',
+ src:'SOP-EQM-00003 5.1.2.2.5 · KC170FS 매뉴얼 스프레이건 셋팅',
+ q:'매뉴얼의 스프레이건 셋팅 기준은?',
+ opts:[['노즐과 정제 표면 약 250~300 mm, 회전 중 정제 표면 윗부분에서 1/3 이상 되는 지점 겨냥',1,'맞아요. 팬 앞·뒷면에 너무 가깝지 않게 건 간격도 띄웁니다.'],
+       ['노즐을 정제 표면에 최대한 가깝게',0,'너무 가까우면 한 지점이 과습되어 얼룩·쌍둥이 정제가 생깁니다.'],
+       ['정제 베드 가장 아래쪽을 겨냥',0,'베드 아래쪽은 정제가 모이는 곳이라 과습 위험이 큽니다. 윗부분 1/3 이상 지점을 겨냥합니다.']],
+ run:{label:'셋팅봉·클램프 조정',path:['door'],dur:1800,say:'건 위치 OK'},
+ hmi:H(Object.assign({},B,RUNSET,{msg:'예열 유지 · 건 위치 조정',mainP:6.2,agit:true,pump:30,g:3.5,exhNow:45,supNow:62,steam:true,dpM:30,dpE:1,air:62,drum:0,bed:1,pan:.5,pre:true,preOn:18,preOff:25,preCnt:6,save:true}))}),
+S({code:'8',group:'coat',name:'코팅 시작',title:'코팅 공정 시작',loc:'panel',say:'스프레이 ON',
+ instr:'분사시간을 입력하고 스프레이 적용 후 SPRAY ON 합니다. 스프레이가 작동하면 액펌프가 설정 RPM으로 자동 작동합니다.',
+ src:'SOP-EQM-00003 5.1.3 코팅 공정 시작 · KC170FS 매뉴얼 3.1 액펌프·총 분사 유량 설정',
+ checks:['분사시간 입력·스프레이 적용 — 가동시간과 일치하면 작업 종료','코팅팬 정상모드 확인','SPRAY ON → 액펌프 자동 작동 확인','공정 조건이 제조지시기록서와 동일한지 확인'],
+ run:{label:'SPRAY ON',path:['panel'],anim:['panel-active','spraying'],dur:3200,say:'코팅 진행'},
+ hmi:H(Object.assign({},B,RUNSET,{msg:'코팅 중 · 스프레이 작동',mainP:6.2,agit:true,pump:30,pumpNow:30,g:3.4,exhNow:44,supNow:63,steam:true,dpM:38,dpE:1,air:62,drum:0,bed:1,pan:6,sprayOn:true,sprApply:true,sprH:1,sprM:10,run:1500,coat:.25,save:true}))}),
+S({code:'9',group:'coat',name:'자동 정지 조건',title:'스프레이 자동 정지 인터록 이해',loc:'panel',say:'모니터링',
+ instr:'코팅 중 스프레이가 스스로 멈출 수 있습니다. 어떤 조건에서 멈추는지 알아야 원인을 빨리 찾습니다.',
+ src:'KC170FS 매뉴얼 3.1 배기홴·스프레이·차압설정',
+ q:'다음 중 스프레이가 자동 정지하는 조건은?',
+ opts:[['배기온도가 하한 이탈 / 스프레이건 압력이 하한압력보다 낮음 / 기계측 차압이 하한보다 낮음 — 셋 다',1,'맞아요. 세 가지 모두 매뉴얼에 "알람 발생 + 스프레이 정지"로 명시되어 있습니다. 과습 코팅을 막는 보호 로직입니다.'],
+       ['배기온도 하한 이탈만',0,'배기온도 외에도 건 압력 하한, 기계측 차압 하한에서도 스프레이가 정지합니다.'],
+       ['자동 정지 조건은 없고 작업자가 멈춰야 한다',0,'하한 적용 시 설비가 스스로 스프레이를 멈춥니다. 알람을 보고 원인을 찾아야 합니다.']],
+ run:{label:'공정 조건 모니터링',anim:['spraying'],dur:2400,say:'조건 정상'},
+ hmi:H(Object.assign({},B,RUNSET,{msg:'코팅 중 · 공정 조건 정상',mainP:6.2,agit:true,pump:30,pumpNow:30,g:3.4,exhNow:44,supNow:64,steam:true,dpM:38,dpE:1,air:62,drum:0,bed:1,pan:6,sprayOn:true,sprApply:true,sprH:1,sprM:10,run:2400,coat:.45,save:true}))}),
+S({code:'10',group:'coat',name:'노즐 막힘',title:'노즐 막힘과 DROPLET 판단',loc:'door',say:'노즐 확인',runFirst:true,
+ instr:'도어 창으로 보니 건 하나의 분사 모양이 가늘어지고 팁 주위에 코팅액이 뭉쳐 있습니다.',
+ src:'SOP-EQM-00003 5.1.3 · KC170FS 매뉴얼 스프레이건 고장 원인과 처리법',
+ q:'조치로 맞는 것은?',
+ opts:[['노즐 팁의 응집된 부분을 제거하고, 코팅액이 DROPLET(물방울이 되어 떨어짐) 상태가 되지 않는지 확인',1,'맞아요. SOP 원문입니다. 방울로 떨어지면 정제에 얼룩·들러붙음이 생깁니다. 계속되면 팁·니들·니들 스프링 손상을 의심합니다.'],
+       ['펌프 속도를 올려 막힌 곳을 밀어낸다',0,'막힘은 풀리지 않고 나머지 건에서 과분사가 생깁니다. 분사량도 기록서 값에서 벗어납니다.'],
+       ['분사량이 조금 줄어도 그대로 진행',0,'한 건이 막히면 코팅이 불균일해집니다. 막힘 제거 후 분사 상태를 확인해야 합니다.']],
+ run:{label:'도어 창으로 분사 상태 확인',path:['door'],anim:['spraying'],dur:2000,say:'팁에 응집!'},
+ hmi:H(Object.assign({},B,RUNSET,{msg:'건 2 압력 저하 관찰',mainP:6.2,agit:true,pump:30,pumpNow:30,g:3.4,exhNow:44,supNow:64,steam:true,dpM:38,dpE:1,air:62,drum:0,bed:1,pan:6,sprayOn:true,sprApply:true,sprH:1,sprM:10,run:3000,coat:.6,save:true}))}),
+S({code:'E1',group:'end',name:'완료·냉각',title:'코팅 완료와 냉각',loc:'panel',say:'코팅 완료',
+ instr:'분사시간이 끝나면 스프레이가 멈춥니다. 정제를 실온으로 냉각시키고, 초기화면의 저장 버튼을 OFF 한 뒤 보고서를 출력해 제조지시기록서에 첨부합니다.',
+ src:'SOP-EQM-00003 5.1.3 · KC170FS 매뉴얼 3.1 스팀밸브',
+ checks:['SPRAY OFF 확인','냉각 시 스팀밸브 정지(스팀 차단)','정제 실온 냉각','저장 버튼 OFF','보고서 출력 · 제조지시기록서 첨부'],
+ run:{label:'냉각 · 저장 OFF · 보고서',anim:['panel-active'],dur:2600,say:'보고서 첨부'},
+ hmi:H(Object.assign({},B,RUNSET,{msg:'코팅 완료 · 냉각',mainP:6.2,agit:true,pump:30,g:3.4,exhNow:28,supNow:26,steam:false,dpM:36,dpE:1,air:62,drum:0,bed:1,pan:3,sprApply:true,sprH:1,sprM:10,run:4200,coat:1,save:false}))}),
+S({code:'E2',group:'end',name:'약액 분리',title:'연동펌프·약액라인 분리',loc:'tank',say:'라인 분리',
+ instr:'공정이 완료되면 연동펌프와 약액라인을 분리합니다.',
+ src:'SOP-EQM-00003 가동 시 주의 사항',
+ q:'공정 완료 후 연동펌프와 약액라인을 분리하는 이유는?',
+ opts:[['약액라인에 남은 코팅액 증량분이 분사되지 않도록',1,'맞아요. 라인 잔액이 흘러나오면 코팅이 끝난 정제에 얼룩이 생기고, 코팅량이 기록서 값을 넘게 됩니다.'],
+       ['펌프 모터 과열을 막기 위해',0,'SOP가 명시한 이유는 잔액 증량분 분사 방지입니다.'],
+       ['다음 배치 약액과 섞이지 않게 하려고',0,'교차오염 방지는 세척으로 관리합니다. 이 단계의 목적은 증량분 분사 방지입니다.']],
+ run:{label:'연동펌프·약액라인 분리',path:['panel','tank'],dur:1600,say:'분리 완료'},
+ hmi:H(Object.assign({},B,RUNSET,{msg:'약액라인 분리',mainP:6.2,g:0,exhNow:26,supNow:24,dpM:36,dpE:1,air:62,drum:0,bed:1,pan:3,run:4200,coat:1,tank:.2}))}),
+S({code:'E3',group:'end',name:'제품 배출',title:'제품 배출',loc:'door',say:'배출합니다',
+ instr:'배출 어댑터를 코팅팬 내부 외곽부에 조립하고, 배출모드로 전환해 코팅팬을 가동합니다.',
+ src:'SOP-EQM-00003 5.1.4 제품 배출 · KC170FS 매뉴얼 3.1 코팅 팬',
+ q:'배출 순서로 맞는 것은?',
+ opts:[['급기팬 정지·배기팬 가동 → 배출 어댑터 조립 → 배출모드(역방향 회전)로 전환, 팬 속도 1~5 RPM',1,'맞아요. 배출모드를 선택하면 코팅팬이 역방향으로 회전합니다. 배기팬은 집진을 위해 계속 돌립니다.'],
+       ['정상모드 그대로 팬 속도를 높여 배출',0,'정상모드는 배출 방향이 아닙니다. 배출모드(역회전)에서 1~5 RPM으로 배출합니다.'],
+       ['급기·배기를 모두 끄고 배출',0,'배출 중 분진이 발생합니다. SOP는 급기팬만 멈추고 배기팬은 가동하도록 합니다.']],
+ run:{label:'배출모드 · 2 RPM 배출',path:['door','drum'],anim:['panel-active'],dur:3000,say:'배출 중'},
+ hmi:H(Object.assign({},B,{msg:'배출모드 · 역회전',mainP:6.2,exh:2650,exhLo:44,exhSet:45,exhNow:25,sup:0,supNow:23,dpM:12,dpE:1,air:0,drum:1,bed:0,pan:2,mode:'배출',run:4200,coat:1,tank:.2}))}),
+S({code:'E4',group:'end',name:'마감',title:'잔량 확인·기록·로그아웃',loc:'panel',say:'마무리',
+ instr:'남은 제품을 확인할 때는 반드시 장비가 완전히 정지된 상태에서 내부를 확인합니다.',
+ src:'SOP-EQM-00003 5.1.4 · 가동 시 주의 사항 · 계정 관리방법',
+ checks:['팬 완전 정지 후 내부 잔량 확인','기계사용/청소기록표(MC-0202 별첨)에 사용 기록','본인 계정 로그아웃'],
+ q:'배출 후 팬 안에 정제가 몇 개 남아 보입니다. 어떻게 할까요?',
+ opts:[['팬을 완전히 정지시킨 뒤 내부를 확인하고 회수',1,'맞아요. 정지 상태라도 사이클 운동으로 움직일 수 있어 작동 반경에 몸을 넣지 않는 것이 원칙입니다. 반드시 완전 정지를 확인합니다.'],
+       ['팬이 천천히 도는 동안 손을 넣어 꺼낸다',0,'회전 중 외부도어(가이드)를 열거나 손을 넣는 것은 SOP 금지 사항입니다.']],
+ run:{label:'정지 확인 · 기록 · 로그아웃',path:['door','panel'],dur:1800,say:'첫 배치 완료'},
+ hmi:H({msg:'로그아웃',drum:1,bed:0,coat:1,tank:.2})})
+];
+const LAST=STEPS.length-1;
+const GROUPS=[['준비','prep'],['셋팅','set'],['투입·예열','load'],['코팅','coat'],['마감','end']];
+const LOC={panel:{x:262,y:420,d:-1},mach:{x:470,y:300,d:1},door:{x:560,y:300,d:1},gauge:{x:430,y:292,d:1},
+ air:{x:612,y:292,d:1},tank:{x:160,y:430,d:-1},drum:{x:100,y:470,d:-1},bearing:{x:664,y:300,d:-1},room:{x:400,y:470,d:1}};
+const st=STEPS.map(()=>({checks:new Set(),choice:false,ran:false}));
+const doneSet=new Set();const log=[];
+let cur=0,running=false,errors=0,hold=false,fbMsg='',fbBad=false,moveTok=0,tAlarm='';
+let opPos={x:400,y:470,d:1};
+let live=Object.assign({},IDLE);
+
+const taskOk=i=>{const s=STEPS[i],x=st[i];return (s.checks||[]).every((_,k)=>x.checks.has(k))&&(!s.q||x.choice)};
+const isDone=i=>taskOk(i)&&(!STEPS[i].run||st[i].ran);
+
+/* 작업자 */
+const scaleAt=y=>.55+(y-250)/250*.55;
+function setOpT(){const s=scaleAt(opPos.y);$('#op').style.transform=`translate(${opPos.x}px,${opPos.y}px) scale(${s})`;$('#bubble').style.transform=`translate(${opPos.x}px,${opPos.y-118*s}px)`;}
+const flip=d=>$('#opFlip').style.transform=`scaleX(${d})`;
+function bubble(t){$('#bubbleText').textContent=t;const w=Math.min(290,t.length*12.5+26);const r=$('#bubbleRect');r.setAttribute('x',-w/2);r.setAttribute('width',w);}
+function moveTo(key,cb){const L=LOC[key]||LOC.room,tok=++moveTok,op=$('#op');
+ const dist=Math.hypot(L.x-opPos.x,L.y-opPos.y);const dur=Math.max(340,Math.min(1600,dist*4));
+ op.style.transitionDuration=dur+'ms';$('#bubble').style.transitionDuration=dur+'ms';
+ if(dist>4){flip(L.x<opPos.x?-1:1);op.classList.add('walking');}
+ opPos={...L};setOpT();
+ setTimeout(()=>{if(tok!==moveTok&&!cb)return;op.classList.remove('walking');flip(L.d);cb&&cb();},dist>4?dur:60);}
+function walkPath(arr,cb){let k=0;const nx=()=>k<arr.length?moveTo(arr[k++],()=>setTimeout(nx,110)):cb();nx();}
+const working=on=>$('#op').classList.toggle('working',on);
+
+/* 연속 애니메이션 */
+let panAng=0,pumpAng=0,agAng=0;
+function mix(a,b,t){return Math.round(a+(b-a)*t);}
+function raf(now){
+ const dt=Math.min(.05,(now-(raf.l||now))/1000);raf.l=now;
+ const dir=live.mode==='배출'?-1:1;
+ panAng+=dir*live.pan*6*dt*6; pumpAng+=(live.pumpNow||0)*6*dt*2; if(live.agit)agAng+=360*dt;
+ $('#panG').setAttribute('transform',`rotate(${panAng.toFixed(1)} 548 128)`);
+ $('#pumpRot').setAttribute('transform',`rotate(${pumpAng.toFixed(1)} 216 310)`);
+ $('#agit').setAttribute('transform',`rotate(${(agAng%360).toFixed(1)} 118 352)`);
+ const tabs=$$('#bedG .tab'),c=live.coat;
+ const col=`rgb(${mix(245,214,c)},${mix(242,112,c)},${mix(234,134,c)})`;
+ tabs.forEach((t,i)=>{
+   t.style.display=live.bed>.05?'':'none';
+   if(live.pan>0){const a=(now/1000)*(live.pan/6+.3)*dir+i*0.37;t.setAttribute('transform',`translate(${(Math.sin(a)*2.2).toFixed(2)} ${(Math.cos(a*1.3)*1.4).toFixed(2)})`);}
+   t.setAttribute('fill',col);});
+ requestAnimationFrame(raf);
+}
+requestAnimationFrame(raf);
+
+/* HMI 렌더 */
+function pct(v,max){return cl(v/max*100,0,100)+'%';}
+function fmtRun(s){s=Math.round(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return `${h}:${String(m).padStart(2,'0')}:${String(x).padStart(2,'0')}`;}
+function renderHMI(v){
+ live=v;const d=new Date();
+ $('#hClock').textContent=d.toISOString().slice(0,10)+' '+d.toTimeString().slice(0,5);
+ $('#hName').textContent=v.name;$('#hLot').textContent=v.lot;$('#hOp').textContent=v.op;
+ const m=$('#cMsg');m.textContent=hold?('알람 · '+(tAlarm||'비상정지 인터록')):v.msg;m.classList.toggle('al',hold);
+ const set=(id,val)=>{$('#'+id).textContent=val;};
+ set('vPan',(+v.pan).toFixed(1));
+ $('#dialNeedle').setAttribute('transform',`rotate(${-135+cl(v.pan,0,10)*27} 35 35)`);
+ $('#mNorm').classList.toggle('on',v.mode==='정상'&&v.power);$('#mDisc').classList.toggle('on',v.mode==='배출');
+ set('vExh',Math.round(v.exh));$('#bExh').style.width=pct(v.exh,3400);
+ set('vExhLo',Math.round(v.exhLo));$('#bExhLo').style.width=pct(v.exhLo,100);
+ set('vExhNow',Math.round(v.exhNow));$('#bExhNow').style.width=pct(v.exhNow,100);
+ set('vExhSet',Math.round(v.exhSet));$('#bExhSet').style.width=pct(v.exhSet,100);
+ set('vSup',Math.round(v.sup));$('#bSup').style.width=pct(v.sup,1700);
+ set('vSupHi',Math.round(v.supHi));$('#bSupHi').style.width=pct(v.supHi,100);
+ set('vSupNow',Math.round(v.supNow));$('#bSupNow').style.width=pct(v.supNow,100);
+ set('vPump',Math.round(v.pump));$('#bPump').style.width=pct(v.pump,220);
+ set('vPumpNow',Math.round(v.pumpNow));$('#pumpNeedle').setAttribute('transform',`rotate(${-70+cl(v.pumpNow,0,220)/220*140} 40 30)`);
+ set('vMainP',(+v.mainP).toFixed(1));set('vLoP',v.loP);
+ ['vG1','vG2','vG3'].forEach(id=>set(id,(+v.g).toFixed(1)));
+ set('vDpM',Math.round(v.dpM));set('vDpE',Math.round(v.dpE));set('vDpLo',v.dpLo);set('vDpHi',v.dpHi);
+ set('vAir',Math.round(v.air));set('vAirLo',v.airLo);
+ set('vTank',0);
+ $('#preChk').textContent=v.pre?'☑':'☐';set('vPreSet',v.preSet);set('vPreOn',v.preOn);set('vPreOff',v.preOff);set('vPreCnt',Math.round(v.preCnt));
+ set('vSprH',v.sprH);set('vSprM',v.sprM);$('#sprApply').textContent='스프레이 적용 '+(v.sprApply?'●':'○');
+ set('vRun',fmtRun(v.run));$('#bCoat').style.width=pct(v.coat,1);set('vCoat',Math.round(v.coat*100)+' %');
+ $('#lFan').classList.toggle('on',v.pan>0);$('#lExh').classList.toggle('on',v.exh>0);$('#lSup').classList.toggle('on',v.sup>0);
+ $('#lPump').classList.toggle('on',v.pumpNow>0);$('#lAgit').classList.toggle('on',v.agit);$('#lSpray').classList.toggle('on',v.sprayOn);
+ $('#lSteam').classList.toggle('on',v.steam);$('#lPre').classList.toggle('on',v.pre);$('#lTime').classList.toggle('on',v.sprApply);
+ $('#lDp').classList.toggle('on',v.dpM>0);
+ // 씬 연동
+ scene.classList.toggle('spraying',!!v.sprayOn&&!hold);
+ $('#dpText').textContent=Math.round(v.dpM);
+ $('#flowBall').setAttribute('cy',String(106-cl(v.air,0,300)/300*34));
+ $('#gFan').setAttribute('x2',String(405-3+cl(v.g,0,6)*1.2));
+ $('#gCap').setAttribute('x2',String(424-3+cl(v.g,0,6)*1.3));
+ const dh=cl(v.drum,0,1)*58;$('#drumFill').setAttribute('y',String(450-dh));$('#drumFill').setAttribute('height',String(dh));
+ const c=v.coat;$('#drumFill').setAttribute('fill',c>.9?'#d9a0ad':'#f3efe6');
+ const th=cl(v.tank,0,1)*66;$('#tankFill').setAttribute('y',String(372-th));$('#tankFill').setAttribute('height',String(th));
+ $('#lampG').setAttribute('fill',(v.pan>0&&!hold)?'#48e062':'#2b5b35');
+ $('#lampY').setAttribute('fill',(v.power&&v.pan===0&&!hold)?'#f0c020':'#6b5a26');
+}
+
+/* 과제 패널 */
+function renderTask(){
+ const s=STEPS[cur],x=st[cur],done=isDone(cur);const lock=running||done||(s.runFirst&&!x.ran);
+ $('#tCode').textContent=`${s.code} · ${s.name}`;
+ $('#tTitle').textContent=s.title;$('#tInstr').textContent=s.instr;$('#tSrc').textContent='근거: '+s.src;
+ let h='';
+ if(s.runFirst&&!x.ran)h+=`<p class="muted">먼저 오른쪽 “${esc(s.run.label)}”을 눌러 확인하세요.</p>`;
+ if(s.checks)h+=s.checks.map((c,k)=>`<button type="button" class="chk" data-chk="${k}" aria-pressed="${x.checks.has(k)}" ${lock?'disabled':''}><span class="box">${x.checks.has(k)?'✓':''}</span>${esc(c)}</button>`).join('');
+ if(s.q)h+=`<div class="q">${esc(s.q)}</div>`+s.opts.map((o,k)=>`<button type="button" class="opt ${x.choice&&o[1]?'good':''}" data-opt="${k}" ${lock?'disabled':''}>${esc(o[0])}</button>`).join('');
+ $('#tWork').innerHTML=h;
+ const rb=$('#runBtn');
+ if(s.run){rb.hidden=false;rb.textContent=x.ran?'실행 완료 ✓':s.run.label;rb.disabled=running||x.ran||!(s.runFirst||taskOk(cur));}else rb.hidden=true;
+ $('#prevBtn').disabled=running||cur===0;
+ const nb=$('#nextBtn');nb.disabled=running||!done;nb.textContent=cur===LAST?'결과 보기':'다음 단계';nb.classList.toggle('primary',done);
+ const fb=$('#fb');
+ fb.textContent=fbMsg||(done?'완료했어요. 다음 단계로 이동하세요.':(s.runFirst&&!x.ran)?'실행 후 상황을 판단해요.':'확인 항목과 질문을 마친 뒤 실행해요.');
+ fb.classList.toggle('bad',fbBad);
+ $('#progText').textContent=doneSet.size+' / '+STEPS.length+' 완료';
+ $('#progBar').style.width=(doneSet.size/STEPS.length*100)+'%';
+}
+function renderRail(){
+ $('#rail').innerHTML=GROUPS.map(([lab,g])=>`<div class="grp"><small>${lab}</small><div class="chips">${
+  STEPS.map((s,i)=>s.group!==g?'':`<button type="button" class="chip ${doneSet.has(i)?'done':''} ${i===cur?'cur':''}" data-go="${i}" ${running?'disabled':''} aria-current="${i===cur?'step':'false'}"><b>${esc(s.code)}</b>${esc(s.name)}</button>`).join('')
+ }</div></div>`).join('');
+ const c=document.querySelector('.chip.cur');c&&c.scrollIntoView&&c.scrollIntoView({inline:'center',block:'nearest'});
+}
+function hmiRest(i){const s=STEPS[i];if(isDone(i))return s.hmi;
+ const p=i>0?STEPS[i-1].hmi:IDLE;return Object.assign({},p);}
+function render(){renderTask();renderRail();if(!running)renderHMI(hmiRest(cur));}
+function say(t,bad){fbMsg=t;fbBad=!!bad;}
+function afterChange(){
+ if(isDone(cur)&&!doneSet.has(cur)){doneSet.add(cur);log.push([STEPS[cur].code,STEPS[cur].title]);
+  if(!fbBad)fbMsg=fbMsg||'완료!';
+  if(cur===LAST){render();setTimeout(summary,700);return;}}
+ render();}
+function setStep(i){if(running||i<0||i>LAST)return;cur=i;fbMsg='';fbBad=false;working(false);render();
+ const s=STEPS[i];moveTo(s.loc);bubble(s.say||s.title);}
+function lerp(a,b,p){const o={};for(const k in b){o[k]=(typeof a[k]==='number'&&typeof b[k]==='number')?a[k]+(b[k]-a[k])*p:b[k];}return o;}
+
+function runStep(){
+ const i=cur,s=STEPS[i];if(running||!s.run||st[i].ran)return;
+ if(!s.runFirst&&!taskOk(i)){say('먼저 확인 항목과 질문을 완료해 주세요.',true);render();return;}
+ const hFrom=hmiRest(i);running=true;say(`${s.run.label}…`);render();
+ walkPath(s.run.path||[s.loc],()=>{
+   working(true);bubble(s.run.say||s.title);
+   const anim=s.run.anim||[];anim.forEach(c=>scene.classList.add(c));
+   const hTo=s.hmi,dur=s.run.dur||2200,t0=performance.now();
+   const frame=now=>{
+     const p=Math.min(1,(now-t0)/dur);
+     const hv=lerp(hFrom,hTo,Math.min(1,p*1.3));
+     ['name','lot','op','msg','mode','power','agit','steam','pre','sprayOn','sprApply','save'].forEach(k=>hv[k]=hTo[k]);
+     if(anim.includes('spraying'))hv.sprayOn=true;
+     renderHMI(hv);
+     if(p<1)requestAnimationFrame(frame);
+     else{anim.forEach(c=>scene.classList.remove(c));working(false);st[i].ran=true;running=false;
+      say(s.q&&!st[i].choice?'실행을 마쳤어요. 이제 판단하세요.':(s.checks&&!taskOk(i))?'실행을 마쳤어요. 남은 확인 항목을 체크하세요.':'완료했어요. 다음 단계로 이동하세요.');
+      afterChange();}};
+   requestAnimationFrame(frame);});
+}
+
+/* ───── 트러블슈팅 (SOP 알람표 · 매뉴얼 고장표 · 정비) ───── */
+const TS=[
+ {type:'알람',title:'비상정지 인터록',src:'SOP-EQM-00003 알람(Alarm) 표 · 이상 상황 발생 시 조치방법',loc:'panel',alarm:'비상정지 인터록',say:'비상정지!',
+  stages:[{sit:'코팅 중 비상정지 인터록 알람이 떴고 장비가 멈췄습니다. 경광등이 빨갛게 깜빡입니다.',
+    q:'원인과 해제 방법은?',
+    opts:[['비상정지 버튼 ON 상태 — 눌린 원인을 실선임자가 확인·조치한 뒤 버튼 해제, 알람 리셋',1,'맞아요. SOP 알람표의 해결책은 "비상정지 버튼 해제"이지만, 이상 상황 조치 순서에 따라 원인 조치 완료를 먼저 확인한 뒤 재가동합니다.',['h-ems','sk-reset']],
+          ['알람 리셋만 반복해서 누른다',0,'비상정지 버튼이 눌린 상태에서는 인터록이 풀리지 않습니다.',['sk-reset']],
+          ['POWER 키를 껐다 켠다',0,'원인 확인 없이 전원을 재투입하면 이력 확인이 어려워지고 이상 상태에서 재가동될 수 있습니다.',['h-power']]]}]},
+ {type:'알람',title:'에어 부족',src:'SOP-EQM-00003 알람표 · 5.1.2.1.5',loc:'air',alarm:'에어 부족',say:'에어 부족!',
+  stages:[{sit:'"에어 부족" 알람이 떴습니다. 스프레이 메인압력 표시가 평소보다 낮습니다.',
+    q:'먼저 확인할 곳은?',
+    opts:[['메인 압축공기 공급 — 밸브 개방 상태와 압력(0.5 MPa 이상) 확인 후 높인다',1,'맞아요. 알람표 원인은 "메인 에어 압력 부족"입니다. 가동 전 점검 기준도 0.5 MPa 이상입니다.',['h-air','pnSpray']],
+          ['FAN·CAP 레귤레이터를 최대로 올린다',0,'공급 원압이 부족하면 레귤레이터를 올려도 압력이 안 나옵니다. 원압부터 확인합니다.',['h-gauge']],
+          ['액펌프 속도를 올린다',0,'액펌프는 약액 공급량입니다. 에어 부족과 무관합니다.',['pnPump']]]}]},
+ {type:'알람',title:'스프레이 에어 부족 · 건 압력 하한',src:'SOP-EQM-00003 알람표 · KC170FS 매뉴얼 3.1 스프레이',loc:'gauge',alarm:'스프레이 에어부족',say:'스프레이 정지!',
+  stages:[{sit:'코팅 중 스프레이가 스스로 멈췄습니다. 스프레이 패널의 건 압력이 하한압력보다 낮게 표시됩니다.',
+    q:'조치는?',
+    opts:[['게이지 유니트의 레귤레이터로 스프레이 압력을 기준까지 높이고 재개',1,'맞아요. 하한압력 적용 시 건 압력이 하한보다 낮으면 스프레이가 정지합니다. 알람표 해결책도 "스프레이 압력을 높인다"입니다.',['h-gauge','pnSpray']],
+          ['하한압력 적용을 해제하고 진행',0,'보호 기능을 끄면 낮은 압력으로 굵은 입자가 분사되어 과습·얼룩이 생깁니다.',['pnSpray']],
+          ['배기 온도를 올린다',0,'배기온도와 건 압력은 별개의 조건입니다.',['pnExh']]]}]},
+ {type:'알람',title:'배기 온도이상 (낮음)',src:'SOP-EQM-00003 알람표 · KC170FS 매뉴얼 3.1 배기홴·스팀밸브',loc:'panel',alarm:'배기 온도이상',say:'배기온도 낮음!',
+  stages:[{sit:'"배기 온도이상" 알람과 함께 스프레이가 멈췄습니다. 배기 현재온도가 하한보다 낮습니다.',
+    q:'원인과 조치는?',
+    opts:[['배기온도가 하한 이탈해 스프레이 자동 정지 — 스팀밸브 작동 상태 확인, 배기 온도를 높여 하한 이상 회복 후 재개',1,'맞아요. 스팀밸브가 배기 설정온도에 따라 자동 개폐하며 온도를 맞춥니다. 스팀밸브가 꺼져 있거나 스팀 공급이 끊겼는지 먼저 봅니다.',['pnExh','pnSteam']],
+          ['배기 하한값을 낮춰 알람을 없앤다',0,'하한은 제조지시기록서 기준입니다. 기준을 바꾸면 저온에서 과습 코팅이 됩니다.',['pnExh']],
+          ['코팅팬 속도를 올린다',0,'팬 속도는 온도 회복 수단이 아닙니다.',['pnFan']]]}]},
+ {type:'알람',title:'급기 과부하',src:'SOP-EQM-00003 알람표',loc:'panel',alarm:'급기 과부하',say:'급기 과부하!',
+  stages:[{sit:'"급기 과부하" 알람이 떴습니다. 원인은 열교환기의 모터 과부하입니다.',
+    q:'SOP 알람표의 첫 확인 항목은?',
+    opts:[['배기가 되는지 확인하고 원인을 찾아 조치',1,'맞아요. 급기 과부하인데 확인은 "배기"입니다. 배기가 막히면 급기가 밀어낼 곳이 없어 급기 모터에 부하가 걸립니다. 반대로 배기 과부하일 때는 급기를 확인합니다.',['pnExh','h-dust']],
+          ['급기 모터만 점검한다',0,'급기 모터 과부하의 원인이 배기 쪽에 있는 경우가 많습니다. SOP는 배기 확인을 먼저 지시합니다.',['pnSup']],
+          ['급기 회전수를 올린다',0,'과부하 상태에서 회전수를 올리면 부하가 더 커집니다.',['pnSup']]]}]},
+ {type:'알람',title:'급기 풍량 이상 · 하한풍압',src:'SOP-EQM-00003 알람표 · KC170FS 매뉴얼 3.1 스팀밸브(하한풍량)',loc:'mach',alarm:'급기 풍량 이상',say:'풍량 부족!',
+  stages:[{sit:'급기풍압이 하한풍압보다 낮아 알람이 발생했습니다.',
+    q:'필터 점검 순서는?',
+    opts:[['프리필터 → 미디움필터 점검, 계속 이상이면 헤파필터 점검, 지속되면 순차 교체',1,'맞아요. 매뉴얼 원문입니다. 앞단 필터부터 막힘을 확인합니다.',['h-ahu','pnSteam']],
+          ['헤파필터부터 교체',0,'헤파는 마지막 단계입니다. 앞단 필터가 막혀도 풍량이 떨어집니다.',['h-ahu']],
+          ['하한풍압을 낮춰 알람을 없앤다',0,'풍량이 부족하면 건조가 늦어져 과습 코팅이 됩니다. 원인을 찾아야 합니다.',['pnSteam']]]}]},
+ {type:'알람',title:'배기 차압 이상 (기계측 낮음)',src:'SOP-EQM-00003 알람표 · KC170FS 매뉴얼 3.1 차압설정·게이지 유니트',loc:'gauge',alarm:'배기 차압 이상',say:'차압 낮음!',
+  stages:[{sit:'기계측 차압이 하한보다 낮아 알람이 발생하고 스프레이가 멈췄습니다.',
+    q:'조치는?',
+    opts:[['코팅기 배기 차압을 높인다 — 배기팬 가동·회전수와 차압계 표시를 확인',1,'맞아요. 기계측 차압이 하한보다 낮으면 알람과 함께 스프레이가 정지합니다. 차압계는 급·배기가 작동될 때 코팅팬 차압을 표시합니다.',['h-dp','pnDp','pnExh']],
+          ['차압 하한 적용을 해제한다',0,'차압이 낮으면 팬 내부 기류가 약해 건조·집진이 제대로 안 됩니다.',['pnDp']],
+          ['스프레이 압력을 올린다',0,'스프레이 압력은 차압과 별개입니다.',['h-gauge']]]}]},
+ {type:'알람',title:'배기 휠터 점검 (집진기)',src:'SOP-EQM-00003 알람표 · KC170FS 매뉴얼 2.3.4 집진기',loc:'mach',alarm:'배기 휠터 점검',say:'집진기 필터!',
+  stages:[{sit:'"배기 휠터 점검" 알람 — 집진기 차압 이상입니다.',
+    q:'집진기 필터 관리로 맞는 것은?',
+    opts:[['배기팬 완전 정지 후 Shaking → 하부 Dust box 분진 제거, 필터는 하루 8시간 사용 기준 6개월마다 교체',1,'맞아요. 분진이 남은 상태로 재가동하면 분진이 필터에 다시 붙습니다.',['h-dust']],
+          ['배기팬 가동 중에 Shaking',0,'매뉴얼은 배기팬이 완전히 정지한 뒤 Shaking하도록 합니다.',['h-dust']],
+          ['급기 필터를 교체한다',0,'이 알람은 집진기(배기 쪽) 필터입니다.',['h-ahu']]]}]},
+ {type:'알람',title:'마우스링 열림',src:'SOP-EQM-00003 알람표 · 가동 시 주의 사항',loc:'door',alarm:'마우스링 열림',say:'도어 확인!',
+  stages:[{sit:'"마우스링 열림" 알람이 떴습니다.',
+    q:'조치와 원칙은?',
+    opts:[['마우스링을 닫는다 — 작업 중이나 팬 회전 중에는 외부도어(가이드)를 열지 않는다',1,'맞아요. 알람표 해결책과 SOP 안전 수칙입니다.',['h-door']],
+          ['팬을 돌린 채로 도어를 닫는다',0,'팬 회전 중 도어 조작은 금지입니다. 정지 상태에서 닫습니다.',['h-door']]]}]},
+ {type:'알람',title:'코팅팬 과부하',src:'SOP-EQM-00003 알람표 · 적용 범위',loc:'door',alarm:'코팅팬 과부하',say:'팬 과부하!',
+  stages:[{sit:'"코팅팬 과부하" 알람 — 코팅기 메인 모터 과부하입니다.',
+    q:'먼저 확인할 것은?',
+    opts:[['정제 총무게 — KC130F 규격(80~150 kg/회) 범위인지 확인하고 원인 조치',1,'맞아요. 알람표 해결책이 "정제 총무게 확인"입니다. 투입량 초과가 가장 흔한 원인입니다.',['h-pan','pnFan']],
+          ['팬 속도를 올려 부하를 넘긴다',0,'과부하 상태에서 속도를 올리면 모터 손상 위험이 커집니다.',['pnFan']]]}]},
+ {type:'고장',title:'스프레이건 팁에서 물방울',src:'KC170FS 매뉴얼 스프레이건 고장 원인과 처리법 · SOP DROPLET',loc:'door',say:'팁에서 방울!',
+  stages:[{sit:'노즐 막힘을 제거했는데도 스프레이건 팁에서 물방울이 계속 떨어집니다.',
+    q:'매뉴얼 고장표의 원인과 처리는?',
+    opts:[['팁 또는 니들 손상·마모, 니들 스프링 손상·변형 — 해당 부품 교체',1,'맞아요. 막힘이 아니라 부품 마모라면 청소로는 해결되지 않습니다. 교체 후 DROPLET이 없는지 다시 확인합니다.',['h-gun']],
+          ['액펌프 속도를 낮춘다',0,'분사량을 줄여도 팁·니들 불량은 그대로입니다. 분사량이 기록서 값에서 벗어납니다.',['pnPump']]]}]},
+ {type:'고장',title:'분사가 나부끼거나 불규칙',src:'KC170FS 매뉴얼 스프레이건 고장 원인과 처리법',loc:'tank',say:'분사 불규칙!',
+  stages:[{sit:'분사 패턴이 나부끼고 불규칙합니다.',
+    q:'매뉴얼이 제시한 원인이 아닌 것은?',
+    opts:[['코팅팬 속도가 너무 빠름',1,'맞아요. 매뉴얼 원인은 탱크 원료 부족·흐름 방해, 건 막힘, needle seal kit 마모, 팁 손상·느슨함입니다. 원료 보충·청소·교체·팁 체결로 조치합니다.',['h-tank','h-gun','h-pump']],
+          ['탱크에 원료가 부족하거나 흐름이 방해됨',0,'이것은 매뉴얼에 있는 원인입니다. 원료를 보충하거나 흐름을 원활하게 합니다.',['h-tank']],
+          ['needle seal kit 마모',0,'이것도 매뉴얼에 있는 원인입니다. 교체합니다.',['h-gun']]]}]},
+ {type:'정비',title:'정기 윤활 포인트',src:'KC170FS 매뉴얼 롤러 베어링 · 연동펌프 정비',loc:'bearing',say:'윤활 점검',
+  stages:[
+   {sit:'코팅팬 구동부 윤활을 점검합니다.',
+    q:'코팅팬 롤러 베어링 구리스 주입 기준은?',
+    opts:[['후면 롤러 베어링 — 기계 우측 주입구로 월 1회 이상, 전면 롤러 베어링은 무급유 타입',1,'맞아요. 매뉴얼 원문입니다. 최초 주입 구리스는 COMBI EP No.2입니다.',['h-bearing']],
+          ['전면·후면 모두 분기 1회',0,'후면은 월 1회 이상입니다. 전면은 무급유 타입이라 주입하지 않습니다.',['h-bearing']]]},
+   {sit:'이어서 연동펌프를 점검합니다.',
+    q:'연동펌프 정비 사항은?',
+    opts:[['펌프헤드 롤러에 주기적으로 구리스 주입 (권장: SHELL OMALA220)',1,'맞아요. 튜브는 매뉴얼 그림의 올바른 장착 방향을 지켜야 하고, 교체 주기는 SOP-EQM-00002를 따릅니다.',['h-pump']],
+          ['튜브에 윤활유를 바른다',0,'튜브 외부에 윤활유를 바르지 않습니다. 구리스는 펌프헤드 롤러에 넣습니다.',['h-pump']]]}]}
+];
+let tsCur=null,tsStage=0;const tsDone=new Set();
+function clearHot(){$$('.halo').forEach(h=>h.classList.remove('ok','bad'));$$('.hsOk,.hsBad').forEach(e=>e.classList.remove('hsOk','hsBad'));const t=$('#hsTags');if(t)t.innerHTML='';}
+function hot(ids,kind){const tags=$('#hsTags');
+ ids.forEach(id=>{const e=document.getElementById(id);if(!e)return;
+  if(e.classList.contains('halo')){e.classList.add(kind);const nm=e.dataset.nm;
+   if(nm&&tags){const cx=+e.getAttribute('cx'),cy=+e.getAttribute('cy'),r=+e.getAttribute('r'),w=nm.length*8.6+12;
+    const g=document.createElementNS(NS,'g');
+    g.innerHTML=`<rect x="${cx-w/2}" y="${cy-r-19}" width="${w}" height="15" rx="4" fill="${kind==='ok'?'#0f7a3a':'#b42318'}"/><text x="${cx}" y="${cy-r-8}" text-anchor="middle" font-size="9.5" font-weight="700" fill="#fff">${esc(nm)}</text>`;
+    tags.appendChild(g);}}
+  else e.classList.add(kind==='ok'?'hsOk':'hsBad');});}
+function troubleList(){
+ if(running)return;clearHot();tAlarm='';if(hold){hold=false;scene.classList.remove('alarm');}
+ renderHMI(hmiRest(cur));modal.classList.add('side');
+ openModal(`<div><h3>트러블슈팅</h3><p style="margin:0 0 6px">SOP 알람표 18종 중 교육 효과가 큰 항목과 매뉴얼 고장표·정비 항목입니다. 선택지를 고르면 확인할 부위가 설비와 HMI에서 깜빡입니다.</p>
+  <p style="margin:0"><b style="color:#16a34a">초록</b> = 확인할 곳 · <b style="color:#dc2626">빨강</b> = 틀린 곳 (이유 표시)</p>
+  <div class="row" style="margin-top:10px"><button type="button" class="btn" data-close>닫기</button></div></div>
+  <div class="tsItems">${TS.map((t,i)=>`<button type="button" class="tsitem" data-tsel="${i}"><b><span class="badge">${t.type}</span>${esc(t.title)}${tsDone.has(i)?' ✓':''}</b><span>${esc(t.src)}</span></button>`).join('')}</div>`);
+}
+function startTs(i){
+ tsCur=i;tsStage=0;const t=TS[i];clearHot();
+ if(t.alarm){hold=true;tAlarm=t.alarm;scene.classList.add('alarm');}else{hold=false;tAlarm='';scene.classList.remove('alarm');}
+ renderHMI(hmiRest(cur));moveTo(t.loc);bubble(t.say);renderTs();
+}
+function renderTs(msg,bad,showNext,picked){
+ const t=TS[tsCur],g=t.stages[tsStage];modal.classList.add('side');
+ openModal(`<div><h3>${esc(t.title)} <span class="muted" style="font-size:12px;font-weight:400">${tsStage+1} / ${t.stages.length}</span></h3>
+  <div class="src">근거: ${esc(t.src)}</div><div class="tsit">${esc(g.sit)}</div>
+  <p style="margin:4px 0 0;font-size:12.5px;${bad?'color:var(--warn)':'color:var(--sub)'}">${msg?esc(msg):'선택지를 고르면 확인할 부위가 깜빡입니다.'}</p></div>
+  <div><div class="q" style="margin-top:0">${esc(g.q)}</div>
+  ${g.opts.map((o,k)=>`<button type="button" class="opt ${picked===k?(o[1]?'good':'badpick'):''}" data-ts="${k}" ${showNext?'disabled':''}>${esc(o[0])}</button>`).join('')}
+  <div class="row">${showNext?`<button type="button" class="btn primary" data-tsnext="1">${tsStage<t.stages.length-1?'다음 단계':'해결 완료'}</button>`:''}<button type="button" class="btn" data-tslist="1">목록</button></div></div>`);
+}
+function tsAnswer(k){
+ const t=TS[tsCur],g=t.stages[tsStage],o=g.opts[k];clearHot();hot(o[3],o[1]?'ok':'bad');
+ if(o[1]){bubble('여기를 확인!');renderTs(o[2],false,true,k);}else{errors++;bubble('거기가 아니에요');renderTs(o[2],true,false,k);}
+}
+function tsNext(){
+ const t=TS[tsCur];
+ if(tsStage<t.stages.length-1){tsStage++;clearHot();renderTs();return;}
+ if(!tsDone.has(tsCur)){tsDone.add(tsCur);log.push(['트러블',t.title]);}
+ clearHot();hold=false;tAlarm='';scene.classList.remove('alarm');renderHMI(hmiRest(cur));bubble('해결했어요');troubleList();
+}
+
+/* 이벤트 */
+document.addEventListener('click',e=>{
+ const b=e.target.closest('button');if(!b||b.disabled)return;
+ if(b.dataset.go!=null){setStep(+b.dataset.go);return;}
+ if(b.dataset.chk!=null){const x=st[cur],k=+b.dataset.chk;x.checks.has(k)?x.checks.delete(k):x.checks.add(k);say('');afterChange();return;}
+ if(b.dataset.opt!=null){const o=STEPS[cur].opts[+b.dataset.opt];
+   if(o[1]){st[cur].choice=true;say(o[2]);bubble('좋아요!');}else{errors++;say(o[2],true);bubble('다시 볼까요?');}
+   afterChange();return;}
+ if(b.id==='runBtn')return runStep();
+ if(b.id==='nextBtn'){cur===LAST?summary():setStep(cur+1);return;}
+ if(b.id==='prevBtn')return setStep(cur-1);
+ if(b.id==='troubleBtn')return troubleList();
+ if(b.dataset.tsel!=null)return startTs(+b.dataset.tsel);
+ if(b.dataset.ts!=null)return tsAnswer(+b.dataset.ts);
+ if(b.dataset.tsnext!=null)return tsNext();
+ if(b.dataset.tslist!=null)return troubleList();
+ if(b.id==='drillBtn')return drill(0);
+ if(b.id==='infoBtn')return info();
+ if(b.dataset.drill!=null)return drillAnswer(+b.dataset.drill);
+ if(b.dataset.close!=null){closeModal();return;}
+ if(b.dataset.reset!=null){location.reload();return;}
+});
+
+const modal=$('#modal'),card=$('#modalCard');
+function openModal(h){card.innerHTML=h;modal.hidden=false;const f=card.querySelector('button');f&&f.focus();}
+function closeModal(){modal.hidden=true;modal.classList.remove('side');clearHot();tAlarm='';if(hold){hold=false;scene.classList.remove('alarm');}render();}
+modal.addEventListener('click',e=>{if(e.target===modal)closeModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!modal.hidden)closeModal();});
+
+const DRILL=[
+ {q:'코팅 중 코팅팬 쪽에서 평소와 다른 소음이 납니다. 작업자가 가장 먼저 할 일은?',
+  opts:[['직접 조치하지 말고 비상정지 스위치를 눌러 장비를 정지',1],['도어를 열어 원인을 직접 확인',0],['소음이 멈출 때까지 지켜본다',0]],
+  bad:'SOP는 작업자가 이상 상황에서 직접 조치하지 말고 비상정지로 먼저 멈추도록 합니다. 팬 회전 중 도어 개방은 금지입니다.'},
+ {q:'장비를 정지시켰습니다. 다음은?',
+  opts:[['실선임자에게 보고',1],['팀장에게 바로 전화',0],['알람 리셋 후 재가동해 본다',0]],
+  bad:'보고 체계는 작업자 → 실선임자입니다. 실선임자가 직접 조치하거나, 어려우면 팀장에게 보고합니다.'},
+ {q:'실선임자가 조치했습니다. 재가동 조건은?',
+  opts:[['조치가 완료되었음을 확인한 후 재가동',1],['조치 여부와 관계없이 바로 재가동',0]],
+  bad:'SOP는 조치 완료를 확인한 뒤에만 재가동하도록 합니다. 정지 상태에서도 사이클 운동으로 움직일 수 있어 작동 반경 접촉을 금합니다.'}];
+let drillPhase=0;
+function drill(p){
+ if(running)return;
+ drillPhase=p;hold=true;tAlarm='비상정지 인터록';scene.classList.add('alarm');renderHMI(hmiRest(cur));
+ moveTo('panel');bubble('이상 소음!');
+ const d=DRILL[p];
+ openModal(`<h3>비상상황 훈련 ${p+1}/3</h3><p>SOP 「이상 상황 발생 시 조치방법」 기반 가상 상황입니다.</p>
+  <div class="q">${d.q}</div>${d.opts.map((o,k)=>`<button type="button" class="opt" data-drill="${k}">${o[0]}</button>`).join('')}
+  <p id="drillFb" class="muted"></p>`);
+}
+function drillAnswer(k){
+ const d=DRILL[drillPhase];
+ if(!d.opts[k][1]){errors++;$('#drillFb').textContent=d.bad;$('#drillFb').style.color='var(--warn)';return;}
+ if(drillPhase<2){if(drillPhase===0){working(true);clearHot();hot(['h-ems'],'ok');}drill(drillPhase+1);return;}
+ working(false);log.push(['훈련','직접 조치 금지 → 비상정지 → 실선임자 보고 → 조치 완료 확인 후 재가동']);
+ openModal('<h3>비상상황 대응 완료</h3><p>직접 조치 금지 → 비상정지 → 실선임자 보고 → 조치 완료 확인 후 재가동 순서를 확인했습니다.</p><button type="button" class="btn primary" data-close>훈련으로 돌아가기</button>');
+}
+function info(){
+ openModal(`<h3>자료와 주의사항</h3>
+ <p>사내 <b>SOP-EQM-00003 「금성코팅기(130F, 170FS, 170FS II) 가동 및 세척」 v3.0</b>, 금성산기 <b>KC170FS 매뉴얼(DH-MAN-AC0511S)</b>·<b>F&amp;DS(DH-F&amp;DS-AC0511S)</b>, 현장 사진·운전 영상을 근거로 만든 교육용 초안입니다.</p>
+ <ul>
+ <li>설비 외관과 조작부는 <b>KC130F</b> 현장 사진 기준입니다. 매뉴얼·F&amp;DS는 같은 시리즈 KC170FS 문서라, HMI 기능 설명은 KC130F 실기와 대조가 필요합니다.</li>
+ <li>HMI는 운전 영상에서 확인한 CIMON <b>일반운전</b> 화면 구성(코팅팬·배기팬·급기팬·액펌프·스프레이·차압설정·스팀밸브·액탱크·예열모드·분사설정)을 재구성했습니다.</li>
+ <li>배기 2650 rpm·설정 45 ℃·하한 44 ℃, 급기 1300 rpm·상한 65 ℃, 액펌프 30 rpm, 메인압력 6.2, 건 3.5, 예열 작동 18·대기 25 등은 <b>현장 화면에서 관찰된 값을 교육용 예시로 쓴 것</b>이며 특정 품목의 기준값이 아닙니다. 실제 기준은 제조지시기록서를 따릅니다.</li>
+ <li>코팅 진행률·정제 색 변화·차압 변화는 교육용 표시입니다.</li>
+ <li>영상에 보인 제품명·생산번호·담당자명은 가상 값(동화C / DWC-2609A / OP-01)으로 대체했습니다.</li>
+ <li>트러블슈팅은 SOP 알람표 18종 중 10종, 매뉴얼 스프레이건 고장표 2종, 정비 항목(롤러 베어링·연동펌프)으로 구성했습니다.</li>
+ <li>훈련 완료는 작업 자격이나 전자서명을 뜻하지 않습니다.</li>
+ </ul><button type="button" class="btn primary" data-close>닫기</button>`);
+}
+function summary(){
+ openModal(`<h3>첫 배치 훈련 결과</h3>
+ <p>완료 ${doneSet.size} / ${STEPS.length} · 다시 선택한 횟수 ${errors}회</p>
+ ${log.map(l=>`<div class="logrow"><span>${esc(l[0])}</span><strong>${esc(l[1])}</strong></div>`).join('')}
+ <p style="margin-top:10px">가상 결과이며 새로 열면 사라집니다. 실제 작업 전에는 담당자의 교육과 자격 확인이 필요합니다.</p>
+ <div class="row"><button type="button" class="btn" data-close>닫기</button><button type="button" class="btn primary" data-reset>처음부터 다시</button></div>`);
+}
+
+setOpT();flip(1);
+setTimeout(()=>setStep(0),250);
+})();
+</script>
+</body>
+</html>
