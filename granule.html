@@ -49,8 +49,8 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .status.hold{background:#e04a3f;color:#fff;animation:blink .6s steps(2) infinite}
 .status.done{background:#f2d46b;color:#332}
 @keyframes blink{50%{opacity:.4}}
-.mimic{background:linear-gradient(90deg,#2f4448,#51686d,#2f4448);border:1px solid #698699;display:grid;grid-template-columns:120px 1fr;align-items:center;gap:6px;padding:4px 6px}
-.mimic svg{width:120px;height:86px}
+.mimic{background:linear-gradient(90deg,#2f4448,#51686d,#2f4448);border:1px solid #698699;display:grid;grid-template-columns:minmax(0,1fr);align-items:stretch;gap:6px;padding:4px 6px}
+.mimic svg{width:100%;height:auto}
 .mimic .ml{font-size:10px;color:#d9e4e2;line-height:1.5}
 .mimic .ml b{color:#9ff28f}
 .vals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;align-content:start;overflow:auto}
@@ -149,15 +149,86 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .lbl{font-size:11px;fill:#3f524e;font-weight:700}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 @media (max-width:1100px){.app{height:auto;min-height:0}.main{grid-template-columns:1fr}.scene{aspect-ratio:8/5}.hmi{min-height:520px}.task{grid-template-columns:1fr}.work{max-height:none}}
+
+/* Expanded process HMI; Recipe View is an independent dialog. */
+.main{grid-template-columns:minmax(0,1.12fr) minmax(480px,1fr)}
+.hmi-grid{display:block;overflow:auto;padding:7px}
+.proc{display:flex;flex-direction:column;gap:7px;min-height:100%}
+.stepbox{min-height:37px}.stepbox .nm{font-size:13px}.stepbox .no{font-size:15px}
+.mimic{display:block;padding:0;background:linear-gradient(110deg,#263b43,#435d60,#2b4047)}
+.mimic svg{display:block;width:100%;height:auto;max-height:275px;min-height:180px}
+.mimic .ml{padding:5px 8px;background:#17353b;display:flex;gap:12px;flex-wrap:wrap;font-size:10px}
+.hm-caption{font:9px Arial,'Malgun Gothic',sans-serif;fill:#e4efe5}.hm-reading{font:10px Arial,'Malgun Gothic',sans-serif;fill:#b8ef93}.hm-numeric{font:bold 12px monospace;fill:#205f20}
+.hm-flow{fill:none;stroke:#9ced77;stroke-width:3;stroke-dasharray:7 6;opacity:0}.hm-flow.active{opacity:1;animation:dash 1.2s linear infinite}
+#hmChopper{transform-box:fill-box;transform-origin:center} .chop-on #hmChopper{animation:rot .4s linear infinite}
+.vals{grid-template-columns:repeat(4,minmax(0,1fr));overflow:visible;gap:5px}.val{padding:5px 6px;font-size:10px}.val b{font-size:15px;line-height:1.5}.val small{display:block;color:#596b58;font-size:9px}
+.fkey{padding:6px 4px;font-weight:700}.fkey small{font-weight:400;font-size:10px}.fkey:hover{background:#edf0dc}
+.recipe-card{width:min(740px,96vw)}.recipe-card>.row{align-items:center;justify-content:space-between}.recipe-card>.row .btn{flex:none}.recipe-card h3{margin:0}
+.recipe-card .recipe{max-height:65vh}.recipe-card .recipe ol{font-size:13px;line-height:1.7;padding:4px}.recipe-card .recipe li,.recipe-head{grid-template-columns:35px 1.05fr 1fr;white-space:normal;padding:5px 8px}.recipe-head{display:grid;gap:3px;background:#bfc6b8;font-size:11px;font-weight:700;padding:8px 12px}
+@media(max-width:1100px){.main{grid-template-columns:1fr}.hmi{min-height:580px}.mimic svg{max-height:310px}}
+@media(max-width:520px){.vals{grid-template-columns:repeat(3,minmax(0,1fr))}.hmi-top{font-size:9px}.stepbox .nm{font-size:11px}}
+
+/* Photo-referenced process screen, redrawn as vector elements. */
+.main{grid-template-columns:minmax(0,.9fr) minmax(570px,1.1fr)}
+.hmi{grid-template-rows:auto minmax(0,1fr) auto auto auto;border:5px ridge #bdc4bd;border-radius:5px;background:#071354}
+.hmi-top{align-items:center;background:linear-gradient(#e0e1d2,#b4b8a9);font-size:10px;min-height:31px}.hmi-top b{font-size:18px;color:#183e61;font-style:italic}
+.hm-expand{padding:4px 8px;background:#e5e8d6;border:1px solid #77867e;color:#143844;white-space:nowrap;font-size:11px}
+.hmi-grid{padding:3px;overflow:auto}.proc{gap:3px;min-height:0}.stepbox{min-height:26px;padding:3px 6px;background:#138e96}.stepbox .nm{font-size:11px}.stepbox .no{font-size:11px}
+.mimic{border:0;background:#061449}.mimic svg{width:100%;height:auto;min-height:0;max-height:none;display:block}.mimic .ml{font-size:9px;background:#0c2251;padding:3px 6px}
+.instrument .hot text:last-child{fill:#117b18}.hm-flow{stroke:#42ed55;stroke-width:4}
+.fkeys{padding:3px;gap:4px}.fkey{border:3px outset #e6e8dc;border-radius:0;padding:4px;font-size:10px;background:#cdd2c4;color:#26372e}.fkey small{font-size:9px}
+.alarm-table{min-height:49px;background:#d5d9d3;color:#334541;font:9px Arial,sans-serif}.alarm-head,.alarm-body{display:grid;grid-template-columns:28px 80px 1fr 56px;gap:3px;padding:3px 5px}.alarm-head{background:#c2c8bf;border-bottom:1px solid #909e95}.alarm-body{color:#576b5f}.alarm-body #hMsg{white-space:normal}.hm-footer{display:flex;justify-content:space-between;gap:5px;background:#129c9c;color:#063339;padding:4px 6px;font:9px Arial,sans-serif}.hm-footer span:first-child{background:#c7c836;padding:0 4px}
+.hmi.expanded{position:fixed;inset:10px max(10px,calc((100vw - 1220px)/2));z-index:18;box-shadow:0 0 0 100vmax #05101bd9;min-height:0}.hmi.expanded .hmi-grid{display:flex;justify-content:center}.hmi.expanded .proc{width:min(100%,calc((100vh - 185px)*1.47));min-width:440px}.hmi.expanded .hmi-top{font-size:13px}.hmi.expanded .stepbox .nm{font-size:13px}.hmi.expanded .mimic .ml{font-size:11px}
+@media(max-width:1100px){.main{grid-template-columns:1fr}.hmi{min-height:0}.hmi.expanded .proc{min-width:0}}
+.param-table{width:100%;border-collapse:collapse;font-size:12px}.param-table th,.param-table td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left}.param-table td:last-child{font-weight:700;white-space:nowrap;color:var(--accent)}
+
+#mLine span{line-height:1.55}.hmi.expanded .mimic .ml{font-size:11px}#hmiRock,#potRock{will-change:transform}
+
+/* Training and assessment */
+.training-status{font-size:11px;flex-basis:100%;color:var(--sub);border-top:1px solid var(--line);padding-top:4px}
+.card{width:min(850px,96vw)}.training-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}.training-fields label,.field-notes{display:flex;flex-direction:column;gap:5px;font-weight:650}.training-fields input,.field-notes textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);padding:10px;border-radius:7px;width:100%}.field-notes textarea{min-height:90px;resize:vertical}.training-note,.hint{background:var(--soft);padding:12px;border-radius:8px}.bad-text{color:var(--warn)!important}.evidence-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}.label-card{border:2px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}.label-card h4{margin:0;background:var(--accent);color:var(--on);padding:10px}.label-card>div{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line);padding:12px}.label-card>div span{color:var(--sub)}.case-top{display:flex;justify-content:space-between;gap:12px;font-size:11px;color:var(--sub);margin-bottom:8px}.case-tag{font-size:11px!important}.case-options{display:grid;grid-template-columns:1fr 1fr;gap:6px}.opt.selected{outline:2px solid var(--accent);background:var(--soft)}.answer-feedback{padding:10px;background:var(--soft);border-radius:8px}.measurement{background:#dce7da;color:#24423b;display:grid;text-align:center;padding:20px;gap:8px;border-radius:10px}.measurement strong{font-size:36px}.measurement small{font-size:11px}.evidence-text{font-size:16px;line-height:1.7;background:var(--soft);padding:18px;border-radius:9px;margin:14px 0}.hose-card{background:#eff4ef;color:#28463f;padding:12px;border-radius:12px}.hose-card svg{width:100%;max-height:210px}.hose-card p{color:#28463f}.mission-block{padding:9px;background:var(--soft);border-radius:9px}.mission-block strong{font-size:12px}.mission-buttons{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0}.mission{font-size:11px;padding:7px 8px}.mission.complete{border-color:var(--accent)}.mission-block small{font-size:10px;color:var(--sub)}.field-list{display:grid;gap:8px;margin:14px 0}.field-list fieldset{border:1px solid var(--line);border-radius:8px;padding:10px}.field-list legend{font-size:12px}.field-list button{margin-right:8px}.history-row{display:grid;gap:4px;padding:12px;border-bottom:1px solid var(--line)}.history-row span,.history-row small{font-size:11px;color:var(--sub)}.result-actions{margin-top:15px;margin-bottom:10px}.param-table td:last-child{white-space:normal}.work{max-height:215px}#paperReport{display:none}
+@media(max-width:600px){.training-fields,.evidence-grid,.case-options{grid-template-columns:1fr}.card{padding:14px}.row{flex-wrap:wrap}.row .btn{min-width:110px}}
+@media print{body>*{display:none!important}#paperReport{display:block!important;background:white;color:#111;font:11px/1.5 sans-serif}#paperReport table{width:100%;border-collapse:collapse}#paperReport td,#paperReport th{color:#111!important;padding:5px;border:1px solid #bbb}#paperReport tr{break-inside:avoid}#paperReport h3,#paperReport h4{break-after:avoid}body{background:white}@page{size:A4;margin:14mm}}
+
+/* Balanced equipment and HMI views. Controls occupy their own full-width row. */
+@media screen {
+.app{max-width:none;height:auto;min-height:100vh;min-height:100dvh;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto clamp(520px,calc(100dvh - 300px),920px) auto auto;grid-template-areas:"top top" "scene hmi" "task task" "rail rail"}
+.top{grid-area:top;gap:6px 10px;padding:7px 12px}
+.top h1{font-size:16px}.top .meta{font-size:10px}.top .btn{padding:6px 9px;font-size:11px}
+.training-status{flex-basis:auto;border:0;padding:0;margin-left:auto;font-size:10px}
+.main{display:contents}.scene{grid-area:scene;aspect-ratio:auto;min-width:0}.scene svg{height:100%;width:100%}
+.task{grid-area:task;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) minmax(230px,.7fr);align-items:start;gap:14px;min-height:0;overflow:visible;padding:10px 12px}
+.task h2{font-size:17px}.task .work{max-height:none;overflow:visible;flex-shrink:0}.task .act{flex-shrink:0}.task .row{flex-wrap:wrap}
+.rail{grid-area:rail;min-width:0}
+.hmi{grid-area:hmi;min-width:0;min-height:0;grid-template-rows:auto minmax(0,1fr) auto auto auto}
+.hmi .hmi-grid{display:block;min-height:0;overflow:hidden;padding:3px}
+.hmi .proc{display:grid;grid-template-rows:auto minmax(0,1fr);height:100%;min-height:0;width:100%;min-width:0;gap:3px}
+.hmi .mimic{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;align-items:stretch;gap:0;min-height:0;min-width:0;overflow:hidden;padding:0}
+.hmi .mimic svg{display:block;width:100%;height:100%;min-height:0;max-height:none;object-fit:contain}
+.hmi .mimic .ml{font-size:10px;gap:2px 12px;padding:3px 6px;line-height:1.3}
+.hmi .hmi-top{gap:6px;font-size:10px}.hmi .alarm-table{min-height:0}.hmi .fkeys{flex-shrink:0}
+.hmi.expanded{inset:8px;width:auto;height:auto;min-height:0;max-width:none}
+.hmi.expanded .hmi-grid{display:block}.hmi.expanded .proc{width:100%;min-width:0;height:100%}
+}
+@media screen and (max-width:900px){
+.app{height:auto;min-height:100dvh;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto auto auto;grid-template-areas:"top" "hmi" "scene" "task" "rail"}
+.hmi{height:clamp(370px,calc(68vw + 175px),850px);max-height:calc(100dvh - 16px)}
+.scene{height:auto;aspect-ratio:8/5}.task{grid-template-columns:minmax(0,1fr);overflow:visible}.top .grow{display:none}
+.hmi .hmi-top{flex-wrap:wrap}.hmi .hmi-top b{font-size:15px}.hmi .mimic .ml{font-size:9px}
+.hmi.expanded{height:auto;max-height:none}.hmi.expanded .hmi-top{font-size:10px}
+}
+
 </style>
 </head>
 <body>
 <div class="app">
   <header class="top">
-    <div><h1>Singlepot 600 첫 배치 시뮬레이터</h1><div class="meta">교육용 가상 배치 TRAIN-600-001 · Recipe DEMO-600 / DEMO-v1 · 실설비 연동 없음</div></div>
+    <div><h1>Singlepot 600 · ALP#018 교육</h1><div class="meta">교육용 가상 배치 TRAIN-600-001 · Recipe DEMO-600 / DEMO-v1 · 실설비 연동 없음</div></div>
     <div class="grow"></div>
     <div class="prog"><span id="progText">0 / 26 완료</span><div class="bar"><i id="progBar"></i></div></div>
     <button class="btn danger" id="drillBtn" type="button">비상상황 훈련</button>
+    <button class="btn" id="recipeBtn" type="button">Recipe 순서 보기</button>
+    <button class="btn" id="trainingSetup" type="button">연습 / 평가 시작</button><button class="btn" id="trainingResult" type="button">교육 결과</button><button class="btn" id="trainingHistory" type="button">교육 이력</button><button class="btn" id="fieldOpen" type="button">현장 실습</button><span id="trainingStatus" class="training-status"></span>
     <button class="btn" id="infoBtn" type="button">자료·주의</button>
   </header>
 
@@ -219,7 +290,7 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
         <path d="M344 120 L325 131 V285 L344 273 Z" fill="#7c9095"/>
         <path d="M351 234 L319 270 L370 282 L440 246" fill="#7f9198" stroke="#60777d" stroke-width="3"/>
         <g fill="#e8f0ef" stroke="#63777e"><circle cx="354" cy="116" r="4"/><circle cx="451" cy="116" r="4"/><circle cx="354" cy="261" r="4"/><circle cx="451" cy="261" r="4"/></g>
-        <g id="wallPot" transform="translate(56 0) scale(.86)">
+        <g id="wallPot" transform="translate(56 0) scale(.86)"><g id="potRock">
         <!-- singlepot -->
         
         
@@ -263,7 +334,8 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
         
         <text x="400" y="62" text-anchor="middle" class="lbl">Singlepot 600 · 벽 부착</text>
 
-</g>
+</g></g>
+        <text id="swingNote" x="400" y="375" text-anchor="middle" fill="#245e59" font-size="12"></text>
         <!-- Wall mounted swing mill. The head stays upright while the arm swings. -->
         <g transform="translate(56 0) scale(.86)">
           <rect x="624" y="235" width="32" height="139" rx="5" fill="url(#gMetal)" stroke="#60777c" stroke-width="2"/>
@@ -333,29 +405,70 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
       </svg>
     </div>
 
-    <section class="hmi" aria-label="교육용 HMI 화면">
-      <div class="hmi-top"><span>PROCESS SCREEN · 교육용 재구성</span><span id="hMode">PRODUCTION · AUTOMATIC MODE</span></div>
+    <section class="hmi" id="hmiPanel" aria-label="교육용 HMI 화면">
+      <div class="hmi-top"><span><b>GEA</b> · SINGLEPOT 600</span><span id="hMode">1010 PROCESS SCREEN · RECIPE SP</span><button type="button" id="expandHmi" class="hm-expand">⛶ 확대</button></div>
       <div class="hmi-grid">
-        <div class="recipe"><h3>Recipe View</h3><ol id="recipeList"></ol></div>
+        
         <div class="proc">
           <div class="stepbox"><span class="no" id="hNo">—</span><span class="nm" id="hName">LOGIN</span><span class="status" id="hStatus">IDLE</span></div>
           <div class="mimic" id="mimic">
-            <svg viewBox="0 0 140 100" aria-hidden="true">
-              <path d="M22,56 Q22,94 70,97 Q118,94 118,56" stroke="#50c83d" stroke-width="5" fill="none"/>
-              <path d="M30,24 V58 Q30,88 70,91 Q110,88 110,58 V24 Z" fill="#b7c6c6" stroke="#4f6a70"/>
-              <rect x="67" y="6" width="6" height="76" fill="#7b9095"/>
-              <g id="mImp"><ellipse cx="70" cy="80" rx="24" ry="3.5" fill="#415c61"/></g>
-              <g id="mDrop" fill="#4aa8ff"><circle cx="50" cy="34" r="3"/><circle cx="58" cy="44" r="2.5"/><circle cx="46" cy="50" r="2.5"/></g>
-              <path id="mWave" d="M84,34 q4,-5 8,0 t8,0 t8,0" stroke="#ff9a3d" stroke-width="3" fill="none"/>
-              <path id="mArrow" d="M104,86 l14,10 m0,0 l-8,1 m8,-1 l-2,-8" stroke="#f3d56b" stroke-width="3" fill="none"/>
-            </svg>
+<svg viewBox="0 0 1000 680" preserveAspectRatio="xMidYMid meet" role="img" aria-label="사진을 참고해 재구성한 Singlepot HMI 공정 화면">
+<defs><linearGradient id="hmSteel"><stop stop-color="#65787e"/><stop offset=".2" stop-color="#aebcbd"/><stop offset=".45" stop-color="#edf1ee"/><stop offset=".7" stop-color="#9baaad"/><stop offset="1" stop-color="#566970"/></linearGradient><linearGradient id="hmBowl"><stop stop-color="#53666e"/><stop offset=".48" stop-color="#c5d0cd"/><stop offset="1" stop-color="#63757c"/></linearGradient><linearGradient id="hmBg" x2="0" y2="1"><stop stop-color="#10172b"/><stop offset="1" stop-color="#001272"/></linearGradient><pattern id="hmHatch" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#166b35"/><path d="M0 6 L6 0" stroke="#69ef70" stroke-width="2"/></pattern></defs>
+<rect width="1000" height="680" fill="url(#hmBg)"/>
+<!-- Panel-to-device signal and process routes -->
+<g fill="none" stroke="#c1cacc" stroke-width="1.2">
+<path d="M216 55 H242 V89 H516 V110 M216 216 H246 V171 H398 V218 M216 305 H272 V193 H415 V242 M216 439 H285 V216 H370 V357 M216 581 H302 V275 H615"/>
+<path d="M600 182 H748 V76 H786 M584 164 H738 V176 H786 M590 254 H722 V254 H786 M607 262 H732 V332 H786 M610 308 H715 V427 H786 M614 368 H707 V503 H786 M638 531 H786 M639 611 H786"/>
+</g>
+<!-- Upper control pictograms -->
+<g fill="#cdd3c0" stroke="#f4f6df" stroke-width="2"><rect x="319" y="16" width="47" height="42"/><rect x="376" y="16" width="95" height="42"/><rect x="481" y="16" width="102" height="42"/><rect x="593" y="16" width="102" height="42"/></g>
+<g fill="#153453" font-size="13" text-anchor="middle"><text x="343" y="43">▱</text><text x="423" y="42">BOWL</text><text x="532" y="42">LID</text><text x="644" y="42">FILTER</text></g>
+<g id="hmiRock">
+<!-- Rear housing and jacket -->
+<path d="M344 101 H670 V527 H344 Z" fill="url(#hmBowl)" opacity=".58"/>
+<path d="M357 258 H652 V411 Q650 493 512 510 Q368 493 357 414 Z" fill="url(#hmSteel)" stroke="#d5ddda" stroke-width="2"/>
+<path id="hmJacket" d="M367 266 H642 V412 Q634 481 512 495 Q381 481 369 412 Z" fill="url(#hmHatch)"/>
+<path d="M380 270 H631 V411 Q620 469 512 480 Q394 469 380 411 Z" fill="url(#hmBowl)" stroke="#bfcac6" stroke-width="2"/>
+<path d="M386 407 Q450 395 514 409 T625 407 Q620 465 512 475 Q400 465 386 407" fill="#baa983" opacity=".36"/>
+<!-- Main drive and large agitator -->
+<rect id="hmMotor" x="483" y="108" width="60" height="65" fill="url(#hmSteel)" stroke="#182a33" stroke-width="2"/>
+<ellipse cx="513" cy="108" rx="30" ry="6" fill="#c5d0cd" stroke="#425760"/>
+<rect x="494" y="173" width="36" height="188" fill="url(#hmSteel)" stroke="#60767c"/>
+<path d="M494 352 L485 386 V455 H539 V386 L530 352" fill="url(#hmSteel)" stroke="#60767c"/>
+<g id="mImp"><path d="M507 443 L456 465 L424 450 L464 445 L505 428 L552 445 L589 430 L577 459 L528 468 Z" fill="#71858a" stroke="#b9c8c5" stroke-width="2"/></g>
+<!-- Chopper drive -->
+<rect x="395" y="190" width="39" height="37" fill="url(#hmSteel)" stroke="#283b43"/><rect x="407" y="226" width="14" height="180" fill="url(#hmSteel)"/>
+<g id="hmChopper" stroke="#b6c8c7" stroke-width="4"><path d="M413 341 L390 359 M413 341 L437 359 M413 372 L390 389 M413 372 L437 389"/></g>
+<!-- Lid, filter and vacuum pipe -->
+<path d="M350 258 H653" stroke="#d7dfdb" stroke-width="12"/>
+<path d="M568 254 V141 H596 V254" fill="url(#hmSteel)" stroke="#c0cecb" stroke-width="2"/>
+<path d="M594 161 H685 V298 H756" fill="none" stroke="#c8d2d0" stroke-width="6"/>
+<path id="hmVac" class="hm-flow" d="M594 161 H685 V298 H756"/>
+<path id="hmFeed" class="hm-flow" d="M246 171 H398 V218"/>
+<circle id="hmVacPump" cx="756" cy="298" r="9" fill="#78918d"/>
+<circle id="hmPump" cx="290" cy="193" r="8" fill="#78918d"/>
+<g id="mDrop" fill="#61b6ef"><circle cx="434" cy="284" r="3"/><circle cx="444" cy="301" r="3"/><circle cx="437" cy="320" r="3"/></g>
+<path id="mWave" d="M604 320 q-9 7 0 14 t0 14 t0 14 M616 315 q-9 7 0 14 t0 14 t0 14" fill="none" stroke="#ffbd4c" stroke-width="4"/>
+</g>
+<!-- Lower discharge and mill -->
+<path d="M596 463 L628 449 L656 502 L630 517 Z" fill="url(#hmSteel)" stroke="#d9e1db"/>
+<path d="M640 491 L675 507 V556 L640 589 L600 557 V522 Z" fill="url(#hmSteel)" stroke="#a3b6ba"/>
+<path id="hmValve" d="M607 474 L632 467 L622 491 Z" fill="#839796" stroke="#e4ece3"/>
+<path id="mArrow" d="M646 528 V556 m-7-9 l7 9 7-9" stroke="#e9cd67" stroke-width="4" fill="none"/>
+<rect x="621" y="588" width="35" height="51" fill="url(#hmSteel)" stroke="#c8d3cc"/>
+<path d="M602 648 H675 V670 H602 Z" fill="#8fa4a5" stroke="#cfdcd6"/>
+<text x="638" y="662" fill="#122b40" font-size="11" text-anchor="middle">IBC</text>
+<text id="hmDock" x="480" y="552" fill="#a6e498" font-size="11" text-anchor="middle">Mill 대기 위치</text>
+<text id="hmVacState" x="654" y="129" fill="#a6e498" font-size="11" text-anchor="middle">대기</text>
+<text id="hmMw" x="330" y="631" fill="#a6e498" font-size="11">0.0 kW</text>
+<g><rect x="549" y="326" width="72" height="16" fill="#e5e7d9" stroke="#768582"/><text x="585" y="338" text-anchor="middle" fill="#182b36" font-size="11">PET01090 SP</text><rect x="549" y="342" width="72" height="18" fill="#063ec5" stroke="#ecf2e8"/><text id="hmPress" x="585" y="355" text-anchor="middle" fill="white" font-size="12">—</text></g><g><rect x="549" y="368" width="72" height="16" fill="#e5e7d9" stroke="#768582"/><text x="585" y="380" text-anchor="middle" fill="#182b36" font-size="11">TE01090 SP</text><rect x="549" y="384" width="72" height="18" fill="#063ec5" stroke="#ecf2e8"/><text id="hmTemp" x="585" y="397" text-anchor="middle" fill="white" font-size="12">—</text></g><g><rect x="341" y="518" width="72" height="16" fill="#e5e7d9" stroke="#768582"/><text x="377" y="530" text-anchor="middle" fill="#182b36" font-size="11">PET02092</text><rect x="341" y="534" width="72" height="18" fill="#063ec5" stroke="#ecf2e8"/><text x="377" y="547" text-anchor="middle" fill="white" font-size="12">—</text></g><g><rect x="601" y="599" width="72" height="16" fill="#e5e7d9" stroke="#768582"/><text x="637" y="611" text-anchor="middle" fill="#182b36" font-size="11">TE11010</text><rect x="601" y="615" width="72" height="18" fill="#063ec5" stroke="#ecf2e8"/><text x="637" y="628" text-anchor="middle" fill="white" font-size="12">—</text></g><g><path d="M250 166 L272 178 V166 L250 178 Z" fill="#879790" stroke="#d8e1d8"/><path d="M261 166 V157" stroke="#d5e0d2"/><rect x="228" y="143" width="66" height="14" fill="#dcdfcb"/><text x="261" y="154" text-anchor="middle" fill="#172a30" font-size="10">YV01060</text></g><g><path d="M255 255 L277 267 V255 L255 267 Z" fill="#879790" stroke="#d8e1d8"/><path d="M266 255 V246" stroke="#d5e0d2"/><rect x="233" y="232" width="66" height="14" fill="#dcdfcb"/><text x="266" y="243" text-anchor="middle" fill="#172a30" font-size="10">YV01050</text></g><g><path d="M718 166 L740 178 V166 L718 178 Z" fill="#879790" stroke="#d8e1d8"/><path d="M729 166 V157" stroke="#d5e0d2"/><rect x="696" y="143" width="66" height="14" fill="#dcdfcb"/><text x="729" y="154" text-anchor="middle" fill="#172a30" font-size="10">YV02111</text></g><g><path d="M718 233 L740 245 V233 L718 245 Z" fill="#879790" stroke="#d8e1d8"/><path d="M729 233 V224" stroke="#d5e0d2"/><rect x="696" y="210" width="66" height="14" fill="#dcdfcb"/><text x="729" y="221" text-anchor="middle" fill="#172a30" font-size="10">YV02110</text></g><g><path d="M718 302 L740 314 V302 L718 314 Z" fill="#879790" stroke="#d8e1d8"/><path d="M729 302 V293" stroke="#d5e0d2"/><rect x="696" y="279" width="66" height="14" fill="#dcdfcb"/><text x="729" y="290" text-anchor="middle" fill="#172a30" font-size="10">YV02094</text></g><g><path d="M718 366 L740 378 V366 L718 378 Z" fill="#879790" stroke="#d8e1d8"/><path d="M729 366 V357" stroke="#d5e0d2"/><rect x="696" y="343" width="66" height="14" fill="#dcdfcb"/><text x="729" y="354" text-anchor="middle" fill="#172a30" font-size="10">YV02090</text></g><g class="instrument"><rect x="12" y="15" width="204" height="93" fill="#cecfbe" stroke="#f4f4df" stroke-width="3"/><rect x="15" y="18" width="34" height="27" fill="#e9ebda" stroke="#9b9e91"/><text x="32" y="38" text-anchor="middle" fill="#153c69" font-size="21">↻</text><text x="56" y="36" fill="#25302d" font-size="11" font-weight="bold">MIXER</text><path d="M15 47 H213" stroke="#8d948a"/><g id="t-mixer"><text x="19" y="62" fill="#23352e" font-size="11">Mixer speed</text><text id="v-mixer" x="208" y="62" text-anchor="end" fill="#28762c" font-size="12" font-weight="bold">—</text></g><g><text x="19" y="81" fill="#23352e" font-size="11">Mixer torque</text><text x="208" y="81" text-anchor="end" fill="#28762c" font-size="12" font-weight="bold">— Nm</text></g><g id="t-power"><text x="19" y="100" fill="#23352e" font-size="11">Mixer power</text><text id="v-power" x="208" y="100" text-anchor="end" fill="#28762c" font-size="12" font-weight="bold">—</text></g></g><g class="instrument"><rect x="12" y="180" width="204" height="55" fill="#cecfbe" stroke="#f4f4df" stroke-width="3"/><rect x="15" y="183" width="34" height="27" fill="#e9ebda" stroke="#9b9e91"/><text x="32" y="203" text-anchor="middle" fill="#153c69" font-size="21">⇩</text><text x="56" y="201" fill="#25302d" font-size="11" font-weight="bold">PRODUCT FEED</text><path d="M15 212 H213" stroke="#8d948a"/><g><text x="19" y="227" fill="#23352e" font-size="11">Product feed type</text><text id="sp-feedType" x="208" y="227" text-anchor="end" fill="#28762c" font-size="12" font-weight="bold">—</text></g></g><g class="instrument"><rect x="12" y="265" width="204" height="112" fill="#cecfbe" stroke="#f4f4df" stroke-width="3"/><rect x="15" y="268" width="34" height="27" fill="#e9ebda" stroke="#9b9e91"/><text x="32" y="288" text-anchor="middle" fill="#153c69" font-size="21">≋</text><text x="56" y="286" fill="#25302d" font-size="11" font-weight="bold">LIQUID FEED</text><path d="M15 297 H213" stroke="#8d948a"/><g><text x="19" y="312" fill="#23352e" font-size="11">Liquid type</text><text id="sp-liquidType" x="208" y="312" text-anchor="end" fill="#28762c" font-size="12" font-weight="bold">—</text></g><g id="t-timer"><text x="19" y="331" fill="#23352e" font-size="11">End time SP</text><text id="v-timer" x="208" y="331" text-anchor="end" fill="#28762c" font-size="12" font-weight="bold">—</text></g><g id="t-pump"><text x="19" y="350" fill="#23352e" font-size="11">Liquid pump speed</text><text id="v-pump" x="208" y="350" text-anchor="end" fill="#28762c" font-size="12" font-weight="bold">—</text></g><g id="t-liquid"><text x="19" y="369" fill="#23352e" font-size="11">Liquid fed</text><text id="v-liquid" x="208" y="369" text-anchor="end" fill="#28762c" font-size="12" font-weight="bold">—</text></g></g><g class="instrument"><rect x="12" y="421" width="204" height="55" fill="#cecfbe" stroke="#f4f4df" stroke-width="3"/><rect x="15" y="424" width="34" height="27" fill="#e9ebda" stroke="#9b9e91"/><text x="32" y="444" text-anchor="middle" fill="#153c69" font-size="21">✣</text><text x="56" y="442" fill="#25302d" font-size="11" font-weight="bold">CHOPPER</text><path d="M15 453 H213" stroke="#8d948a"/><g id="t-chopper"><text x="19" y="468" fill="#23352e" font-size="11">Chopper speed</text><text id="v-chopper" x="208" y="468" text-anchor="end" fill="#28762c" font-size="12" font-weight="bold">—</text></g></g><g class="instrument"><rect x="12" y="533" width="204" height="93" fill="#cecfbe" stroke="#f4f4df" stroke-width="3"/><rect x="15" y="536" width="34" height="27" fill="#e9ebda" stroke="#9b9e91"/><text x="32" y="556" text-anchor="middle" fill="#153c69" font-size="21">∿</text><text x="56" y="554" fill="#25302d" font-size="11" font-weight="bold">MICROWAVE</text><path d="M15 565 H213" stroke="#8d948a"/><g id="t-mw"><text x="19" y="580" fill="#23352e" font-size="11">MW forwarded power</text><text id="v-mw" x="208" y="580" text-anchor="end" fill="#28762c" font-size="12" font-weight="bold">—</text></g><g><text x="19" y="599" fill="#23352e" font-size="11">MW reflected power</text><text id="sp-reflected" x="208" y="599" text-anchor="end" fill="#28762c" font-size="12" font-weight="bold">—</text></g><g id="t-energy"><text x="19" y="618" fill="#23352e" font-size="11">End energy SP</text><text id="v-energy" x="208" y="618" text-anchor="end" fill="#28762c" font-size="12" font-weight="bold">—</text></g></g><g class="instrument"><rect x="786" y="15" width="202" height="55" fill="#cecfbe" stroke="#f4f4df" stroke-width="3"/><rect x="789" y="18" width="34" height="27" fill="#e9ebda" stroke="#9b9e91"/><text x="806" y="38" text-anchor="middle" fill="#153c69" font-size="21">❄</text><text x="830" y="36" fill="#25302d" font-size="11" font-weight="bold">CHILLER</text><path d="M789 47 H985" stroke="#8d948a"/><g><text x="793" y="62" fill="#23352e" font-size="11">Chiller temperature</text><text id="sp-Chiller" x="980" y="62" text-anchor="end" fill="#28762c" font-size="12" font-weight="bold">SP —</text></g></g><g class="instrument"><rect x="786" y="102" width="202" height="55" fill="#cecfbe" stroke="#f4f4df" stroke-width="3"/><rect x="789" y="105" width="34" height="27" fill="#e9ebda" stroke="#9b9e91"/><text x="806" y="125" text-anchor="middle" fill="#153c69" font-size="21">⊔</text><text x="830" y="123" fill="#25302d" font-size="11" font-weight="bold">BOWL / LID</text><path d="M789 134 H985" stroke="#8d948a"/><g><text x="793" y="149" fill="#23352e" font-size="11">Lid position</text><text x="980" y="149" text-anchor="end" fill="#28762c" font-size="12" font-weight="bold">자료 대기</text></g></g><g class="instrument"><rect x="786" y="181" width="202" height="55" fill="#cecfbe" stroke="#f4f4df" stroke-width="3"/><rect x="789" y="184" width="34" height="27" fill="#e9ebda" stroke="#9b9e91"/><text x="806" y="204" text-anchor="middle" fill="#153c69" font-size="21">⇣</text><text x="830" y="202" fill="#25302d" font-size="11" font-weight="bold">GAS SUPPLY</text><path d="M789 213 H985" stroke="#8d948a"/><g><text x="793" y="228" fill="#23352e" font-size="11">Gas condition</text><text x="980" y="228" text-anchor="end" fill="#28762c" font-size="12" font-weight="bold">자료 대기</text></g></g><g class="instrument"><rect x="786" y="261" width="202" height="55" fill="#cecfbe" stroke="#f4f4df" stroke-width="3"/><rect x="789" y="264" width="34" height="27" fill="#e9ebda" stroke="#9b9e91"/><text x="806" y="284" text-anchor="middle" fill="#153c69" font-size="21">⊔</text><text x="830" y="282" fill="#25302d" font-size="11" font-weight="bold">VACUUM</text><path d="M789 293 H985" stroke="#8d948a"/><g id="t-press"><text x="793" y="308" fill="#23352e" font-size="11">Bowl pressure</text><text id="v-press" x="980" y="308" text-anchor="end" fill="#28762c" font-size="12" font-weight="bold">—</text></g></g><g class="instrument"><rect x="786" y="341" width="202" height="55" fill="#cecfbe" stroke="#f4f4df" stroke-width="3"/><rect x="789" y="344" width="34" height="27" fill="#e9ebda" stroke="#9b9e91"/><text x="806" y="364" text-anchor="middle" fill="#153c69" font-size="21">≈</text><text x="830" y="362" fill="#25302d" font-size="11" font-weight="bold">LID HEATING</text><path d="M789 373 H985" stroke="#8d948a"/><g><text x="793" y="388" fill="#23352e" font-size="11">Lid temperature</text><text id="sp-Lid" x="980" y="388" text-anchor="end" fill="#28762c" font-size="12" font-weight="bold">SP —</text></g></g><g class="instrument"><rect x="786" y="421" width="202" height="74" fill="#cecfbe" stroke="#f4f4df" stroke-width="3"/><rect x="789" y="424" width="34" height="27" fill="#e9ebda" stroke="#9b9e91"/><text x="806" y="444" text-anchor="middle" fill="#153c69" font-size="21">≈</text><text x="830" y="442" fill="#25302d" font-size="11" font-weight="bold">BOWL HEATING</text><path d="M789 453 H985" stroke="#8d948a"/><g><text x="793" y="468" fill="#23352e" font-size="11">Bowl temperature</text><text id="sp-Bowl" x="980" y="468" text-anchor="end" fill="#28762c" font-size="12" font-weight="bold">SP —</text></g><g id="t-temp"><text x="793" y="487" fill="#23352e" font-size="11">Product TE01090 SP</text><text id="v-temp" x="980" y="487" text-anchor="end" fill="#28762c" font-size="12" font-weight="bold">—</text></g></g><g class="instrument"><rect x="786" y="526" width="202" height="55" fill="#cecfbe" stroke="#f4f4df" stroke-width="3"/><rect x="789" y="529" width="34" height="27" fill="#e9ebda" stroke="#9b9e91"/><text x="806" y="549" text-anchor="middle" fill="#153c69" font-size="21">⇩</text><text x="830" y="547" fill="#25302d" font-size="11" font-weight="bold">DISCHARGE</text><path d="M789 558 H985" stroke="#8d948a"/><g id="t-disc"><text x="793" y="573" fill="#23352e" font-size="11">Discharge position</text><text id="v-disc" x="980" y="573" text-anchor="end" fill="#28762c" font-size="12" font-weight="bold">—</text></g></g><g class="instrument"><rect x="786" y="608" width="202" height="55" fill="#cecfbe" stroke="#f4f4df" stroke-width="3"/><rect x="789" y="611" width="34" height="27" fill="#e9ebda" stroke="#9b9e91"/><text x="806" y="631" text-anchor="middle" fill="#153c69" font-size="21">▱</text><text x="830" y="629" fill="#25302d" font-size="11" font-weight="bold">MILL</text><path d="M789 640 H985" stroke="#8d948a"/><g id="t-mill"><text x="793" y="655" fill="#23352e" font-size="11">Mill speed</text><text id="v-mill" x="980" y="655" text-anchor="end" fill="#28762c" font-size="12" font-weight="bold">—</text></g></g></svg>
             <div class="ml" id="mLine">설비 대기</div>
           </div>
-          <div class="vals" id="vals"></div>
+
         </div>
       </div>
-      <div class="fkeys"><span class="fkey" id="fF2">F2 Start</span><span class="fkey">F8</span><span class="fkey">F9</span><span class="fkey">F10</span><span class="fkey">F11</span><span class="fkey">ESC Exit</span></div>
-      <div class="hmsg" id="hMsg">Description: 로그인 대기</div>
+      <div class="fkeys"><button type="button" class="fkey" id="fF2">START<br><small>현재 단계 실행</small></button><button type="button" class="fkey" id="hRecipeBtn">RECIPE VIEW<br><small>별도 창에서 보기</small></button><button type="button" class="fkey" id="paramsBtn">SETPOINTS<br><small>현재 단계 설정값</small></button><button type="button" class="fkey" id="hInfoBtn">자료 안내</button></div>
+      <div class="alarm-table"><div class="alarm-head"><span>Ack</span><span>Tagname</span><span>Description</span><span>Status</span></div><div class="alarm-body"><span>—</span><span>TRAINING</span><span id="hMsg">로그인 대기</span><span id="alarmState">NORMAL</span></div></div><div class="hm-footer"><span>ULTIMA · 교육용</span><span>RECIPE: ALP#018 / SP 참조</span><span id="hmFooterState">READY</span></div>
     </section>
   </div>
 
@@ -372,6 +485,8 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
   <nav class="rail" id="rail" aria-label="단계 선택"></nav>
 </div>
 
+<div id="paperReport"></div>
+<div class="modal" id="recipeModal" hidden role="dialog" aria-modal="true" aria-labelledby="recipeTitle"><div class="card recipe-card"><div class="row"><h3 id="recipeTitle">ALP#018 · Recipe 순서</h3><button class="btn" type="button" id="closeRecipe">닫기 ✕</button></div><p>단계를 선택하면 해당 교육 단계로 이동합니다. 8 WET MILLING은 요청에 따라 실행에서 제외했습니다. 현재 운전 중에는 이동할 수 없습니다.</p><div class="recipe"><div class="recipe-head"><span>No.</span><span>PHASE</span><span>DESCRIPTION</span></div><ol id="recipeList"></ol></div></div></div>
 <div class="modal" id="modal" hidden><div class="card" id="modalCard"></div></div>
 
 <script>
@@ -383,107 +498,96 @@ const scene=$('#scene');
 (()=>{let t='';for(let k=-7;k<=7;k++)t+=`<line x1="${400+k*44}" y1="250" x2="${400+k*120}" y2="500"/>`;
 [268,292,322,360,408,470].forEach(y=>{const f=(y-250)/250;t+=`<line x1="${110-110*f}" y1="${y}" x2="${690+110*f}" y2="${y}"/>`});$('#tiles').innerHTML=t;})();
 
-const RECIPE=[['INITIAL',''],['INITIALISE',''],['LOADING','DISCONTINUOUS'],['DRY MIXING',''],['WAITING',''],['WET MIXING','WITHOUT CHOPPER'],['WET MIXING','WITH CHOPPER'],['GRANULATION',''],['WAITING',''],['DRYING','VACUUM DRYING'],['DRYING','0/1/4'],['DRYING','0/2/4'],['DRYING','0/3/4'],['DRYING','0/6/4'],['DRYING','0/10/4'],['DRYING','VACUUM DRYING'],['WAITING','SAMPLE'],['WAITING','READY TO MILL'],['UNLOADING','10% OPEN'],['UNLOADING','15% OPEN'],['UNLOADING','100% OPEN'],['TERMINAL','']];
-const IDLE={mixer:0,chopper:0,power:0,temp:22,press:1013,pump:0,liquid:0,mw:0,energy:0,disc:0,mill:0,timer:null,status:'COMPLETE'};
-const H=o=>Object.assign({},IDLE,o);
-const R=(n,o)=>Object.assign({code:String(n),rno:n,name:RECIPE[n][0],sub:RECIPE[n][1],group:'recipe'},o);
+const REPORT=[{"n": 1, "name": "INITIALISE", "page": 1, "p": {"Heat balancing unit bowl": "ON", "Heat balancing unit lid": "ON", "Vacuum equipment": "ON", "Chiller": "ON", "Bowl temperature": "25 °C", "Lid temperature": "75 °C", "Chiller temperature": "2 °C", "RPT_MAIN_BYPASS_INERTING": "ON", "End time": "0 s", "End point bowl temperature": "0 °C", "End lid temperature": "60 °C", "End point chiller temperature": "0 °C", "Error point maximum time": "0 s"}}, {"n": 2, "name": "Waiting", "page": 1, "p": {"Bowl temperature": "25 °C", "Lid temperature": "75 °C", "Chiller temperature": "2 °C", "Operator action": "ON", "Error point maximum time": "0 s"}}, {"n": 3, "name": "Loading PROCUT FEED", "page": 2, "p": {"Product feed": "ON", "Mixer": "OFF", "Vacuum": "OFF", "Ventilation": "OFF", "Bowl pressure": "999 mbar", "Blowback interval": "600 s", "Bowl temperature": "30 °C", "Lid temperature": "75 °C", "Chiller temperature": "2 °C", "End time": "0 s", "End point bowl temperature": "0 °C", "End lid temperature": "0 °C", "Error point maximum time": "0 s", "Operator action": "ON", "Product feed type": "Discontinuous", "Mixer speed": "20 rpm"}}, {"n": 4, "name": "Dry mixing", "page": 2, "p": {"Vacuum": "OFF", "Ventilation": "ON", "Bowl pressure": "999 mbar", "Blowback interval": "600 s", "Bowl temperature": "30 °C", "Lid temperature": "75 °C", "Chiller temperature": "2 °C", "End time": "300 s", "End point bowl temperature": "0 °C", "End lid temperature": "0 °C", "Error point maximum time": "0 s", "Mixer": "ON", "Chopper": "OFF", "Mixer speed": "65 rpm", "Chopper speed": "600 rpm", "Chopper flip-flop ON time": "0 s", "Chopper flip-flop OFF time": "0 s", "Bowl offset temperature": "0 °C", "End product temperature": "0 °C"}}, {"n": 5, "name": "Waiting", "page": 3, "p": {"Bowl temperature": "30 °C", "Lid temperature": "75 °C", "Chiller temperature": "2 °C", "Operator action": "ON", "Error point maximum time": "0 s"}}, {"n": 6, "name": "Wet mixing", "page": 3, "p": {"Vacuum": "OFF", "Ventilation": "OFF", "Bowl pressure": "999 mbar", "Blowback interval": "600 s", "Bowl temperature": "30 °C", "Lid temperature": "75 °C", "Chiller temperature": "2 °C", "End time": "0 s", "End point bowl temperature": "0 °C", "End lid temperature": "0 °C", "Error point maximum time": "0 s", "Operator action": "ON", "Mixer": "ON", "Chopper": "OFF", "Liquid feed": "ON", "Mixer speed": "65 rpm", "Chopper speed": "1000 rpm", "Chopper flip-flop ON time": "0 s", "Chopper flip-flop OFF time": "0 s", "Liquid feed pump speed": "50 %", "Liquid type": "Low viscosity", "Bowl offset temperature": "0 °C", "End point mixer power": "0.0 kW", "Error point maximum mixer power": "0.0 kW", "End product temperature": "0 °C"}}, {"n": 7, "name": "Granulation", "page": 4, "p": {"Vacuum": "OFF", "Ventilation": "OFF", "Bowl pressure": "999 mbar", "Blowback interval": "600 s", "Bowl temperature": "30 °C", "Lid temperature": "75 °C", "Chiller temperature": "2 °C", "End time": "0 s", "End point bowl temperature": "0 °C", "End lid temperature": "0 °C", "Error point maximum time": "200 s", "Operator action": "ON", "Mixer": "ON", "Chopper": "ON", "Mixer speed": "135 rpm", "Chopper speed": "1500 rpm", "Chopper flip-flop ON time": "0 s", "Chopper flip-flop OFF time": "0 s", "Liquid type": "Low viscosity", "Power rise": "0 W/10s", "Bowl offset temperature": "0 °C", "End point mixer power": "0.0 kW", "End product temperature": "0 °C", "Error point maximum mixer power": "0.0 kW"}}, {"n": 8, "name": "Waiting WET MILLING", "page": 4, "p": {"Bowl temperature": "30 °C", "Lid temperature": "75 °C", "Chiller temperature": "2 °C", "Operator action": "ON", "Error point maximum time": "0 s"}}, {"n": 9, "name": "Drying VACUUM DRYING", "page": 5, "p": {"Mixer": "ON", "Chopper": "ON", "Vacuum": "ON", "Ventilation": "OFF", "Swinging": "OFF", "Microwave": "OFF", "Mixer speed": "20 rpm", "Mixer flip-flop ON time": "2 s", "Mixer flip-flop OFF time": "30 s", "Chopper speed": "600 rpm", "Chopper flip-flop ON time": "0 s", "Chopper flip-flop OFF time": "0 s", "Bowl pressure": "0 mbar", "Blowback interval": "420 s", "Swinging position": "Position 1", "Swinging mixer left": "0", "Swinging mixer right": "0", "Chopper ON/OFF during swinging": "OFF", "Swinging On-time mixer": "0 s", "Microwave forwarded power": "2.4 kW", "Microwave reflected power": "0.0 kW", "Product temperature": "41 °C", "Bowl temperature": "50 °C", "Lid temperature": "75 °C", "Chiller temperature": "2 °C", "Bowl offset temperature": "0 °C", "End time": "1200 s", "End point bowl pressure": "0 mbar", "End point microwave energy": "0 kJ", "End point bowl temperature": "0 °C", "End lid temperature": "0 °C", "End product temperature": "0 °C", "Error point maximum time": "0 s", "Error point maximum microwave energy": "0 kJ", "Error point maximum product temperature": "0 °C"}}, {"n": 10, "name": "Drying 0/2/6", "page": 6, "p": {"Mixer": "OFF", "Chopper": "OFF", "Vacuum": "ON", "Ventilation": "OFF", "Swinging": "ON", "Microwave": "ON", "Mixer speed": "14 rpm", "Mixer flip-flop ON time": "2 s", "Mixer flip-flop OFF time": "50 s", "Chopper speed": "600 rpm", "Chopper flip-flop ON time": "0 s", "Chopper flip-flop OFF time": "0 s", "Bowl pressure": "50 mbar", "Blowback interval": "240 s", "Swinging position": "Position 1", "Swinging mixer left": "0", "Swinging mixer right": "2", "Chopper ON/OFF during swinging": "ON", "Swinging On-time mixer": "6 s", "Microwave forwarded power": "6.0 kW", "Microwave reflected power": "0.0 kW", "Product temperature": "41 °C", "Bowl temperature": "50 °C", "Lid temperature": "75 °C", "Chiller temperature": "2 °C", "Bowl offset temperature": "0 °C", "End time": "0 s", "End point bowl pressure": "0 mbar", "End point microwave energy": "5500 kJ", "End point bowl temperature": "0 °C", "End lid temperature": "0 °C", "End product temperature": "0 °C", "Error point maximum time": "0 s", "Error point maximum microwave energy": "0 kJ", "Error point maximum product temperature": "0 °C"}}, {"n": 11, "name": "Drying 0/3/6", "page": 7, "p": {"Mixer": "OFF", "Chopper": "OFF", "Vacuum": "ON", "Ventilation": "OFF", "Swinging": "ON", "Microwave": "ON", "Mixer speed": "14 rpm", "Mixer flip-flop ON time": "10 s", "Mixer flip-flop OFF time": "50 s", "Chopper speed": "600 rpm", "Chopper flip-flop ON time": "0 s", "Chopper flip-flop OFF time": "0 s", "Bowl pressure": "55 mbar", "Blowback interval": "420 s", "Swinging position": "Position 1", "Swinging mixer left": "0", "Swinging mixer right": "3", "Chopper ON/OFF during swinging": "ON", "Swinging On-time mixer": "6 s", "Microwave forwarded power": "10.0 kW", "Microwave reflected power": "0.0 kW", "Product temperature": "41 °C", "Bowl temperature": "50 °C", "Lid temperature": "75 °C", "Chiller temperature": "2 °C", "Bowl offset temperature": "0 °C", "End time": "0 s", "End point bowl pressure": "0 mbar", "End point microwave energy": "25000 kJ", "End point bowl temperature": "0 °C", "End lid temperature": "0 °C", "End product temperature": "0 °C", "Error point maximum time": "0 s", "Error point maximum microwave energy": "0 kJ", "Error point maximum product temperature": "0 °C"}}, {"n": 12, "name": "Drying 0/4/6", "page": 8, "p": {"Mixer": "OFF", "Chopper": "OFF", "Vacuum": "ON", "Ventilation": "OFF", "Swinging": "ON", "Microwave": "ON", "Mixer speed": "14 rpm", "Mixer flip-flop ON time": "5 s", "Mixer flip-flop OFF time": "80 s", "Chopper speed": "600 rpm", "Chopper flip-flop ON time": "0 s", "Chopper flip-flop OFF time": "0 s", "Bowl pressure": "60 mbar", "Blowback interval": "420 s", "Swinging position": "Position 2", "Swinging mixer left": "0", "Swinging mixer right": "4", "Chopper ON/OFF during swinging": "OFF", "Swinging On-time mixer": "6 s", "Microwave forwarded power": "14.0 kW", "Microwave reflected power": "0.0 kW", "Product temperature": "41 °C", "Bowl temperature": "50 °C", "Lid temperature": "75 °C", "Chiller temperature": "2 °C", "Bowl offset temperature": "0 °C", "End time": "0 s", "End point bowl pressure": "0 mbar", "End point microwave energy": "40000 kJ", "End point bowl temperature": "0 °C", "End lid temperature": "0 °C", "End product temperature": "0 °C", "Error point maximum time": "0 s", "Error point maximum microwave energy": "0 kJ", "Error point maximum product temperature": "0 °C"}}, {"n": 13, "name": "Drying 0/6/4", "page": 9, "p": {"Mixer": "OFF", "Chopper": "OFF", "Vacuum": "ON", "Ventilation": "OFF", "Swinging": "ON", "Microwave": "ON", "Mixer speed": "14 rpm", "Mixer flip-flop ON time": "10 s", "Mixer flip-flop OFF time": "70 s", "Chopper speed": "600 rpm", "Chopper flip-flop ON time": "0 s", "Chopper flip-flop OFF time": "0 s", "Bowl pressure": "60 mbar", "Blowback interval": "420 s", "Swinging position": "Position 2", "Swinging mixer left": "0", "Swinging mixer right": "6", "Chopper ON/OFF during swinging": "ON", "Swinging On-time mixer": "4 s", "Microwave forwarded power": "14.0 kW", "Microwave reflected power": "0.0 kW", "Product temperature": "45 °C", "Bowl temperature": "50 °C", "Lid temperature": "75 °C", "Chiller temperature": "2 °C", "Bowl offset temperature": "0 °C", "End time": "0 s", "End point bowl pressure": "0 mbar", "End point microwave energy": "65000 kJ", "End point bowl temperature": "0 °C", "End lid temperature": "0 °C", "End product temperature": "0 °C", "Error point maximum time": "0 s", "Error point maximum microwave energy": "0 kJ", "Error point maximum product temperature": "0 °C"}}, {"n": 14, "name": "Drying 0/12/3", "page": 10, "p": {"Mixer": "OFF", "Chopper": "OFF", "Vacuum": "ON", "Ventilation": "OFF", "Swinging": "ON", "Microwave": "ON", "Mixer speed": "14 rpm", "Mixer flip-flop ON time": "10 s", "Mixer flip-flop OFF time": "90 s", "Chopper speed": "600 rpm", "Chopper flip-flop ON time": "0 s", "Chopper flip-flop OFF time": "0 s", "Bowl pressure": "60 mbar", "Blowback interval": "420 s", "Swinging position": "Position 2", "Swinging mixer left": "0", "Swinging mixer right": "12", "Chopper ON/OFF during swinging": "OFF", "Swinging On-time mixer": "3 s", "Microwave forwarded power": "10.0 kW", "Microwave reflected power": "0.0 kW", "Product temperature": "45 °C", "Bowl temperature": "50 °C", "Lid temperature": "75 °C", "Chiller temperature": "2 °C", "Bowl offset temperature": "0 °C", "End time": "0 s", "End point bowl pressure": "0 mbar", "End point microwave energy": "70000 kJ", "End point bowl temperature": "0 °C", "End lid temperature": "0 °C", "End product temperature": "0 °C", "Error point maximum time": "0 s", "Error point maximum microwave energy": "0 kJ", "Error point maximum product temperature": "0 °C"}}, {"n": 15, "name": "Drying 0/15/3", "page": 11, "p": {"Mixer": "OFF", "Chopper": "OFF", "Vacuum": "ON", "Ventilation": "OFF", "Swinging": "ON", "Microwave": "ON", "Mixer speed": "14 rpm", "Mixer flip-flop ON time": "10 s", "Mixer flip-flop OFF time": "90 s", "Chopper speed": "600 rpm", "Chopper flip-flop ON time": "0 s", "Chopper flip-flop OFF time": "0 s", "Bowl pressure": "60 mbar", "Blowback interval": "420 s", "Swinging position": "Position 2", "Swinging mixer left": "0", "Swinging mixer right": "15", "Chopper ON/OFF during swinging": "OFF", "Swinging On-time mixer": "3 s", "Microwave forwarded power": "6.0 kW", "Microwave reflected power": "0.0 kW", "Product temperature": "45 °C", "Bowl temperature": "50 °C", "Lid temperature": "75 °C", "Chiller temperature": "2 °C", "Bowl offset temperature": "0 °C", "End time": "0 s", "End point bowl pressure": "0 mbar", "End point microwave energy": "100000 kJ", "End point bowl temperature": "0 °C", "End lid temperature": "0 °C", "End product temperature": "0 °C", "Error point maximum time": "0 s", "Error point maximum microwave energy": "0 kJ", "Error point maximum product temperature": "0 °C"}}, {"n": 16, "name": "Waiting TAKE SAMPLE", "page": 12, "p": {"Bowl temperature": "12 °C", "Lid temperature": "75 °C", "Chiller temperature": "2 °C", "Operator action": "OFF", "Error point maximum time": "0 s"}}, {"n": 17, "name": "Drying VACUUM DRYING", "page": 13, "p": {"Mixer": "OFF", "Chopper": "OFF", "Vacuum": "ON", "Ventilation": "OFF", "Swinging": "ON", "Microwave": "OFF", "Mixer speed": "14 rpm", "Mixer flip-flop ON time": "10 s", "Mixer flip-flop OFF time": "60 s", "Chopper speed": "600 rpm", "Chopper flip-flop ON time": "0 s", "Chopper flip-flop OFF time": "0 s", "Bowl pressure": "0 mbar", "Blowback interval": "420 s", "Swinging position": "Position 2", "Swinging mixer left": "10", "Swinging mixer right": "10", "Chopper ON/OFF during swinging": "OFF", "Swinging On-time mixer": "3 s", "Microwave forwarded power": "2.4 kW", "Microwave reflected power": "0.2 kW", "Product temperature": "0 °C", "Bowl temperature": "65 °C", "Lid temperature": "75 °C", "Chiller temperature": "2 °C", "Bowl offset temperature": "0 °C", "End time": "32000 s", "End point bowl pressure": "0 mbar", "End point microwave energy": "0 kJ", "End point bowl temperature": "0 °C", "End lid temperature": "0 °C", "End product temperature": "0 °C", "Error point maximum time": "0 s", "Error point maximum microwave energy": "0 kJ", "Error point maximum product temperature": "0 °C"}}, {"n": 18, "name": "Waiting SAMPLE", "page": 14, "p": {"Bowl temperature": "65 °C", "Lid temperature": "75 °C", "Chiller temperature": "2 °C", "Operator action": "ON", "Error point maximum time": "0 s"}}, {"n": 19, "name": "Unloading 10%", "page": 14, "p": {"Mixer": "ON", "Discharge": "ON", "Mill": "ON", "Ventilation": "ON", "Mixer speed": "14 rpm", "Mixer flip-flop ON time": "3 s", "Mixer flip-flop OFF time": "15 s", "Discharge position": "10 %", "Mill speed": "50 %", "Bowl temperature": "57 °C", "Lid temperature": "75 °C", "Chiller temperature": "2 °C", "End time": "0 s", "End point bowl temperature": "0 °C", "End lid temperature": "0 °C", "End product temperature": "0 °C", "Operator action": "ON", "Error point maximum time": "0 s"}}, {"n": 20, "name": "Unloading 20%", "page": 15, "p": {"Mixer": "ON", "Discharge": "ON", "Mill": "ON", "Ventilation": "ON", "Mixer speed": "14 rpm", "Mixer flip-flop ON time": "3 s", "Mixer flip-flop OFF time": "10 s", "Discharge position": "20 %", "Mill speed": "50 %", "Bowl temperature": "57 °C", "Lid temperature": "75 °C", "Chiller temperature": "3 °C", "End time": "0 s", "End point bowl temperature": "0 °C", "End lid temperature": "0 °C", "End product temperature": "0 °C", "Operator action": "ON", "Error point maximum time": "0 s"}}, {"n": 21, "name": "Unloading 40%", "page": 15, "p": {"Mixer": "ON", "Discharge": "ON", "Mill": "ON", "Ventilation": "ON", "Mixer speed": "14 rpm", "Mixer flip-flop ON time": "3 s", "Mixer flip-flop OFF time": "5 s", "Discharge position": "40 %", "Mill speed": "50 %", "Bowl temperature": "57 °C", "Lid temperature": "70 °C", "Chiller temperature": "3 °C", "End time": "0 s", "End point bowl temperature": "0 °C", "End lid temperature": "0 °C", "End product temperature": "0 °C", "Operator action": "ON", "Error point maximum time": "0 s"}}, {"n": 22, "name": "Unloading 100%", "page": 16, "p": {"Mixer": "ON", "Discharge": "ON", "Mill": "ON", "Ventilation": "ON", "Mixer speed": "14 rpm", "Mixer flip-flop ON time": "10 s", "Mixer flip-flop OFF time": "3 s", "Discharge position": "100 %", "Mill speed": "50 %", "Bowl temperature": "57 °C", "Lid temperature": "70 °C", "Chiller temperature": "3 °C", "End time": "0 s", "End point bowl temperature": "0 °C", "End lid temperature": "0 °C", "End product temperature": "0 °C", "Operator action": "ON", "Error point maximum time": "0 s"}}];
 
-const STEPS=[
-{code:'P1',group:'prep',name:'가동 전',sub:'확인',title:'가동 전 현장 확인',loc:'pot',say:'점검부터 시작해요',
- instr:'작업실을 돌며 청소·세척·안전 상태를 확인해요. 모두 체크한 뒤 순회를 시작하세요.',src:'SOP 가동 전 준비 · 세척 상태 점검 · 주의사항',
- checks:['청소 유효기간·건조상태·온습도 확인','볼 내부·Filter·Mixer/Chopper 세척 상태','캡·배출구 안전망·Mill parking 확인','Bowl 주변 사람·물품 없음, 가동은 1.5 m 밖'],
- run:{label:'현장 점검 순회 시작',path:['pot','sample','mill','ibc','panel'],dur:900,say:'점검 끝!'},hmi:H({status:'CHECKED'})},
-{code:'P2',group:'prep',name:'로그인',sub:'Recipe',title:'본인 계정 로그인과 Recipe 선택',loc:'panel',say:'내 계정으로 로그인',
- instr:'OPERATOR는 정해진 Recipe로만 작업해요. 계정·설비·버전을 함께 확인하세요.',src:'기록서 1항 · SOP 접속권한·Recipe 선택',
- q:'어떻게 시작할까요? (가상 Recipe)',opts:[['본인 OPERATOR 계정 + DEMO-600 / DEMO-v1',1,'맞아요. 본인 계정과 원팟 600용 Recipe·버전을 확인했어요.'],['선배 공용 계정 + DEMO-600 / DEMO-v1',0,'다른 사람의 ID/PASSWORD 사용과 공유는 금지예요.'],['본인 계정 + DEMO-300 / DEMO-v1',0,'원팟 300용 Recipe라 설비와 맞지 않아요.']],
- run:{label:'Batch ID 입력 · Load recipe',anim:['panel-active'],dur:1600,say:'Recipe 로드'},hmi:H({status:'LOADED'})},
-R(0,{title:'Auto 모드 진입',loc:'panel',say:'F2로 시작',
- instr:'Ultima → Production → Batch ID → Auto 순서로 진입해요. Batch ID는 한 번 더 확인합니다.',src:'SOP 자동 공정 진입',
- checks:['Batch ID 재입력·일치 확인','Recipe 이름·버전 재대조'],run:{label:'Auto 시작 (F2)',anim:['panel-active','run-state'],dur:1400,say:'Start!'},hmi:H({status:'START'})}),
-R(1,{title:'초기화와 원료 투입 준비',loc:'ibc',say:'IBC 연결 확인',
- instr:'카메라와 구성품을 확인하고, IBC를 Product feed에 연결한 뒤 IBC 밸브를 열어 투입을 준비해요.',src:'SOP Initializing',
- checks:['카메라 ON','Bowl 닫힘·캡·안전망 확인','IBC ↔ Product feed 호스 연결','IBC 밸브 열기 (가상)'],
- run:{label:'Initialise 확인',path:['ibc','panel'],anim:['panel-active','run-state'],dur:1300,say:'준비 완료'},hmi:H({status:'INIT OK'})}),
-R(2,{title:'IBC에서 진공으로 원료 투입',loc:'ibc',say:'내용물 대조부터',
- instr:'IBC 내용물이 기록서와 같은지 대조한 뒤 투입 경로를 고르세요. 투입 압력은 Recipe 값을 따릅니다.',src:'기록서 2항 · SOP Charging',
- checks:['옥수수전분(나정용) 44.46 kg','시메트로퓸브롬화물(동화) 30.90 kg','유당수화물 58.80 kg','전호전분 STA-RX 1500 18.00 kg'],
- q:'IBC 원료는 어느 경로로 들어갈까요?',opts:[['Product feed (진공 이송)',1,'맞아요. 원료는 Product feed, 액체는 Liquid feed예요.'],['Liquid feed',0,'Liquid feed는 정제수 같은 액체 투입 경로예요.'],['Sample port',0,'Sample port는 시료 채취용이에요.']],
- run:{label:'진공 원료 이송',path:['panel'],anim:['loading','panel-active','run-state'],dur:3400,say:'호스로 이송 중'},set:{level:.62,ibc:0},hmi:H({press:null,status:'LOADED'})}),
-R(3,{title:'건식 혼합',loc:'ibc',say:'IBC 잔량 확인',
- instr:'IBC를 두드려 잔량이 없는지 확인한 뒤 기록서 혼합 조건을 고르세요.',src:'기록서 2항 · SOP Charging',
- checks:['IBC 잔량 없음 확인'],q:'기록서의 혼합 조건은?',opts:[['Mixer 65 RPM · 5분 · Chopper 0 또는 600 RPM',1,'정확해요.'],['Mixer 135 RPM · 90초 · Chopper 1,500 RPM',0,'연합(Granulation) 조건과 헷갈렸어요.'],['Mixer 65 RPM · 30분 · Chopper 1,500 RPM',0,'혼합 시간은 5분, Chopper는 0/600 RPM이에요.']],
- run:{label:'Dry mixing 실행',path:['panel'],anim:['mix-slow','run-state'],dur:3000,say:'골고루 섞는 중'},hmi:H({mixer:65,chopper:0,timer:300})}),
-R(4,{title:'정제수 투입 준비',loc:'liquid',say:'액체 라인 점검',
- instr:'정제수를 준비하고 Liquid feed tube를 점검·연결해요. 펌프 종류별 절차는 현장에서 확인합니다.',src:'SOP 결합액 준비 · 기록서 3항',
- checks:['정제수 32.00 kg 준비 확인','Liquid feed tube 손상 확인 후 연결'],
- run:{label:'연결 완료, Next',path:['panel'],anim:['panel-active'],dur:1000,say:'액체 준비 끝'},hmi:H({status:'WAITING'})}),
-R(5,{title:'습윤 1: Chopper 없이',loc:'panel',say:'정제수 투입 시작',
- instr:'정제수 투입을 시작해요. 단계 이름을 보고 Chopper 상태를 판단하세요.',src:'기록서 3항 (STEP 1·2 참조값)',
- q:'WITHOUT CHOPPER 단계의 Chopper는?',opts:[['정지 (0 RPM), Mixer는 65~105 RPM 참조 범위',1,'맞아요. Mixer만 돌며 고르게 적셔요.'],['1,500 RPM으로 고속 회전',0,'1,500 RPM은 연합 조건이에요.']],
- run:{label:'Wet mixing 1 실행',anim:['mix-slow','spray','run-state'],dur:3200,say:'정제수 투입 중'},set:{tone:'damp',level:.66},hmi:H({mixer:65,chopper:0,pump:60,liquid:16,timer:180})}),
-R(6,{title:'습윤 2: Chopper 함께',loc:'panel',say:'전량 투입 확인',
- instr:'정제수 전량 투입까지의 조건을 확인해요. 펌프 %와 실제 유량(kg/min)은 다른 값이에요.',src:'기록서 3항',
- q:'습윤 전체 조건으로 맞는 것은?',opts:[['정제수 32.00 kg · 총 6±3분 · 펌프 40~100%',1,'좋아요. 투입속도 5.0±1.5 kg/min은 참조값으로 함께 봐요.'],['정제수 32.00 kg · 총 20분 · 펌프 10%',0,'시간은 6±3분(3~9분), 펌프는 40~100%예요.'],['정제수 16 kg만 투입하고 종료',0,'정제수는 전량 32.00 kg이에요.']],
- run:{label:'Wet mixing 2 실행',anim:['mix-fast','chop','spray','run-state'],dur:3200,say:'Chopper 가동'},set:{tone:'wet',level:.7},hmi:H({mixer:85,chopper:600,pump:60,liquid:32,timer:180})}),
-R(7,{title:'연합',loc:'panel',say:'고속 연합',
- instr:'고속 회전으로 과립을 만드는 단계예요. 기록서 조건을 고르세요.',src:'기록서 4항 · SOP Granulation',
- q:'연합 조건은?',opts:[['90±30초 · Mixer 135 RPM · Chopper 1,500 RPM',1,'맞아요. Mixer power 1.5±1.0 kW는 참조값이에요.'],['5분 · Mixer 65 RPM · Chopper 0 RPM',0,'건식 혼합 조건이에요.'],['10분 · Mixer 135 RPM · Chopper 0 RPM',0,'시간은 90±30초, Chopper는 1,500 RPM이에요.']],
- run:{label:'Granulation 실행',anim:['mix-fast','chop','run-state'],dur:3000,say:'과립 만드는 중'},set:{tone:'granule',level:.74},hmi:H({mixer:135,chopper:1500,power:1.5,liquid:32,timer:90})}),
-R(8,{title:'건조 전 대기',loc:'liquid',say:'라인 분리',
- instr:'액체 라인을 분리·캡 처리하고 과립 상태를 확인해요. 분리 시점은 현행 SOP 순서를 따릅니다.',src:'SOP Granulation 후 조치',
- checks:['Liquid feed tube 분리·캡 확인','카메라로 과립 상태 확인'],
- run:{label:'Drying으로 진행',path:['panel'],anim:['panel-active'],dur:1000,say:'건조로 넘어가요'},hmi:H({liquid:32,status:'WAITING'})}),
-R(9,{title:'진공 건조 시작',loc:'panel',say:'진공 건조',
- instr:'진공으로 수분을 날리기 시작해요. 건조 종료를 무엇으로 판단하는지 확인하세요.',src:'기록서 6항 · SOP Drying',
- q:'건조 종료는 어떻게 판단하나요?',opts:[['Sampling 후 LOD 0.95~2.54% 확인',1,'맞아요. 에너지나 시간만으로 끝내지 않아요.'],['MW 에너지 93,000 kJ 도달 시 바로 종료',0,'93,000±20,000 kJ는 참조값이에요. 반드시 LOD로 확인해요.'],['Mixer가 멈추면 종료',0,'회전 정지는 공정 종료 신호가 아니에요.']],
- run:{label:'Vacuum drying 실행',anim:['drying','run-state'],dur:2600,say:'수증기 배출 중'},hmi:H({liquid:32,press:80,temp:30,mixer:null,chopper:null})}),
-...[[10,15000,33],[11,33000,35],[12,52000,37],[13,72000,38],[14,88000,39]].map(([n,e,t],k)=>R(n,{title:`마이크로웨이브 건조 ${k+1}/5`,loc:'panel',say:'MW 가동',
- instr:`Recipe 표기 "${RECIPE[n][1]}"의 각 숫자가 뜻하는 파라미터는 Recipe에서 확인해요. 이 화면은 누적 에너지 흐름만 보여줘요.`,src:'Recipe View · 기록서 6항 (참조 93,000±20,000 kJ)',
- q:n===12?'HMI의 MW kW와 kJ는 무엇이 다를까요?':undefined,opts:n===12?[['kW는 순간 출력, kJ는 누적 에너지',1,'정확해요.'],['둘 다 같은 누적값',0,'kW는 출력(Power), kJ는 누적 에너지(Energy)예요.']]:undefined,
- run:{label:`Drying ${RECIPE[n][1]} 실행`,anim:['drying','mw','run-state'],dur:2300,say:'MW 가동 중'},hmi:H({liquid:32,press:80,temp:t,mw:4.0,energy:e,mixer:null,chopper:null})})),
-R(15,{title:'마무리 진공 건조',loc:'panel',say:'마무리 건조',
- instr:'마이크로웨이브를 끄고 진공으로 마무리해요. 다음 단계에서 시료를 채취합니다.',src:'Recipe View · 기록서 6항',
- run:{label:'Vacuum drying 실행',anim:['drying','run-state'],dur:2400,say:'거의 다 됐어요'},set:{tone:'dry',level:.6},hmi:H({liquid:32,press:80,temp:38,mw:0,energy:93000,mixer:null,chopper:null})}),
-R(16,{title:'시료 채취와 수분 확인',loc:'sample',say:'시료 채취',runFirst:true,
- instr:'Sample port에서 시료를 채취하고 수분측정기(80℃)로 LOD를 확인해요. 80℃는 측정 조건이에요.',src:'기록서 6항',
- q:'측정 결과 1.80 % LOD. 판정은?',opts:[['기준(0.95~2.54%) 적합, 다음 단계',1,'적합이에요. 3.10%처럼 초과면 절차에 따라 추가 건조·재측정, 0.80%처럼 미달이면 종료 보류 후 보고해요.'],['기준 초과, 추가 건조',0,'1.80%는 0.95~2.54% 안이에요.'],['기준 미달, 보고',0,'1.80%는 하한 0.95%보다 높아요.']],
- run:{label:'Sampling · LOD 측정',anim:['sampling'],dur:2200,say:'결과 1.80%'},hmi:H({liquid:32,energy:93000,press:null,mixer:null,chopper:null,status:'SAMPLE'})}),
-R(17,{title:'건식 정립 준비',loc:'mill',say:'스크린 확인',
- instr:'IBC를 Singlepot 아래 수거 위치로 옮겨요. 벽 부착형 Mill을 스윙해 본체 배출구에 결합하면, 정립물이 IBC로 바로 들어갑니다.',src:'기록서 7항',
- checks:['스크린 표기·Serial Number 확인','IBC 이동 경로·수거 위치 확인','Mill 스윙 범위·배출구 결합 위치 확인'],
- q:'건식 정립 조합은?',opts:[['050G 스크린 · 원형 임펠러',1,'맞아요. Speed는 기록서에 수치가 없어 승인 조건을 확인해요.'],['187S 스크린 · 사각 임펠러',0,'187S·사각은 습식 코밀 조합이에요. 이번 흐름에서는 쓰지 않아요.']],
- run:{label:'IBC 이동 → Mill 스윙 결합',path:['ibc','mill'],anim:[],dur:4800,say:'IBC 이동 후 Mill 결합'},set:{dock:1},hmi:H({liquid:32,energy:93000,status:'READY'})}),
-R(18,{title:'배출 10% 개방',loc:'mill',say:'천천히 배출',
- instr:'밸브를 조금만 열어 과립이 Dry Mill을 지나 IBC로 바로 들어가는지 확인해요.',src:'Recipe View · 기록서 7항',
- checks:['Mill·배출구 결합 및 IBC 수거 위치 확인'],
- run:{label:'Unloading 10% 실행',anim:['milling','run-state'],dur:2600,say:'흐름 확인 중'},set:{level:.42,received:.35,disc:10},hmi:H({liquid:32,energy:93000,disc:10,mill:null})}),
-R(19,{title:'배출 15% 개방',loc:'mill',say:'개도 조금 더',
- instr:'흐름이 안정되면 개도를 조금 더 열어요. 이상이 보이면 어떻게 할지 확인하세요.',src:'Recipe View · SOP 비상상황 대처',
- q:'Mill이 막히거나 이상음이 나면?',opts:[['정지 후 팀장에게 보고, 원인 해결 뒤 SOP대로 재개',1,'맞아요. 억지로 밀어내지 않아요.'],['개도를 100%로 올려 밀어낸다',0,'원인을 해결하지 않고 진행하면 위험해요. 먼저 정지하고 보고해요.']],
- run:{label:'Unloading 15% 실행',anim:['milling','run-state'],dur:2400,say:'잘 나오고 있어요'},set:{level:.2,received:.66,disc:15},hmi:H({liquid:32,energy:93000,disc:15,mill:null})}),
-R(20,{title:'배출 100% 개방',loc:'mill',say:'전량 배출',runFirst:true,
- instr:'완전히 열어 전량 배출한 뒤, Bowl 안에 남은 과립이 없는지 확인해요.',src:'Recipe View',
- checks:['Bowl 내부 잔량 확인 (카메라)'],
- run:{label:'Unloading 100% 실행',anim:['milling','run-state'],dur:2600,say:'잔량 확인할게요'},set:{level:0,received:1,disc:100},hmi:H({liquid:32,energy:93000,disc:100,mill:null})}),
-R(21,{title:'Recipe 종료',loc:'panel',say:'Recipe 종료',
- instr:'밸브 닫힘과 Mill 정지를 확인하고 Recipe를 종료한 뒤 Exit 해요.',src:'SOP 리포트 출력 전 단계',
- checks:['배출 밸브 닫힘·Mill 정지 확인'],
- run:{label:'Recipe 종료, Exit (ESC)',anim:['panel-active'],dur:1300,say:'Recipe 종료'},set:{disc:0},hmi:H({liquid:32,energy:93000,status:'END'})}),
-{code:'R',group:'end',name:'리포트',sub:'출력',title:'Batch report 출력·첨부',loc:'panel',say:'기록 마감',
- instr:'Exit → Process administration → Batch handling → Batch report. 작업한 Batch의 리포트인지 이중 확인해요.',src:'기록서 8항 · SOP 리포트 출력',
- checks:['Short report 출력','Trend report 출력','작업 Batch 일치·이중 확인','제조지시기록서에 첨부'],
- run:{label:'리포트 확인',anim:['panel-active'],dur:1200,say:'첨부 완료'},hmi:H({liquid:32,energy:93000,status:'REPORT'})},
-{code:'L',group:'end',name:'로그아웃',sub:'',title:'로그아웃',loc:'panel',say:'마지막 한 가지',
- instr:'작업을 마치면 반드시 본인 계정에서 로그아웃해요.',src:'기록서 9항',
- q:'작업 마감 시 마지막으로?',opts:[['본인 계정 로그아웃',1,'첫 배치 완료!'],['다음 근무자를 위해 로그인 유지',0,'로그인 상태로 두면 다른 사람이 내 계정으로 작업할 수 있어요.']],hmi:H({liquid:32,energy:93000,status:'LOGOUT'})}
-];
+const RECIPE=[['교육 준비',''],...REPORT.map(r=>[r.name.split(' ')[0].toUpperCase(),r.name.split(' ').slice(1).join(' ')])];
+const IDLE={mixer:0,chopper:0,power:null,temp:null,press:null,pump:0,liquid:null,mw:0,energy:null,disc:0,mill:0,timer:null,status:'READY'};
+const H=o=>Object.assign({},IDLE,o);
+const num=(r,k)=>r.p[k]==null?null:parseFloat(r.p[k]);
+const hints={1:'보울·리드 열교환, 진공장치, Chiller ON을 확인해요. 리드 설정 75℃와 End lid temperature 60℃는 다른 항목입니다.',2:'원료 투입 전 확인 단계예요. 원료이송호스 결합 상태를 확인하고 IBC 원료의 제품·품목·투입량을 제조지시기록서와 대조한 뒤 투입을 허용합니다.',3:'오른쪽 IBC에서 Product feed 호스를 통해 원료를 이송해요. 보고서의 Vacuum OFF와 현장의 진공 원료 이송을 같은 신호로 단정하지 않아요.',4:'Mixer ON, 65 rpm, End time 300 s. Chopper는 설정 600 rpm이 있어도 OFF입니다.',5:'액체 투입 전 대기 단계입니다. 이 제품의 제조지시기록서에서 액체 종류와 투입량을 대조해요.',6:'Mixer 65 rpm, Chopper OFF, Liquid feed ON, 펌프 설정 50%입니다. 원료량·액체량은 이전 다른 제품의 기록서 수치를 사용하지 않아요.',7:'Mixer 135 rpm, Chopper 1500 rpm입니다. 최대시간 오류 기준 200 s는 연합 종료시간과 다릅니다.',9:'Mixer ON과 2 s ON / 30 s OFF 간헐 조건을 함께 확인해요. Microwave OFF이므로 저장된 2.4 kW를 실제 출력으로 표시하지 않아요.',16:'TAKE SAMPLE: 보울 12℃, 리드 75℃, Chiller 2℃, Operator action OFF가 보고서에 저장돼 있어요. 실제 시료 채취 조작은 현장 절차 확인이 필요합니다.',17:'마무리 진공 건조입니다. Microwave OFF이고 2.4 kW / 0.2 kW는 저장된 설정값입니다. End time은 32,000 s이며 교육 시간은 축약합니다.',18:'Operator action ON인 SAMPLE 단계예요. 해당 제품의 승인 수분 기준과 시험 결과를 대조한 뒤 진행합니다.'};
+const STEPS=[{code:'P1',group:'prep',name:'현장 점검',title:'작업 전 점검',loc:'pot',instr:'Singlepot·Mill·IBC 상태와 작업실 준비 상태를 확인해요.',src:'기존 SOP 교육 흐름 / 사용자 설비 설명',checks:['청소·조립 상태 및 작업실 확인','해당 제품 제조지시기록서 확인'],run:{label:'현장 점검',path:['pot','mill','ibc','panel'],dur:1000},hmi:H({})},{code:'P2',group:'prep',name:'로그인',title:'ALP#018 Recipe 대조',loc:'panel',instr:'본인 계정으로 로그인하고 Ultima Pro 600용 ALP#018을 대조해요. 보고서 수정일은 2025-11-24이며 별도 버전 번호는 사진에서 확인되지 않습니다.',src:'Recipe report p.1',checks:['본인 계정·장비·Recipe 이름 대조','현행 승인 상태·버전 별도 확인'],run:{label:'교육 Recipe 불러오기',dur:1000},hmi:H({status:'LOADED'})}];
+for(const r of REPORT){
+ if(r.n===8)continue;
+ if(r.n===19)STEPS.push({code:'M',group:'prep',name:'정립 준비',title:'IBC 이동과 벽 부착 Mill 결합',loc:'mill',instr:'IBC를 Singlepot 아래로 옮기고 Mill을 스윙해 배출구에 결합해요. 스크린과 임펠러는 해당 제품 승인 규격을 대조합니다.',src:'사용자 설비 설명 · Recipe 19 전 교육 보조 단계',checks:['스크린·임펠러·Serial Number 대조','IBC 이동 경로와 수거 위치 확인','배출구·Mill 결합 확인'],run:{label:'IBC 이동 → Mill 결합',path:['ibc','mill'],dur:4800},set:{dock:1},hmi:H({})});
+ const dry=r.name.startsWith('Drying'),unload=r.n>=19;
+ const hv=H({mixer:r.p.Mixer==='ON'?num(r,'Mixer speed'):0,chopper:r.p.Chopper==='ON'?num(r,'Chopper speed'):0,pump:r.p['Liquid feed']==='ON'?num(r,'Liquid feed pump speed'):0,mw:r.p.Microwave==='ON'?num(r,'Microwave forwarded power'):0,disc:unload?num(r,'Discharge position'):0,mill:unload?num(r,'Mill speed'):0,timer:num(r,'End time')||null});
+ const anim=['run-state'];if(r.n===3)anim.push('loading');if(r.n===6)anim.push('spray');if(dry)anim.push('drying');if(hv.mw>0)anim.push('mw');if(unload)anim.push('milling');
+ const checks=r.n===2?['원료이송호스의 Singlepot·IBC 양쪽 결합 상태 확인','IBC 원료의 제품 대조','IBC 원료의 품목 대조','IBC 원료의 투입량 대조']:r.n===3?['Product feed 선택 및 이송 경로 확인']:r.n===18?['해당 제품 수분 기준 확인','시료 시험 결과 및 진행 가능 여부 확인']:['단계별 설정값과 ON/OFF 확인'];
+ const stp={code:String(r.n),rno:r.n,group:'recipe',name:RECIPE[r.n][0],sub:RECIPE[r.n][1],title:r.name,loc:r.n===2?'ibc':[16,18].includes(r.n)?'sample':unload?'mill':'panel',say:r.name,instr:hints[r.n]||(dry?'Vacuum·Swinging·Microwave와 스윙 전용 조건을 각각 확인해요. 설정값 상세에서 원문 파라미터를 볼 수 있습니다.':`배출 개도 ${num(r,'Discharge position')}%, Mill 50%. Mixer 간헐 운전은 ${num(r,'Mixer flip-flop ON time')} s ON / ${num(r,'Mixer flip-flop OFF time')} s OFF입니다.`),src:`ALP#018 Recipe report p.${r.page} / Operation ${r.n}`,checks,run:{label:r.n===2?'원료 투입 전 확인 완료':unload?'배출·정립 실행':dry?'건조 · 본체 스윙 실행':'단계 실행·확인',path:r.n===2?['ibc','pot','panel']:undefined,anim,dur:dry||unload?6500:2500},hmi:hv,report:r};
+ if(r.n===3)stp.set={level:.62,ibc:0};if(r.n===6)stp.set={tone:'wet',level:.7};if(r.n===7)stp.set={tone:'granule',level:.74};if(r.n===17)stp.set={tone:'dry',level:.6};
+ if(unload)stp.set={level:[.45,.3,.15,0][r.n-19],received:[.25,.5,.75,1][r.n-19],disc:hv.disc};
+ STEPS.push(stp);
+}
+STEPS.push({code:'END',group:'end',name:'마감',title:'배출 종료·기록·로그아웃',loc:'panel',instr:'배출 밸브 닫힘, Mill 정지, 잔량을 확인하고 Batch report를 대조·첨부한 뒤 로그아웃합니다.',src:'기존 SOP 교육 흐름 / 보고서 밖의 마감 단계',checks:['잔량·밸브 닫힘·Mill 정지 확인','Short·Trend report 및 Batch 대조','기록 첨부·로그아웃 확인'],run:{label:'작업 마감',dur:1000},set:{disc:0},hmi:H({status:'END'})});
 const LAST=STEPS.length-1;
 const LOC={panel:{x:190,y:448,d:-1},pot:{x:268,y:452,d:1},sample:{x:258,y:414,d:1},liquid:{x:292,y:334,d:-1},ibc:{x:590,y:466,d:1},mill:{x:580,y:431,d:-1},center:{x:400,y:478,d:1}};
 const st=STEPS.map(()=>({checks:new Set(),choice:false,ran:false}));
 const doneSet=new Set();const log=[];
 let cur=0,running=false,errors=0,hold=false,fbMsg='',fbBad=false,moveToken=0,opPos={x:400,y:478,d:1};
 
-const taskOk=i=>{const s=STEPS[i],x=st[i];return (s.checks||[]).every((_,k)=>x.checks.has(k))&&(!s.q||x.choice)};
+/* Offline training layer: versioned sessions, first-attempt scoring and field observation. */
+const TRAIN_VERSION='ALP018-TRAIN-1.0';
+const STORE_KEY='singlepot.training.v1';
+const FIELDS=['제품·품목·투입량과 제조지시기록서 대조','호스 양쪽 결합 상태와 이송 경로 확인','로그인·Recipe·운전 조건 대조','건조 시 본체 스윙 범위와 주변 상태 확인','샘플 채취 절차·해당 제품 수분 기준 설명','IBC 이동·Mill 결합·스크린 규격 확인','이상 상황 시 정지·보고·재개 조건 설명','Batch report 대조·기록 마감·로그아웃'];
+const CASES=[
+{id:'label-product',stage:'2',title:'IBC 제품 대조',kind:'label',loc:'ibc',critical:true,expected:['교육제품 A','교육원료 X','25.00 kg'],actual:['교육제품 B','교육원료 X','25.00 kg'],q:'두 표를 대조해 불일치 항목을 선택하세요.',options:['제품','품목','투입량','모두 일치'],correct:0,why:'IBC 제품이 교육제품 B로 지시서의 A와 다릅니다. 투입을 보류하고 담당자에게 확인합니다.'},
+{id:'label-item',stage:'2',title:'IBC 품목 대조',kind:'label',loc:'ibc',critical:true,expected:['교육제품 A','교육원료 X','25.00 kg'],actual:['교육제품 A','교육원료 Y','25.00 kg'],q:'이번 IBC에서 불일치하는 항목은?',options:['제품','품목','투입량','모두 일치'],correct:1,why:'제품은 같아도 품목이 다릅니다. 교육원료 X와 Y를 구분해야 합니다.'},
+{id:'label-amount',stage:'2',title:'IBC 투입량 대조',kind:'label',loc:'ibc',critical:true,expected:['교육제품 A','교육원료 X','25.00 kg'],actual:['교육제품 A','교육원료 X','20.00 kg'],q:'불일치하는 항목은?',options:['제품','품목','투입량','모두 일치'],correct:2,why:'투입량은 25.00 kg 지시인데 IBC에는 20.00 kg으로 표시돼 있습니다. 임의 투입하지 않습니다.'},
+{id:'label-ok',stage:'2',title:'정상 IBC 판별',kind:'label',loc:'ibc',critical:false,expected:['교육제품 A','교육원료 X','25.00 kg'],actual:['교육제품 A','교육원료 X','25.00 kg'],q:'이번 라벨 대조 결과는?',options:['제품 불일치','품목 불일치','투입량 불일치','세 항목 모두 일치'],correct:3,why:'제품·품목·투입량이 모두 일치합니다. 호스 결합까지 확인해야 투입 준비가 완료됩니다.'},
+{id:'hose',stage:'2',title:'호스 결합 상태 찾기',kind:'hose',loc:'ibc',critical:true,q:'그림의 A·B 연결부 중 재확인이 필요한 곳을 선택하세요.',options:['A · Singlepot 측','B · IBC 측','둘 다 결합 완료'],correct:1,why:'B의 클램프가 열려 있고 결합면이 벌어져 있습니다. 이송 시작 전 결합 상태를 바로잡고 재확인합니다.'},
+{id:'hose-action',stage:'2',title:'연결 불량 시 행동',kind:'text',loc:'panel',critical:true,evidence:'이송을 시작하기 전, IBC 측 호스 클램프가 체결되지 않은 것을 발견했습니다.',q:'다음 행동은?',options:['이송을 시작해서 흡입 상태를 확인','투입을 보류하고 절차에 따라 결합을 바로잡은 뒤 재확인','작동 중 손으로 호스를 잡고 진행'],correct:1,why:'불완전한 연결 상태로 이송을 시작하지 않습니다. 정지 상태에서 조치하고 확인 후 시작합니다.'},
+{id:'swing',stage:'9',title:'스윙 범위의 장애물',kind:'text',loc:'pot',critical:true,evidence:'건조 시작 전 본체가 좌우로 움직일 범위에 이동식 물품이 놓여 있습니다.',q:'시작 전에 어떻게 할까요?',options:['조금만 스윙하므로 그대로 시작','스윙 설정을 임의로 끄고 시작','시작을 보류하고 안전한 상태에서 장애물 제거·주변 확인'],correct:2,why:'스윙 범위와 주변을 확인하고 장애물이 없는 상태로 시작합니다. 임의로 Recipe를 바꾸지 않습니다.'},
+{id:'lod-high',stage:'18',title:'수분 기준 초과',kind:'lod',loc:'sample',critical:true,result:'3.40 %',q:'교육 사례 기준 1.00~3.00%에서 다음 판단은?',options:['배출 보류·담당자 보고 후 절차에 따른 추가 건조·재측정','누적 에너지가 충분하므로 배출','기록 수치를 3.00%로 수정'],correct:0,why:'교육 기준 상한을 초과했습니다. 배출을 보류하고 보고하며, 추가 건조와 재측정은 해당 절차에 따릅니다.'},
+{id:'lod-low',stage:'18',title:'수분 기준 미달',kind:'lod',loc:'sample',critical:true,result:'0.60 %',q:'교육 사례 기준보다 낮은 결과입니다. 다음 행동은?',options:['낮을수록 좋으므로 배출','물을 임의로 보충','배출 보류·담당자 보고 후 처리 지시 확인'],correct:2,why:'하한보다 낮은 결과도 부적합입니다. 임의 가수나 배출을 하지 않고 보고합니다.'},
+{id:'lod-ok',stage:'18',title:'수분 기준 적합',kind:'lod',loc:'sample',critical:false,result:'2.00 %',q:'교육 사례 기준과 비교한 판정은?',options:['기준 초과','범위 내 적합 · 나머지 진행 조건 확인','기준 미달'],correct:1,why:'1.00~3.00% 안에 있습니다. 이 문제의 가상 기준을 실제 ALP#018 기준으로 사용하지 않습니다.'},
+{id:'mill-stop',stage:'20',title:'Mill 막힘·이상음',kind:'text',loc:'mill',critical:true,evidence:'가상 배출·정립 중 정립물 흐름이 멈추고 Mill에서 이상음이 발생했습니다.',q:'가장 먼저 선택할 행동은?',options:['배출 개도를 100%로 늘려 밀어내기','공정을 정지하고 접근을 막은 뒤 담당자에게 보고','가동 중 배출구에 도구를 넣기'],correct:1,why:'공정을 정지하고 보고합니다. 막힘 제거·분해는 설비 정지와 필요한 에너지 차단 등 해당 절차를 따릅니다.'},
+{id:'mill-restart',stage:'20',title:'Mill 재개 조건',kind:'text',loc:'panel',critical:true,evidence:'정지 후 담당자에게 보고했습니다. 재시작 전 확인할 조건을 고르세요.',q:'어떤 상태에서 재개하나요?',options:['원인 해결·조립과 주변 안전 확인 후 권한 있는 담당자의 지시와 SOP에 따라 재개','알람 표시가 사라졌으므로 즉시 재시작','보고했으므로 바로 다음 단계 실행'],correct:0,why:'알람 소거만으로 원인이 해결됐다고 판단하지 않습니다. 재개 전 확인과 담당자 지시가 필요합니다.'},
+{id:'report-batch',stage:'END',title:'잘못된 Batch report',kind:'text',loc:'panel',critical:true,evidence:'교육 작업 Batch: TR-001 / 출력한 리포트 Batch: TR-002',q:'기록 마감 시 올바른 행동은?',options:['같은 제품이니 첨부','Batch 번호만 손으로 바꿔 첨부','첨부 보류 후 해당 Batch의 올바른 리포트 출력·대조'],correct:2,why:'다른 Batch의 리포트를 첨부하지 않습니다. 실제 작업 Batch와 일치하는 자료를 대조합니다.'}
+];
+let session=null,history=[],caseId=null,caseSelection=null,caseHint=false,storageOK=true;
+const iso=()=>new Date().toISOString();
+function newSession(mode='practice',profile={},parent=null){return {id:'TR-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),version:TRAIN_VERSION,recipe:'ALP#018',mode,profile:{learner:profile.learner||'',instructor:profile.instructor||'',team:profile.team||''},parent,started:iso(),ended:null,answers:{},events:[],field:{date:'',observer:'',notes:'',checks:FIELDS.map(()=>''),confirmedAt:null},progress:null};}
+function currentStage(){return STEPS[cur].code;}
+function requiredCases(i){return CASES.filter(c=>c.stage===STEPS[i].code);}
+function caseReady(c){return !!session?.answers[c.id]?.resolved;}
+function casesReady(i){return requiredCases(i).every(caseReady);}
+function record(type,detail={}){if(!session)return;session.events.push({time:iso(),stage:currentStage(),type,...detail});}
+function progressData(){return {cur,steps:st.map(x=>({checks:[...x.checks],choice:x.choice,ran:x.ran})),done:[...doneSet],log:[...log],errors};}
+function saveTraining(){if(!session)return;session.progress=progressData();try{localStorage.setItem(STORE_KEY,JSON.stringify({version:TRAIN_VERSION,current:session,history}));storageOK=true;}catch(e){storageOK=false;}updateTrainingBar();}
+function updateTrainingBar(){if(!session)return;$('#trainingStatus').textContent=(session.mode==='exam'?'평가':'연습')+' · '+(session.profile.learner||'이름 미입력')+' · '+(storageOK?'이 브라우저에 저장':'저장 불가 · 결과 내보내기 필요');}
+function resetProgress(){cur=0;doneSet.clear();log.length=0;errors=0;hold=false;fbMsg='';fbBad=false;st.forEach(x=>{x.checks.clear();x.choice=false;x.ran=false;});rockBowl(null);scene.classList.remove('alarm');}
+function initTraining(){try{const raw=JSON.parse(localStorage.getItem(STORE_KEY)||'null');if(raw?.version===TRAIN_VERSION&&raw.current?.version===TRAIN_VERSION&&raw.current?.answers&&raw.current?.profile&&Array.isArray(raw.current?.events)&&raw.current?.field?.checks?.length===FIELDS.length){session=raw.current;history=Array.isArray(raw.history)?raw.history:[];const p=session.progress;if(p&&p.steps?.length===st.length){p.steps.forEach((x,i)=>{st[i].checks=new Set(x.checks);st[i].choice=!!x.choice;st[i].ran=!!x.ran;});p.done.forEach(i=>doneSet.add(i));log.push(...p.log);cur=Math.max(0,Math.min(LAST,p.cur));errors=p.errors||0;}}}catch(e){storageOK=false;}
+ if(!session)session=newSession();updateTrainingBar();setStep(cur);saveTraining();}
+function sessionForm(){if(running)return;openModal(`<h3>교육 시작 / 새 회차</h3><p>연습은 힌트와 재시도가 가능합니다. 평가는 순서대로 진행하며 각 문제의 첫 제출로 채점합니다.</p><div class="training-fields"><label>교육생 이름<input id="trLearner" maxlength="80" value="${esc(session.profile.learner)}"></label><label>교육자 이름<input id="trInstructor" maxlength="80" value="${esc(session.profile.instructor)}"></label><label>소속<input id="trTeam" maxlength="100" value="${esc(session.profile.team)}"></label></div><p class="training-note">평가 기준: 80점 이상 + 필수 안전 문제 첫 제출 정답 + 전 과정 완료. 초안 기준이며 작업 자격 판정은 아닙니다. 현재 회차는 이력에 보관됩니다.</p><p id="startError" class="bad-text"></p><div class="row"><button class="btn primary" type="button" data-start-mode="practice">새 연습 시작</button><button class="btn primary" type="button" data-start-mode="exam">새 평가 시작</button><button class="btn" type="button" data-close>돌아가기</button></div><p>이름·기록은 이 브라우저에 저장됩니다. 파일을 다른 PC로 옮겨도 기록이 자동 이동하지 않으므로 결과를 내보내세요.</p>`);}
+function startAttempt(mode,parent=null){if(running||!['practice','exam'].includes(mode))return;const profile={learner:$('#trLearner')?.value.trim()||session.profile.learner,instructor:$('#trInstructor')?.value.trim()||session.profile.instructor,team:$('#trTeam')?.value.trim()||session.profile.team};if(mode==='exam'&&(!profile.learner||!profile.instructor)){if($('#startError'))$('#startError').textContent='평가 시작 전 교육생과 교육자 이름을 입력하세요.';return false;}
+ const parentId=parent||(profile.learner===session.profile.learner?session.id:null);session.progress=progressData();session.archivedAt=iso();history.push(JSON.parse(JSON.stringify(session)));if(history.length>20)history=history.slice(-20);resetProgress();session=newSession(mode,profile,parentId);record('attempt-start',{mode,parent:parentId});closeModal();setStep(0);saveTraining();return true;}
+function caseEvidence(c){if(c.kind==='label'){const rows=['제품','품목','투입량'];return `<div class="evidence-grid">${[['교육용 제조지시서',c.expected],['IBC 원료 라벨',c.actual]].map(([title,vals])=>`<div class="label-card"><h4>${title}</h4>${rows.map((x,i)=>`<div><span>${x}</span><b>${esc(vals[i])}</b></div>`).join('')}</div>`).join('')}</div>`;}
+ if(c.kind==='hose')return `<div class="hose-card"><svg viewBox="0 0 540 175" role="img" aria-label="A Singlepot 측은 클램프가 닫혀 있고 B IBC 측은 클램프가 열리고 결합면에 틈이 있는 교육용 그림"><rect x="12" y="25" width="110" height="110" rx="20" fill="#b5c6c7" stroke="#45656b" stroke-width="3"/><text x="67" y="82" text-anchor="middle" font-size="16">Singlepot</text><rect x="415" y="25" width="110" height="110" rx="8" fill="#cbd4d4" stroke="#45656b" stroke-width="3"/><text x="470" y="82" text-anchor="middle" font-size="20">IBC</text><path d="M122 110 H172 Q270 171 358 110 H382 M400 110 H415" fill="none" stroke="#3d5960" stroke-width="14"/><rect x="140" y="95" width="17" height="30" rx="3" fill="#aec0c2" stroke="#39575c" stroke-width="3"/><path d="M376 98 L363 79 M402 98 L419 79" stroke="#566d73" stroke-width="7"/><path d="M377 96 V123 M400 96 V123" stroke="#9dacad" stroke-width="4"/><text x="147" y="62" text-anchor="middle" font-size="22" font-weight="bold">A</text><text x="391" y="62" text-anchor="middle" font-size="22" font-weight="bold">B</text></svg><p>결합면과 클램프를 보고 판단하세요. 그림의 치수는 교육용입니다.</p></div>`;
+ if(c.kind==='lod')return `<div class="measurement"><span>교육용 가상 수분 기준 <b>1.00~3.00 %</b></span><strong>${c.result}</strong><small>가상 측정 결과 · ALP#018의 실제 기준이 아닙니다.</small></div>`;
+ return `<div class="evidence-text">${esc(c.evidence)}</div>`;}
+function openCase(id){if(running)return;const c=CASES.find(x=>x.id===id);if(!c||c.stage!==currentStage())return;caseId=id;caseSelection=null;caseHint=false;record('case-open',{case:id});moveTo(c.loc);bubble(c.title);renderCase();}
+function renderCase(){const c=CASES.find(x=>x.id===caseId);if(!c)return;const a=session.answers[c.id];const resolved=!!a?.resolved;const first=a?.first;const explain=session.mode==='practice'||first!=null;const next=requiredCases(cur).find(x=>!caseReady(x));
+ openModal(`<div class="case-top"><span>${session.mode==='exam'?'평가 · 첫 제출 채점':'연습 · 힌트 사용 가능'}</span><span>${c.critical?'필수 안전 문제':'판단 문제'}</span></div><h3>${esc(c.title)}</h3><p class="case-tag">교육용 가상 사례 · 실제 제품 정보와 분리</p>${caseEvidence(c)}<div class="q">${esc(c.q)}</div><div class="case-options">${c.options.map((o,k)=>`<button class="opt ${caseSelection===k?'selected':''}" type="button" data-case-pick="${k}" aria-pressed="${caseSelection===k}" ${resolved?'disabled':''}>${esc(o)}</button>`).join('')}</div>${a&&explain?`<p class="answer-feedback ${resolved?'':'bad-text'}">${resolved?'확인 완료. ':session.mode==='exam'?'첫 제출 오답으로 기록됐습니다. 안전한 진행을 위해 올바른 판단을 다시 선택하세요. ':'다시 확인해 보세요. '}${esc(c.why)}</p>`:''}${caseHint?`<p class="hint">${esc(c.why)}</p>`:''}<div class="row"><button class="btn primary" type="button" id="caseSubmit" ${caseSelection==null||resolved?'disabled':''}>${a&&!resolved?'보완 답안 제출':'판단 제출'}</button>${session.mode==='practice'&&!resolved?'<button class="btn" type="button" id="caseHint">힌트 보기</button>':''}${resolved&&next?`<button class="btn primary" type="button" data-open-case="${next.id}">다음 문제</button>`:''}<button class="btn" type="button" data-close>단계로 돌아가기</button></div><p class="muted">${session.mode==='exam'?'오답을 바로잡아도 첫 제출 점수는 바뀌지 않습니다. 재평가는 새 회차로 기록됩니다.':'정답을 확인한 뒤 단계 실행이 가능합니다.'}</p>`);}
+function submitCase(){const c=CASES.find(x=>x.id===caseId);if(!c||caseSelection==null||caseReady(c)||c.stage!==currentStage())return;let a=session.answers[c.id];if(!a)a=session.answers[c.id]={first:{choice:caseSelection,correct:caseSelection===c.correct,time:iso()},attempts:[],resolved:false,hints:0};const correct=caseSelection===c.correct;a.attempts.push({choice:caseSelection,correct,time:iso()});a.resolved=correct;if(!correct)errors++;record('case-answer',{case:c.id,choice:c.options[caseSelection],correct,first:a.attempts.length===1});if(correct)bubble('판단 확인 완료');else bubble('진행 전 다시 확인');
+ if(currentStage()==='2'&&casesReady(cur))STEPS[cur].checks.forEach((_,k)=>st[cur].checks.add(k));caseSelection=null;saveTraining();render();renderCase();}
+function missionButtons(i){const cs=requiredCases(i);if(!cs.length)return '';return `<div class="mission-block"><strong>필수 판단 미션 ${cs.filter(caseReady).length}/${cs.length}</strong><div class="mission-buttons">${cs.map(c=>`<button class="btn mission ${caseReady(c)?'complete':''}" type="button" data-open-case="${c.id}" ${running?'disabled':''}>${caseReady(c)?'✓ ':''}${esc(c.title)}</button>`).join('')}</div><small>판단 미션을 마쳐야 이 단계를 실행할 수 있습니다.</small></div>`;}
+function scoreOf(r){const first=CASES.filter(c=>r.answers[c.id]?.first);const right=first.filter(c=>r.answers[c.id].first.correct);const failed=CASES.filter(c=>c.critical&&r.answers[c.id]?.first&&!r.answers[c.id].first.correct);const full=(r.progress?.done.length===STEPS.length)&&CASES.every(c=>r.answers[c.id]?.resolved);const score=Math.round(right.length/CASES.length*100);return {score,answered:first.length,total:CASES.length,correct:right.length,criticalWrong:failed.map(c=>c.id),complete:full,verdict:!full?'진행 중':r.mode==='practice'?'연습 완료':score>=80&&!failed.length?'평가 통과':'재교육 필요'};}
+function fieldStatus(r){const f=r.field;if(!f.confirmedAt)return '미확인';return f.checks.every(x=>x==='확인')?'현장 실습 확인':'현장 재교육 필요';}
+function resultHTML(r){const z=scoreOf(r);return `<h3>Singlepot 교육 기록</h3><p><b>${esc(z.verdict)}</b> · ${r.mode==='exam'?'평가':'연습'} · 첫 제출 ${z.score}점 (${z.correct}/${z.total})</p><table class="param-table"><tbody>${[['회차',r.id],['교육 버전',r.version],['Recipe','ALP#018'],['교육생',r.profile.learner||'미입력'],['교육자',r.profile.instructor||'미입력'],['소속',r.profile.team||'미입력'],['시작',r.started],['종료',r.ended||'진행 중'],['공정 완료',`${r.progress?.done.length||0}/${STEPS.length}`],['필수 안전 오답',String(z.criticalWrong.length)],['이전 회차',r.parent||'—'],['현장 실습',fieldStatus(r)]].map(([k,v])=>`<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</tbody></table><h4>판단·오답·보완 기록</h4><table class="param-table"><thead><tr><th>항목</th><th>첫 제출</th><th>보완</th></tr></thead><tbody>${CASES.map(c=>{const a=r.answers[c.id];return `<tr><td>${esc(c.title)}${c.critical?' *':''}</td><td>${a?esc(c.options[a.first.choice])+' / '+(a.first.correct?'정답':'오답'):'미응답'}</td><td>${a?.resolved?'확인 완료':'미완료'}${a?' · '+a.attempts.length+'회':''}</td></tr>`}).join('')}</tbody></table><p>* 필수 안전 문제. 평가 기준: 80점 이상, 필수 안전 문제 첫 제출 전부 정답, 공정과 미션 완료.</p><h4>현장 실습 / 지도자 수동 확인</h4><p>실습일 ${esc(r.field.date||'—')} · 지도자 ${esc(r.field.observer||'—')} · 확인 시각 ${esc(r.field.confirmedAt||'—')}</p><table class="param-table"><tbody>${FIELDS.map((f,i)=>`<tr><td>${esc(f)}</td><td>${esc(r.field.checks[i]||'미확인')}</td></tr>`).join('')}</tbody></table><p>관찰·재교육 메모: ${esc(r.field.notes||'—')}</p><h4>진행 이력</h4><table class="param-table"><tbody>${r.events.map(e=>`<tr><td>${esc(e.time)}</td><td>${esc(e.stage)}</td><td>${esc(e.type)}</td><td>${esc(e.choice||e.case||e.detail||'')}</td></tr>`).join('')}</tbody></table><p>교육 보조 기록입니다. 현장 확인은 입력자가 수동 기록하며 본인 인증·전자서명·작업 자격 부여 기능은 없습니다.</p>`;}
+function finishIfComplete(){session.progress=progressData();if(scoreOf(session).complete&&!session.ended){session.ended=iso();record('attempt-completed');}saveTraining();}
+function trainingResults(){if(running)return;finishIfComplete();openModal(`${resultHTML(session)}<div class="row result-actions"><button class="btn primary" type="button" id="exportJson">JSON 저장</button><button class="btn" type="button" id="exportCsv">CSV 저장</button><button class="btn" type="button" id="printRecord">인쇄 / PDF</button></div><div class="row"><button class="btn" type="button" id="fieldOpen">현장 실습 기록</button><button class="btn" type="button" id="retryAttempt">새 재교육 회차</button><button class="btn" type="button" data-close>닫기</button></div>`);}
+function download(name,data,type){try{const blob=new Blob([data],{type});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);}catch(e){openModal('<h3>파일 저장을 시작하지 못했어요</h3><p>브라우저에서 열고 다시 시도하거나 인쇄 / PDF를 사용하세요.</p><button class="btn" data-close>닫기</button>');}}
+function csvCell(x){let t=String(x??'');if(/^[\s]*[=+@-]/.test(t))t="'"+t;return '"'+t.replace(/"/g,'""')+'"';}
+function recordsCSV(records){const rows=[['회차','모드','교육생','교육자','버전','시작','종료','점수','판정','유형','항목','첫 제출/상태','보완/메모']];for(const r of records){const z=scoreOf(r),pre=[r.id,r.mode,r.profile.learner,r.profile.instructor,r.version,r.started,r.ended,z.score,z.verdict];rows.push([...pre,'요약','공정 완료',`${r.progress?.done.length||0}/${STEPS.length}`,`필수 안전 오답 ${z.criticalWrong.length}`]);for(const c of CASES){const a=r.answers[c.id];rows.push([...pre,'판단',c.title,a?c.options[a.first.choice]+' / '+(a.first.correct?'정답':'오답'):'미응답',a?.resolved?'보완 완료':'미완료']);}FIELDS.forEach((f,i)=>rows.push([...pre,'현장 실습',f,r.field.checks[i]||'미확인',r.field.notes]));rows.push([...pre,'현장 지도자',r.field.observer,r.field.date,r.field.confirmedAt||'미확인']);}return '\uFEFF'+rows.map(row=>row.map(csvCell).join(',')).join('\r\n');}
+function exportRecord(kind,all=false){finishIfComplete();const rs=all?[...history,session]:[session];record('export',{detail:kind});saveTraining();if(kind==='json')download('Singlepot_'+session.id+(all?'_history':'')+'.json',JSON.stringify({version:TRAIN_VERSION,exportedAt:iso(),records:rs},null,2),'application/json');else download('Singlepot_'+session.id+(all?'_history':'')+'.csv',recordsCSV(rs),'text/csv;charset=utf-8');}
+function printRecord(){finishIfComplete();$('#paperReport').innerHTML=resultHTML(session);window.print();}
+function fieldForm(){if(running)return;const f=session.field;openModal(`<h3>현장 실습 체크리스트</h3><p>게임에서 배운 내용을 실제 설비에서 설명·확인한 결과를 지도자가 수동 기록합니다. 시뮬레이터 완료와 별도로 관리합니다.</p><div class="training-fields"><label>실습일<input id="fieldDate" type="date" value="${esc(f.date)}"></label><label>현장 지도자<input id="fieldObserver" maxlength="80" value="${esc(f.observer)}"></label></div><div class="field-list">${FIELDS.map((x,i)=>`<fieldset><legend>${i+1}. ${esc(x)}</legend>${['확인','재교육'].map(v=>`<button class="btn ${f.checks[i]===v?'primary':''}" type="button" data-field-index="${i}" data-field-value="${v}" aria-pressed="${f.checks[i]===v}">${v}</button>`).join('')}</fieldset>`).join('')}</div><label class="field-notes">관찰 내용 / 재교육 내용<textarea id="fieldNotes" maxlength="4000">${esc(f.notes)}</textarea></label><p class="muted">수정하면 기존 확인 표시가 해제됩니다. 입력자 본인 인증이나 전자서명은 제공하지 않습니다.</p><p id="fieldError" class="bad-text"></p><div class="row"><button class="btn" id="saveFieldDraft">임시 저장</button><button class="btn primary" id="confirmField">지도자 확인 기록</button><button class="btn" data-close>닫기</button></div>`);}
+function readFieldInputs(){const f=session.field;for(const [id,key] of [['fieldDate','date'],['fieldObserver','observer'],['fieldNotes','notes']]){const el=$('#'+id);if(el&&f[key]!==el.value){f[key]=el.value;f.confirmedAt=null;}}}
+function saveField(confirm){readFieldInputs();const f=session.field;if(confirm&&(!f.date||!f.observer.trim()||f.checks.some(x=>!x))){$('#fieldError').textContent='실습일·지도자 이름과 모든 항목의 확인/재교육 결과를 입력하세요.';saveTraining();return;}if(confirm){f.confirmedAt=iso();record('field-confirmed',{detail:fieldStatus(session)});}else record('field-draft');saveTraining();$('#fieldError').textContent=confirm?'지도자 수동 확인을 기록했습니다.':'실습 기록을 임시 저장했습니다.';}
+function historyView(){if(running)return;saveTraining();openModal(`<h3>교육 이력</h3><p>현재 회차와 최근 20개 이전 회차를 이 브라우저에 보관합니다. 오래된 이력을 유지하려면 전체 JSON/CSV를 내려받으세요.</p>${[...history,session].reverse().map(r=>`<div class="history-row"><b>${esc(r.profile.learner||'이름 미입력')} · ${r.mode==='exam'?'평가':'연습'}</b><span>${esc(r.id)} · ${esc(r.started)}</span><span>${scoreOf(r).verdict} / ${scoreOf(r).score}점 / ${fieldStatus(r)}</span>${r.parent?`<small>이전 회차 ${esc(r.parent)}</small>`:''}</div>`).join('')}<div class="row"><button class="btn primary" id="allJson">전체 JSON 저장</button><button class="btn" id="allCsv">전체 CSV 저장</button><button class="btn" data-close>닫기</button></div>`);}
+function trainingClick(b){if(b.dataset.openCase!=null){openCase(b.dataset.openCase);return true;}if(b.dataset.casePick!=null){caseSelection=+b.dataset.casePick;renderCase();return true;}if(b.dataset.startMode!=null){startAttempt(b.dataset.startMode);return true;}if(b.dataset.fieldIndex!=null){readFieldInputs();session.field.checks[+b.dataset.fieldIndex]=b.dataset.fieldValue;session.field.confirmedAt=null;saveTraining();fieldForm();return true;}switch(b.id){case 'trainingSetup':sessionForm();break;case 'trainingResult':trainingResults();break;case 'trainingHistory':historyView();break;case 'fieldOpen':fieldForm();break;case 'caseSubmit':submitCase();break;case 'caseHint':if(session.mode==='practice'){caseHint=true;record('hint',{case:caseId});saveTraining();renderCase();}break;case 'exportJson':exportRecord('json');break;case 'exportCsv':exportRecord('csv');break;case 'allJson':exportRecord('json',true);break;case 'allCsv':exportRecord('csv',true);break;case 'printRecord':printRecord();break;case 'saveFieldDraft':saveField(false);break;case 'confirmField':saveField(true);break;case 'retryAttempt':if(running)return true;const oldId=session.id;startAttempt('practice',oldId);break;default:return false;}return true;}
+
+const taskOk=i=>{const s=STEPS[i],x=st[i];return (s.checks||[]).every((_,k)=>x.checks.has(k))&&(!s.q||x.choice)&&casesReady(i)};
 const isDone=i=>taskOk(i)&&(!STEPS[i].run||st[i].ran);
 
 /* ---------- operator ---------- */
@@ -513,7 +617,7 @@ function applyScene(sc){const h=sc.level*44;const p=$('#powder');p.setAttribute(
  $('#feedHose').setAttribute('opacity',sc.dock>.001?0:1);
  $('#receiveLabel').setAttribute('opacity',move>.98?1:0);
  $('#millLabel').textContent=swing>.98?'Mill · 배출구 결합':swing>0?'Mill · 스윙 중':'벽 부착 Mill · 대기';
- if(running&&STEPS[cur].rno===17){
+ if(running&&STEPS[cur].code==='M'){
   const px=590+(445-590)*ease(move),py=466+(478-466)*ease(move);
   opPos={x:move<1?px:580,y:move<1?py:431,d:move<1?-1:-1};setOpT();
   $('#op').classList.toggle('walking',move<1);bubble(move<1?'IBC를 수거 위치로 이동':'Mill을 배출구에 결합');
@@ -523,60 +627,91 @@ function lerp(a,b,p){const o={};for(const k in b){o[k]=(typeof a[k]==='number'&&
 
 /* ---------- HMI ---------- */
 const TILES=[['mixer','Mixer'],['chopper','Chopper'],['power','Mixer power'],['temp','TE01090'],['press','PET01090 Bowl'],['pump','Liquid pump'],['liquid','Liquid fed'],['mw','MW power'],['energy','MW energy'],['disc','Discharge'],['mill','Mill speed'],['timer','Step timer']];
-$('#vals').innerHTML=TILES.map(([k,l])=>`<div class="val" id="t-${k}">${l}<b id="v-${k}">—</b></div>`).join('');
-$('#recipeList').innerHTML=RECIPE.map((r,n)=>`<li data-r="${n}"><span>${n}</span><span>${r[0]}</span><span>${r[1]}</span></li>`).join('');
+
+$('#recipeList').innerHTML=RECIPE.map((r,n)=>n===0?'':`<li data-r="${n}"><span>${n}</span><span>${r[0]}</span><span>${r[1]}${n===8?' · 교육 제외':''}</span></li>`).join('');
 function fmt(k,v){if(v==null)return k==='press'?'Recipe 값':k==='mill'?'승인 조건':'—';
  switch(k){case 'mixer':case 'chopper':return Math.round(v)+' rpm';case 'power':case 'mw':return v.toFixed(1)+' kW';case 'temp':return v.toFixed(1)+' ℃';case 'press':return Math.round(v)+' mbar';
  case 'pump':case 'disc':case 'mill':return Math.round(v)+' %';case 'liquid':return v.toFixed(2)+' kg';case 'energy':return Math.round(v).toLocaleString('en-US')+' kJ';
  case 'timer':{const t=Math.max(0,Math.round(v));return String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0');}}}
-function hmiRest(i){const s=STEPS[i];if(st[i].ran||isDone(i))return s.hmi;const p=i>0?STEPS[i-1].hmi:IDLE;
+function hmiRest(i){const s=STEPS[i];if(st[i].ran||isDone(i))return Object.assign({},s.hmi,{mixer:0,chopper:0,mw:0,pump:0,mill:0,status:'COMPLETE'});const p=i>0?STEPS[i-1].hmi:IDLE;
  return Object.assign({},p,{mixer:p.mixer==null?null:0,chopper:p.chopper==null?null:0,power:0,pump:0,mw:0,mill:0,disc:s.rno>=19?(STEPS[i-1].hmi.disc||0):0,timer:s.hmi.timer,status:s.group==='prep'&&i<2?'LOGIN':'READY'});}
 function renderHMI(v,i){const s=STEPS[i];
- TILES.forEach(([k])=>{$('#v-'+k).textContent=fmt(k,v[k]);$('#t-'+k).classList.toggle('hot',typeof v[k]==='number'&&v[k]>0&&!['temp','press','liquid','energy','timer'].includes(k));});
+ TILES.forEach(([k])=>{$('#v-'+k).textContent='—';$('#t-'+k).classList.toggle('hot',typeof v[k]==='number'&&v[k]>0&&!['temp','press','liquid','energy','timer'].includes(k));});
  $('#hNo').textContent=s.rno!=null?s.rno:s.code;$('#hName').textContent=s.rno!=null?(s.name+(s.sub?' · '+s.sub:'')):s.title;
  const status=hold?'HOLD':v.status;const el=$('#hStatus');el.textContent=status;el.className='status'+(status==='RUNNING'?' run':status==='HOLD'?' hold':['COMPLETE','END','LOADED','CHECKED'].includes(status)?' done':'');
  $$('#recipeList li').forEach(li=>{const n=+li.dataset.r;const ref=s.rno!=null?s.rno:(s.group==='end'?99:-1);li.classList.toggle('on',n===s.rno);li.classList.toggle('past',n<ref);});
  const m=$('#mimic');m.classList.toggle('m-mix',v.mixer>0);m.classList.toggle('m-drop',v.pump>0);m.classList.toggle('m-wave',v.mw>0);m.classList.toggle('m-disc',v.disc>0);
- $('#mLine').innerHTML=`Mixer <b>${fmt('mixer',v.mixer)}</b><br>Chopper <b>${fmt('chopper',v.chopper)}</b><br>Bowl <b>${fmt('press',v.press)}</b><br>교육용 가상값`;
+ const active=running&&!hold;
+ const vacuum=active&&s.report?.p.Vacuum==='ON' && s.name==='DRYING';
+ $('#hmPress').textContent=fmt('press',v.press);$('#hmTemp').textContent=fmt('temp',v.temp);$('#hmMw').textContent=fmt('mw',v.mw);
+ $('#hmVacState').textContent=vacuum?'진공 건조 중':'대기';
+ $('#hmFeed').classList.toggle('active',active&&s.rno===3);$('#hmVac').classList.toggle('active',vacuum);
+ $('#hmMotor').setAttribute('stroke',v.mixer>0?'#7bdd68':'#182a33');$('#hmPump').setAttribute('fill',v.pump>0?'#7bdd68':'#7c9191');$('#hmVacPump').setAttribute('fill',vacuum?'#7bdd68':'#78918d');
+ $('#hmValve').setAttribute('fill',v.disc>0?'#7bdd68':'#839796');m.classList.toggle('chop-on',v.chopper>0);
+ $('#hmDock').textContent=s.rno>=19||s.code==='M'&&st[i].ran||s.group==='end'?'Mill 결합 · IBC 수거 위치':'Mill 대기 위치';
+ const rp=s.report?.p||{};
+ const mapping={mixer:'Mixer speed',chopper:'Chopper speed',temp:'Product temperature',press:'Bowl pressure',pump:'Liquid feed pump speed',mw:'Microwave forwarded power',energy:'End point microwave energy',disc:'Discharge position',mill:'Mill speed',timer:'End time'};
+ for(const [k,key] of Object.entries(mapping))$('#v-'+k).textContent=rp[key]||'—';
+ $('#hmPress').textContent=rp['Bowl pressure']||'—';$('#hmTemp').textContent=rp['Product temperature']||'—';$('#hmMw').textContent='MW SP '+(rp['Microwave forwarded power']||'—');
+ for(const key of ['Bowl','Lid','Chiller'])$('#sp-'+key).textContent=rp[key+' temperature']||'—';
+ $('#sp-reflected').textContent=rp['Microwave reflected power']||'—';$('#sp-liquidType').textContent=rp['Liquid type']||'—';$('#sp-feedType').textContent=rp['Product feed type']||'—';
+ const dry=s.name==='DRYING';
+ $('#mLine').innerHTML=`<span><b>숫자 = Recipe 저장값(SP) · 실제 PV 아님</b></span><span>Mixer ${rp.Mixer||'—'} · Chopper ${rp.Chopper||'—'} · Vacuum ${rp.Vacuum||'—'} · MW ${rp.Microwave||'—'}</span><span>일반 Mixer ON/OFF ${rp['Mixer flip-flop ON time']||'—'} / ${rp['Mixer flip-flop OFF time']||'—'} · 스윙 위치 ${rp['Swinging position']||'—'}</span><span>${dry?'본체 스윙: 현장 설명 반영 · 보고서 Swinging '+(rp.Swinging||'—'):'현재 단계 설정값 표시'} · 종료시간 ${rp['End time']||'—'} · 종료 에너지 ${rp['End point microwave energy']||'—'}</span>`;
+ $('#paramsBtn').disabled=!s.report;
+ $('#alarmState').textContent=hold?'HOLD':'NORMAL';$('#hmFooterState').textContent=hold?'HOLD':active?'RUNNING':v.status;
  $('#hMsg').textContent=hold?'ALARM · 가상 위험 상황 · 공정 HOLD':`Description: ${s.title}`;
+ $('#fF2').disabled=hold||running||!s.run||st[i].ran||!(s.runFirst||taskOk(i));
  $('#fF2').classList.toggle('lit',!!s.run&&!st[i].ran&&(s.runFirst||taskOk(i))&&!running);}
 function $$(q){return Array.from(document.querySelectorAll(q));}
 
 /* ---------- task & rail ---------- */
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-function renderRail(){const groups=[['준비','prep'],['Recipe 0–21','recipe'],['마감','end']];
- $('#rail').innerHTML=groups.map(([lab,g])=>`<div class="grp"><small>${lab}</small><div class="chips">${STEPS.map((s,i)=>s.group!==g?'':`<button type="button" class="chip ${doneSet.has(i)?'done':''} ${i===cur?'cur':''}" data-go="${i}" ${running?'disabled':''} aria-current="${i===cur?'step':'false'}"><b>${esc(s.code)}</b>${esc(s.rno!=null?s.name:s.name)}${s.sub&&s.rno!=null?'<br>'+esc(s.sub.length>11?s.sub.slice(0,10)+'…':s.sub):''}</button>`).join('')}</div></div>`).join('');
+function renderRail(){const groups=[['준비','prep'],['ALP#018 · Operation 1–22','recipe'],['마감','end']];
+ $('#rail').innerHTML=groups.map(([lab,g])=>`<div class="grp"><small>${lab}</small><div class="chips">${STEPS.map((s,i)=>s.group!==g?'':`<button type="button" class="chip ${doneSet.has(i)?'done':''} ${i===cur?'cur':''}" data-go="${i}" ${running||!canVisit(i)?'disabled':''} aria-current="${i===cur?'step':'false'}"><b>${esc(s.code)}</b>${esc(s.rno!=null?s.name:s.name)}${s.sub&&s.rno!=null?'<br>'+esc(s.sub.length>11?s.sub.slice(0,10)+'…':s.sub):''}</button>`).join('')}</div></div>`).join('');
  const c=document.querySelector('.chip.cur');c&&c.scrollIntoView({inline:'center',block:'nearest'});}
 function renderTask(){const s=STEPS[cur],x=st[cur],done=isDone(cur);const lock=running||done||(s.runFirst&&!x.ran);
  $('#tCode').textContent=(s.rno!=null?`Recipe ${s.rno} · ${s.name}${s.sub?' '+s.sub:''}`:`${s.code} · ${s.name}${s.sub?' '+s.sub:''}`);
  $('#tTitle').textContent=s.title;$('#tInstr').textContent=s.instr;$('#tSrc').textContent='근거: '+s.src;
  let h='';
  if(s.runFirst&&!x.ran)h+=`<p class="muted">먼저 오른쪽 “${esc(s.run.label)}”을 눌러 진행하세요.</p>`;
- if(s.checks)h+=s.checks.map((c,k)=>`<button type="button" class="chk" data-chk="${k}" aria-pressed="${x.checks.has(k)}" ${lock?'disabled':''}><span class="box">${x.checks.has(k)?'✓':''}</span>${esc(c)}</button>`).join('');
+ if(s.checks&&s.rno!==2)h+=s.checks.map((c,k)=>`<button type="button" class="chk" data-chk="${k}" aria-pressed="${x.checks.has(k)}" ${lock?'disabled':''}><span class="box">${x.checks.has(k)?'✓':''}</span>${esc(c)}</button>`).join('');
  if(s.q)h+=`<div class="q">${esc(s.q)}</div>`+s.opts.map((o,k)=>`<button type="button" class="opt ${x.choice&&o[1]?'good':''}" data-opt="${k}" ${lock?'disabled':''}>${esc(o[0])}</button>`).join('');
  if(!s.checks&&!s.q)h+='<p class="muted">확인할 항목이 없어요. 오른쪽 실행 버튼으로 단계를 진행하세요.</p>';
+ h+=missionButtons(cur);
  $('#tWork').innerHTML=h;
  const rb=$('#runBtn');if(s.run){rb.hidden=false;rb.textContent=x.ran?'실행 완료 ✓':s.run.label;rb.disabled=running||x.ran||!(s.runFirst||taskOk(cur));}else rb.hidden=true;
  $('#prevBtn').disabled=running||cur===0;
  const nb=$('#nextBtn');nb.disabled=running||!done;nb.textContent=cur===LAST?'결과 보기':'다음 단계';nb.classList.toggle('primary',done);
- const fb=$('#fb');fb.textContent=fbMsg||(done?'완료했어요. 다음 단계로 이동하세요.':s.runFirst&&!x.ran?'실행 후 결과를 판단해요.':'확인 항목과 질문을 마친 뒤 실행해요.');fb.classList.toggle('bad',fbBad);
+ const fb=$('#fb');fb.textContent=fbMsg||(session?.mode==='exam'&&!done?'평가: 확인 항목·판단 미션을 순서대로 완료하세요.':done?'완료했어요. 다음 단계로 이동하세요.':s.runFirst&&!x.ran?'실행 후 결과를 판단해요.':'확인 항목과 질문을 마친 뒤 실행해요.');fb.classList.toggle('bad',fbBad);
  $('#progText').textContent=doneSet.size+' / '+STEPS.length+' 완료';$('#progBar').style.width=(doneSet.size/STEPS.length*100)+'%';}
 function render(){renderTask();renderRail();if(!running){applyScene(sceneAt(cur));renderHMI(hmiRest(cur),cur);}}
 function say(t,bad){fbMsg=t;fbBad=!!bad;}
-function afterChange(){if(isDone(cur)&&!doneSet.has(cur)){doneSet.add(cur);log.push([STEPS[cur].code,STEPS[cur].title]);if(!fbBad)fbMsg=fbMsg||'완료!';if(cur===LAST){render();setTimeout(summary,700);return;}}render();}
-function setStep(i){if(running||i<0||i>LAST)return;cur=i;fbMsg='';fbBad=false;working(false);render();const s=STEPS[i];moveTo(s.loc);bubble(s.say||s.title);}
+function afterChange(){record('progress-updated');if(isDone(cur)&&!doneSet.has(cur)){doneSet.add(cur);log.push([STEPS[cur].code,STEPS[cur].title]);if(!fbBad)fbMsg=fbMsg||'완료!';if(cur===LAST){render();finishIfComplete();setTimeout(summary,700);return;}}render();finishIfComplete();}
+function canVisit(i){if(session?.mode!=='exam')return true;const next=STEPS.findIndex((_,n)=>!isDone(n));return i<=(next<0?LAST:next);}
+function setStep(i){if(running||i<0||i>LAST)return;if(!canVisit(i)){say('평가는 순서대로 진행합니다. 현재 미완료 단계를 먼저 마쳐 주세요.',true);render();return;}cur=i;fbMsg='';fbBad=false;rockBowl(null);working(false);render();const s=STEPS[i];moveTo(s.loc);bubble(s.say||s.title);record('stage-open');saveTraining();}
 
-function runStep(){const i=cur,s=STEPS[i];if(running||!s.run||st[i].ran)return;if(!s.runFirst&&!taskOk(i)){say('먼저 확인 항목과 질문을 완료해 주세요.',true);render();return;}
+function rockBowl(progress){
+ const theta=progress==null?0:8*Math.sin(progress*Math.PI*4)*Math.sin(Math.PI*progress);
+ const reduced=typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+ const angle=reduced?0:theta;
+ $('#potRock').setAttribute('transform',`rotate(${angle} 400 205)`);
+ $('#hmiRock').setAttribute('transform',`rotate(${angle*.6} 512 258)`);
+ $('#swingNote').textContent=progress==null?'':reduced?'건조 · 본체 좌우 스윙 (동작 축소)':'건조 · 본체 좌우 스윙';
+}
+function loadingReady(){const i=STEPS.findIndex(s=>s.rno===2);return i>=0&&isDone(i);}
+function runStep(){const i=cur,s=STEPS[i];if(running||!s.run||st[i].ran)return;if(!s.runFirst&&!taskOk(i)){say('먼저 확인 항목과 필수 판단 미션을 완료해 주세요.',true);render();return;}
+ if(s.rno===3&&!loadingReady()){say('2번 Waiting에서 호스 결합과 IBC 원료의 제품·품목·투입량 대조를 먼저 완료해 주세요.',true);render();return;}
  const from=sceneAt(i),hFrom=hmiRest(i);running=true;say(s.run.say?`${s.run.label}…`:'진행 중…');render();
  walkPath(s.run.path||[s.loc],()=>{working(true);bubble(s.run.say||s.title);const anim=s.run.anim||[];anim.forEach(c=>scene.classList.add(c));
   const to=Object.assign({},from,s.set||{}),hTo=s.hmi,dur=s.run.dur||2500,t0=performance.now();
-  const frame=now=>{const p=Math.min(1,(now-t0)/dur);applyScene(lerp(from,to,p));
-   const hv=lerp(hFrom,hTo,Math.min(1,p*1.6));hv.timer=hTo.timer!=null?hTo.timer*(1-p):null;hv.status='RUNNING';if(hTo.mixer===0&&hTo.chopper===0&&!anim.length)hv.status='RUNNING';renderHMI(hv,i);
-   if(p<1)requestAnimationFrame(frame);else{anim.forEach(c=>scene.classList.remove(c));working(false);$('#op').classList.remove('walking');st[i].ran=true;running=false;
+  const frame=now=>{const p=Math.min(1,(now-t0)/dur);applyScene(lerp(from,to,p));rockBowl(s.name==='DRYING'?p:null);
+   const hv=Object.assign({},hTo);const rr=s.report;if(rr){const on=num(rr,'Mixer flip-flop ON time')||0,off=num(rr,'Mixer flip-flop OFF time')||0;const elapsed=p*(on+off)*2; if(on>0&&off>0)hv.mixer=(elapsed%(on+off)<on)?hTo.mixer:0;}
+   scene.classList.toggle('mix-slow',hv.mixer>0);scene.classList.toggle('chop',hv.chopper>0);hv.timer=hTo.timer!=null?hTo.timer*(1-p):null;hv.status='RUNNING';if(hTo.mixer===0&&hTo.chopper===0&&!anim.length)hv.status='RUNNING';renderHMI(hv,i);
+   if(p<1)requestAnimationFrame(frame);else{anim.forEach(c=>scene.classList.remove(c));scene.classList.remove('mix-slow','chop');rockBowl(null);working(false);$('#op').classList.remove('walking');st[i].ran=true;running=false;
     say(s.q&&!st[i].choice?'실행을 마쳤어요. 이제 결과를 판단하세요.':s.checks&&!taskOk(i)?'실행을 마쳤어요. 남은 확인 항목을 체크하세요.':'완료했어요. 다음 단계로 이동하세요.');afterChange();}};
   requestAnimationFrame(frame);});}
 
-document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;
+document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;if(trainingClick(b))return;
  if(b.dataset.go!=null){setStep(+b.dataset.go);return;}
  if(b.dataset.chk!=null){const x=st[cur],k=+b.dataset.chk;x.checks.has(k)?x.checks.delete(k):x.checks.add(k);say('');afterChange();return;}
  if(b.dataset.opt!=null){const o=STEPS[cur].opts[+b.dataset.opt];if(o[1]){st[cur].choice=true;say(o[2]);bubble('좋아요!');}else{errors++;say(o[2],true);bubble('다시 볼까요?');}afterChange();return;}
@@ -584,16 +719,26 @@ document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||
  if(b.id==='nextBtn'){cur===LAST?summary():setStep(cur+1);return;}
  if(b.id==='prevBtn')return setStep(cur-1);
  if(b.id==='drillBtn')return drill(0);
- if(b.id==='infoBtn')return info();
+ if(b.id==='infoBtn'||b.id==='hInfoBtn')return info();
+ if(b.id==='recipeBtn'||b.id==='hRecipeBtn')return openRecipe();
+ if(b.id==='closeRecipe')return closeRecipe();
+ if(b.id==='paramsBtn')return showParams();
+ if(b.id==='fF2')return runStep();
+ if(b.id==='expandHmi'){const on=$('#hmiPanel').className.includes('expanded');$('#hmiPanel').classList.toggle('expanded',!on);b.textContent=on?'⛶ 확대':'✕ 축소';b.setAttribute('aria-expanded',!on);return;}
  if(b.dataset.drill!=null)return drillAnswer(+b.dataset.drill);
  if(b.dataset.close!=null){closeModal();return;}
- if(b.dataset.reset!=null){location.reload();return;}});
-document.getElementById('recipeList').addEventListener('click',e=>{const li=e.target.closest('li');if(!li)return;const i=STEPS.findIndex(s=>s.rno===+li.dataset.r);setStep(i);});
+ if(b.dataset.reset!=null){sessionForm();return;}});
+document.getElementById('recipeList').addEventListener('click',e=>{const li=e.target.closest('li');if(!li)return;const i=STEPS.findIndex(s=>s.rno===+li.dataset.r);if(running)return;if(i<0){closeRecipe();openModal('<h3>Operation 8 · WET MILLING</h3><p>요청에 따라 이 단계는 게임 실행에서 제외했습니다. 보고서 p.4에는 보울 30℃, 리드 75℃, Chiller 2℃, Operator action ON, Error point maximum time 0 s로 기록돼 있습니다.</p><button class="btn" type="button" data-close>닫기</button>');return;}setStep(i);closeRecipe();});
+
+function openRecipe(){$('#recipeModal').hidden=false;$('#closeRecipe').focus();}
+function closeRecipe(){$('#recipeModal').hidden=true;$('#recipeBtn').focus();}
+$('#recipeModal').addEventListener('click',e=>{if(e.target===$('#recipeModal'))closeRecipe();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#recipeModal').hidden)closeRecipe();});
 
 /* ---------- modal: drill / info / summary ---------- */
 const modal=$('#modal'),card=$('#modalCard');
 function openModal(h){card.innerHTML=h;modal.hidden=false;const f=card.querySelector('button');f&&f.focus();}
-function closeModal(){modal.hidden=true;if(hold){hold=false;scene.classList.remove('alarm');render();}}
+function closeModal(){if($('#fieldDate')){readFieldInputs();saveTraining();}modal.hidden=true;if(hold){hold=false;scene.classList.remove('alarm');render();}}
 const DRILL=[
  {q:'가동 중 이상 소음과 위험한 움직임을 발견했어요. 가장 먼저 할 일은?',opts:[['즉시 비상 정지',1],['Next로 다음 단계 진행',0],['Restart를 반복해서 누르기',0]],bad:'원인이 해결되지 않은 상태로 진행하거나 재시작하지 않아요. 먼저 비상 정지!'},
  {q:'공정이 정지했어요. 다음 행동은?',opts:[['팀장에게 보고하고 조치를 받기',1],['비상 정지만 풀고 바로 재시작',0]],bad:'혼자 판단해 재시작하지 않아요. 팀장에게 보고해요.'},
@@ -601,26 +746,20 @@ const DRILL=[
 let drillPhase=0;
 function drill(p){if(running)return;drillPhase=p;hold=true;scene.classList.add('alarm');renderHMI(hmiRest(cur),cur);moveTo('panel');bubble('위험! 멈춰야 해요');
  const d=DRILL[p];openModal(`<h3>비상상황 훈련 ${p+1}/3</h3><p>제조 흐름과 별개인 가상 상황이에요.</p><div class="q">${d.q}</div>${d.opts.map((o,k)=>`<button type="button" class="opt" data-drill="${k}">${o[0]}</button>`).join('')}<p id="drillFb" class="muted"></p>`);}
-function drillAnswer(k){const d=DRILL[drillPhase];if(!d.opts[k][1]){errors++;$('#drillFb').textContent=d.bad;$('#drillFb').style.color='var(--warn)';return;}
+function drillAnswer(k){const d=DRILL[drillPhase];record('emergency-drill',{choice:d.opts[k][0],correct:!!d.opts[k][1]});saveTraining();if(!d.opts[k][1]){errors++;$('#drillFb').textContent=d.bad;$('#drillFb').style.color='var(--warn)';return;}
  if(drillPhase<2){if(drillPhase===0)working(true);drill(drillPhase+1);return;}
  working(false);log.push(['훈련','비상 정지 → 팀장 보고 → 해결 확인 후 복귀']);
  openModal('<h3>비상상황 대응 완료</h3><p>멈춤 → 보고 → 해결 확인 후 복귀 순서를 확인했어요. 알람별 상세 조치는 현행 SOP와 담당자 지시를 따릅니다.</p><button type="button" class="btn primary" data-close>훈련으로 돌아가기</button>');}
-function info(){openModal(`<h3>자료와 주의사항</h3>
-<p>SOP「과립기(One pot 300&amp;600) 가동방법」, 제조지시기록서 1~9항, Singlepot Recipe View 단계(0~21)를 바탕으로 만든 교육용 초안이에요. 실제 사진은 사용하지 않았습니다.</p>
-<ul>
-<li>습식 코밀(187S·사각 임펠러) 단계는 제외했어요. 흐름은 Recipe View 순서를 따릅니다.</li>
-<li>설비 배치는 사용자 설명을 반영한 모식도입니다. Singlepot·Mill은 벽 부착형이며, 정립 시 IBC를 아래로 옮겨 직접 수거해요. 세부 Recipe 조건은 추가 자료를 받은 뒤 맞출 예정입니다.</li>
-<li>HMI 수치 중 기록서에 없는 값(펌프 60%, 정제수 16/16 kg 분배, 온도, 80 mbar, 단계별 누적 에너지 등)은 교육용 가상값이에요.</li>
-<li>DRYING 0/1/4 ~ 0/10/4의 숫자 의미, 진공 이송 압력, Mill speed는 Recipe·승인 조건에서 확인해야 해요.</li>
-<li>Liquid feed tube 분리 시점은 현행 SOP 순서를 확인하세요.</li>
-<li>Recipe 이름·버전·제조번호는 가상 값이며, 훈련 완료는 작업 자격이나 전자서명을 뜻하지 않아요.</li>
-</ul><button type="button" class="btn primary" data-close>닫기</button>`);}
-function summary(){openModal(`<h3>첫 배치 훈련 결과</h3><p>완료 ${doneSet.size} / ${STEPS.length} · 다시 선택한 횟수 ${errors}회</p>${log.map(l=>`<div class="logrow"><span>${esc(l[0])}</span><strong>${esc(l[1])}</strong></div>`).join('')}<p style="margin-top:10px">가상 결과이며 새로 열면 사라져요. 실제 작업 전에는 담당자의 교육과 자격 확인이 필요해요.</p><div class="row"><button type="button" class="btn" data-close>닫기</button><button type="button" class="btn primary" data-reset>처음부터 다시</button></div>`);}
+function showParams(){const r=STEPS[cur].report;if(!r)return;openModal(`<h3>ALP#018 · Operation ${r.n}</h3><p>${esc(r.name)} · Recipe report p.${r.page}</p><p>보고서에 저장된 설정값(SP)입니다. 실제 계측값(PV)이 아닙니다. OFF여도 속도·출력 설정이 저장될 수 있습니다. 0인 종료·오류 항목의 활성 여부는 제어 로직 확인이 필요합니다.</p><table class="param-table"><thead><tr><th>Parameter</th><th>저장값</th></tr></thead><tbody>${Object.entries(r.p).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</tbody></table><p>Swinging과 일반 Mixer/Chopper 운전은 별도 항목입니다. 게임의 간헐 운전은 2주기로 축약한 예시입니다. 본체는 현장 설명에 따라 모든 건조 단계에서 스윙하며 각도·주기는 시각화용입니다. Operation 9의 보고서 Swinging OFF는 원문 그대로 보존했습니다.</p><button class="btn primary" type="button" data-close>닫기</button>`);}
+function info(){openModal(`<h3>ALP#018 교육 초안</h3><p>Ultima Pro 600 · Recipe report 16쪽 · 출력일 2026-09-21 · 수정일 2025-11-24. 별도 버전 번호는 자료에서 확인되지 않습니다.</p><p>Operation 1–22를 따르며, 요청에 따라 8 Waiting WET MILLING은 학습 실행에서 제외했습니다. IBC 이동·Mill 결합과 작업 마감은 교육 보조 단계입니다.</p><p>보고서는 설정값 자료입니다. 실제 온도·압력·출력의 PV와 원료량·액체량·수분 합격 기준은 제공되지 않아 추정하지 않습니다. 이전 다른 제품의 기록서 수치는 이번 Recipe에 적용하지 않습니다.</p><p>일반 Mixer/Chopper OFF와 스윙 전용 동작 조건을 구분합니다. 현장 설명에 따라 모든 건조 단계에서 본체 좌우 스윙을 표현합니다. 각도·주기는 교육용이며 내부 회전 제어 순서와는 별개입니다. Operation 9의 Swinging OFF 표기는 원문대로 두고 현장 동작 설명을 별도로 표시합니다. End time 0이나 0인 End point 항목은 즉시 종료 또는 목표값 도달로 해석하지 않습니다.</p><button class="btn primary" type="button" data-close>닫기</button>`);}
+function summary(){trainingResults();}
 modal.addEventListener('click',e=>{if(e.target===modal)closeModal();});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!modal.hidden)closeModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!modal.hidden)closeModal();$('#hmiPanel').classList.remove('expanded');$('#expandHmi').textContent='⛶ 확대';$('#expandHmi').setAttribute('aria-expanded','false');}});
 
 setOpT();flip(1);
-setTimeout(()=>setStep(0),250);
+setTimeout(initTraining,250);
+if(typeof window!=='undefined')window.addEventListener('beforeunload',()=>saveTraining());
+document.addEventListener('change',e=>{if(['fieldDate','fieldObserver','fieldNotes'].includes(e.target.id)){readFieldInputs();saveTraining();}});
 })();
 </script>
 </body>
