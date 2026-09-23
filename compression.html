@@ -1,0 +1,843 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KORSCH XL 400FT 첫 배치 시뮬레이터</title>
+<style>
+:root{--bg:#e8eaee;--surface:#fbfcfd;--ink:#1a2a38;--sub:#5d6b78;--line:#d2d8de;--accent:#1f4f7a;--on:#fff;--soft:#dde8f2;--warn:#a8322b;--warnsoft:#fbe7e2;--steel:#9eabb0}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101820;--surface:#18242e;--ink:#e3ecf2;--sub:#a4b4c0;--line:#2d414f;--accent:#8fc4ea;--on:#0f2331;--soft:#1f3442;--warn:#ff9f95;--warnsoft:#3b2427;--steel:#68808a}}
+:root[data-theme="dark"]{--bg:#101820;--surface:#18242e;--ink:#e3ecf2;--sub:#a4b4c0;--line:#2d414f;--accent:#8fc4ea;--on:#0f2331;--soft:#1f3442;--warn:#ff9f95;--warnsoft:#3b2427;--steel:#68808a}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.45 'Pretendard','Noto Sans KR','Malgun Gothic',system-ui,sans-serif}
+button{font:inherit;color:inherit;cursor:pointer}
+button:disabled{cursor:default;opacity:.5}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.app{display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;height:100vh;min-height:780px;max-width:1580px;margin:0 auto;padding:10px;gap:8px}
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 14px}
+.top h1{font-size:18px;margin:0;letter-spacing:-.4px}
+.top .meta{color:var(--sub);font-size:12px}
+.top .grow{flex:1}
+.prog{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--sub)}
+.bar{width:140px;height:7px;background:var(--line);border-radius:5px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .4s}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:8px 13px;font-weight:650}
+.btn:not(:disabled):hover{background:var(--soft)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on)}
+.btn.danger{border-color:var(--warn);color:var(--warn)}
+.main{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(392px,1fr);gap:8px;min-height:0}
+.scene{position:relative;background:#dfe4e8;border:1px solid var(--line);border-radius:12px;overflow:hidden;min-height:0}
+.scene svg{display:block;width:100%;height:100%}
+.tag{position:absolute;left:10px;top:10px;background:rgba(255,255,255,.85);color:#33505f;border-radius:6px;padding:3px 8px;font-size:11px}
+
+/* ── HMI (KORSCH 실화면 색감: 연회색 패널 + 청회색 배경) ── */
+.hmi{background:#b9bccb;border:4px solid #8f9499;border-radius:10px;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto auto auto;overflow:hidden;font-family:Tahoma,Arial,'Malgun Gothic',sans-serif;color:#15202b}
+.hmi-top{background:#ededed;display:flex;align-items:center;gap:5px;padding:4px 6px;font-size:10.5px}
+.hmi-top .fld{display:flex;align-items:center;gap:4px}
+.hmi-top .v{background:#fff;border:1px solid #8a8a8a;padding:1px 6px;font-weight:700;font-size:10.5px;min-width:78px}
+.hmi-top .logo{margin-left:auto;background:#111;color:#fff;font-weight:900;font-style:italic;letter-spacing:.13em;padding:2px 9px;font-size:13px}
+.alarmwrap{display:flex;gap:4px;padding:4px 5px 0}
+.albox{flex:1;background:#fff;border:1px solid #8a8a8a}
+.alhead{background:#c00;color:#fff;text-align:center;font-weight:700;font-size:10px;letter-spacing:.05em}
+.alrow{display:flex;gap:7px;font-size:9.5px;padding:0 4px;height:14px;line-height:14px;color:#c00;font-weight:700;white-space:nowrap;overflow:hidden}
+.alrow.ok{color:#777;font-weight:400}
+.alrow i{font-style:normal;width:56px;flex:none}
+.modecol{display:flex;gap:4px}
+.mcell{width:92px;display:flex;flex-direction:column;gap:2px}
+.pill{font-size:10px;text-align:center;padding:2px;font-weight:700;border:1px solid #9a9a9a;background:#dcdcdc}
+.pill.man{background:#ffb3b3}.pill.aut{background:#8fe08f}
+.hmi-body{display:grid;grid-template-columns:auto 1fr 150px;gap:6px;padding:5px 6px;min-height:0}
+.gauges{display:flex;gap:5px}
+.g{width:46px;display:flex;flex-direction:column;align-items:center}
+.g .gn{font-size:8.5px;font-weight:700;text-align:center;line-height:1.15;margin-bottom:2px}
+.gt{position:relative;width:17px;flex:1;background:#fff;border:1px solid #555;min-height:120px}
+.gf{position:absolute;left:0;right:0;bottom:0;background:#12a012;transition:height .12s linear}
+.gl{position:absolute;left:-5px;right:-5px;border-top:2px solid #c00;height:0}
+.gl.lo{border-top-color:#1050c8}
+.gv{margin-top:3px;font-size:9.5px;font-weight:700;background:#fff;border:1px solid #777;padding:0 3px;min-width:44px;text-align:center;font-variant-numeric:tabular-nums}
+.pgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;align-content:start}
+.pbtn{background:#d8d8d0;border:2px solid;border-color:#fff #83837c #83837c #fff;padding:2px 3px;min-width:0}
+.pbtn .l{font-size:8.5px;line-height:1.15;font-weight:700;text-align:center}
+.pbtn .v{background:#e9f2dc;border:1px solid #6d6d6d;margin-top:2px;text-align:center;font-size:11.5px;font-weight:700;color:#146b14;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden}
+.pbtn.ro .v{background:#e0e6ee;color:#204060}
+.pbtn.hot{border-color:#3fbf3f #1d7a1d #1d7a1d #3fbf3f}
+.spec{background:#e7eaf0;border:1px solid #9aa0a8;padding:4px 5px;font-size:9px;line-height:1.55}
+.spec b{font-size:9.5px}
+.softkeys{display:flex;gap:3px;padding:0 6px 5px}
+.sk{flex:1;background:#d8d8d0;border:2px solid;border-color:#fff #83837c #83837c #fff;font-size:8.5px;font-weight:700;text-align:center;padding:4px 1px;line-height:1.2}
+.sk.lit{background:#f3d56b}
+.statbar{display:flex;gap:3px;padding:0 6px 6px;font-size:9px}
+.statbar div{background:#d8d8d0;border:1px solid #9a9a9a;padding:1px 6px}
+.statbar .auto{min-width:96px;font-weight:700}
+.statbar .auto.on{background:#8fe08f}
+.statbar .msg{flex:1;color:#b00;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── 과제 패널 ── */
+.task{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1.55fr) minmax(232px,.8fr);gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 14px;min-height:170px}
+.code{font-size:12px;color:var(--sub);font-weight:700}
+.task h2{font-size:18px;margin:2px 0 5px;letter-spacing:-.4px}
+.task p{margin:0 0 6px;color:var(--sub);font-size:12.5px;max-width:62ch}
+.src{font-size:11px;color:var(--sub)}
+.work{min-width:0;max-height:182px;overflow:auto;padding-right:2px}
+.chk{display:inline-flex;gap:7px;align-items:center;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 10px;margin:0 6px 6px 0;font-size:12px;text-align:left}
+.chk .box{width:16px;height:16px;border:1px solid var(--sub);border-radius:4px;display:grid;place-items:center;font-size:11px;flex:none}
+.chk[aria-pressed="true"]{background:var(--soft);border-color:var(--accent)}
+.chk[aria-pressed="true"] .box{background:var(--accent);border-color:var(--accent);color:var(--on)}
+.q{font-weight:700;margin:4px 0 5px;font-size:13px}
+.opt{display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 10px;margin-bottom:5px;font-size:12.5px}
+.opt.good{background:var(--soft);border-color:var(--accent);font-weight:700}
+.opt:not(:disabled):hover{border-color:var(--accent)}
+.muted{color:var(--sub);font-size:12px}
+.act{display:flex;flex-direction:column;gap:8px}
+.fb{background:var(--soft);border-radius:10px;padding:9px 11px;font-size:12.5px;flex:1;min-height:62px}
+.fb.bad{background:var(--warnsoft);color:var(--warn)}
+.row{display:flex;gap:6px}
+.row .btn{flex:1}
+.rail{display:flex;gap:10px;overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:7px 10px}
+.grp{display:flex;flex-direction:column;gap:3px}
+.grp small{color:var(--sub);font-size:10.5px;padding-left:2px}
+.chips{display:flex;gap:4px}
+.chip{min-width:58px;border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:4px 5px;font-size:9.5px;line-height:1.2;text-align:center}
+.chip b{display:block;font-size:12px}
+.chip.done{background:var(--soft);border-color:var(--accent)}
+.chip.done b::after{content:" ✓"}
+.chip.cur{background:var(--accent);color:var(--on);border-color:var(--accent)}
+.modal{position:fixed;inset:0;background:rgba(8,16,24,.52);display:grid;place-items:center;z-index:20;padding:12px}
+.modal[hidden]{display:none}
+.card{background:var(--surface);color:var(--ink);width:min(600px,100%);max-height:88vh;overflow:auto;border-radius:14px;padding:18px 20px;border:1px solid var(--line)}
+.card h3{margin:0 0 8px;font-size:19px}
+.card p,.card li{color:var(--sub);font-size:13px}
+.logrow{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding:5px 0;font-size:12px}
+table.ipc{width:100%;border-collapse:collapse;font-size:12px;margin:6px 0}
+table.ipc th,table.ipc td{border:1px solid var(--line);padding:4px 6px;text-align:center}
+table.ipc th{background:var(--soft)}
+td.ng{background:var(--warnsoft);color:var(--warn);font-weight:700}
+td.okc{background:var(--soft);font-weight:700}
+
+/* ── 씬 애니메이션 ── */
+.leg,.arm{transform-box:fill-box;transform-origin:50% 5%}
+#op{transition:transform 1.3s ease-in-out}
+#bubble{transition:transform 1.3s ease-in-out}
+#opFlip{transition:transform .3s}
+#op.walking .leg-f,#op.walking .arm-b{animation:swA .42s ease-in-out infinite alternate}
+#op.walking .leg-b,#op.walking .arm-f{animation:swB .42s ease-in-out infinite alternate}
+@keyframes swA{from{transform:rotate(24deg)}to{transform:rotate(-24deg)}}
+@keyframes swB{from{transform:rotate(-24deg)}to{transform:rotate(24deg)}}
+#op.working .arm-f{animation:press .45s ease-in-out infinite alternate}
+@keyframes press{from{transform:rotate(-105deg)}to{transform:rotate(-70deg)}}
+#opBody{animation:breathe 2.4s ease-in-out infinite}
+#op.walking #opBody{animation:bob .21s ease-in-out infinite alternate}
+@keyframes bob{to{transform:translateY(-3px)}}
+@keyframes breathe{50%{transform:translateY(-1px)}}
+@keyframes blink{50%{opacity:.35}}
+.panel-active #hmiScreen{fill:#20507e}
+.run-state #lampG{fill:#48e062}
+.alarm #lampR{fill:#ff3b30;animation:blink .5s steps(2) infinite}
+#dedRotor,#mdBar{transform-box:fill-box;transform-origin:center}
+.dedust #dedRotor{animation:rot .3s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.mdreject #mdBar{animation:blink .35s steps(2) infinite;fill:#ff6a3d}
+.lbl{font-size:11px;fill:#3f5260;font-weight:700}
+.lbl.s{font-size:9.5px;font-weight:400;fill:#5d6b78}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+@media (max-width:1140px){.app{height:auto;min-height:0}.main{grid-template-columns:1fr}.scene{aspect-ratio:8/5}.hmi{min-height:560px}.task{grid-template-columns:1fr}.work{max-height:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div><h1>KORSCH XL 400FT 첫 배치 시뮬레이터</h1><div class="meta">교육용 가상 배치 TRAIN-XL-001 · 동화A 표준작업조건 기준 · 실설비 연동 없음</div></div>
+    <div class="grow"></div>
+    <div class="prog"><span id="progText">0 / 0 완료</span><div class="bar"><i id="progBar"></i></div></div>
+    <button class="btn danger" id="drillBtn" type="button">비상상황 훈련</button>
+    <button class="btn" id="infoBtn" type="button">자료·주의</button>
+  </header>
+
+  <div class="main">
+    <div class="scene">
+      <span class="tag">교육용 3D 모식도 · 실제 치수·배치와 다를 수 있음</span>
+      <svg id="scene" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet" role="img" aria-label="타정실 모식도와 작업자">
+        <defs>
+          <linearGradient id="gMetal" x1="0" x2="1"><stop offset="0" stop-color="#8e9ba0"/><stop offset=".32" stop-color="#f2f5f6"/><stop offset=".6" stop-color="#c2cbcf"/><stop offset="1" stop-color="#7c898e"/></linearGradient>
+          <linearGradient id="gMetalV" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f7f8"/><stop offset="1" stop-color="#a8b3b7"/></linearGradient>
+          <linearGradient id="gWall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0f3f5"/><stop offset="1" stop-color="#d8dfe3"/></linearGradient>
+          <linearGradient id="gFloor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b8c4ca"/><stop offset="1" stop-color="#d3dcdf"/></linearGradient>
+          <pattern id="pGran" width="7" height="6" patternUnits="userSpaceOnUse"><rect width="7" height="6" fill="#eee7d6"/><circle cx="2" cy="2" r="1.6" fill="#d6c9ab"/><circle cx="5.4" cy="4.4" r="1.3" fill="#e2d7bd"/></pattern>
+          <clipPath id="cWin"><rect x="316" y="182" width="252" height="132"/></clipPath>
+          <clipPath id="cIbc"><polygon points="596,196 676,196 676,272 596,272"/></clipPath>
+          <clipPath id="cDrum"><rect x="612" y="404" width="62" height="50"/></clipPath>
+        </defs>
+
+        <!-- room -->
+        <polygon points="0,0 800,0 690,22 110,22" fill="#f5f7f8"/>
+        <polygon points="110,22 690,22 690,250 110,250" fill="url(#gWall)"/>
+        <polygon points="0,0 110,22 110,250 0,340" fill="#ced7db"/>
+        <polygon points="800,0 690,22 690,250 800,340" fill="#c7d0d4"/>
+        <polygon points="110,250 690,250 800,500 0,500" fill="url(#gFloor)"/>
+        <g id="tiles" stroke="#aab7bd" stroke-width="1" opacity=".5"></g>
+        <rect x="250" y="5" width="100" height="9" rx="3" fill="#fff"/><rect x="470" y="5" width="100" height="9" rx="3" fill="#fff"/>
+        <line x1="110" y1="142" x2="690" y2="142" stroke="#d3dadd"/>
+        <text x="400" y="40" text-anchor="middle" class="lbl s">타정실 · 온도 18~26℃ / 습도 50%RH 이하 (주원료 흡습성)</text>
+
+        <!-- 조작 터치스크린 -->
+        <g>
+          <rect x="150" y="330" width="13" height="96" fill="#9aa5a9"/>
+          <ellipse cx="156" cy="426" rx="26" ry="7" fill="#8d989c"/>
+          <polygon points="104,266 190,258 194,330 108,338" fill="#3a464c"/>
+          <polygon id="hmiScreen" points="112,273 183,266 186,323 115,330" fill="#132c46"/>
+          <rect x="120" y="280" width="30" height="3" fill="#dcdfd6"/><rect x="120" y="287" width="22" height="3" fill="#8fe08f"/><rect x="120" y="294" width="26" height="3" fill="#dcdfd6"/>
+          <rect x="155" y="278" width="24" height="26" fill="#2c6fae" opacity=".75"/>
+          <text x="150" y="360" text-anchor="middle" class="lbl">HMI 터치스크린</text>
+          <circle id="lampR" cx="200" cy="248" r="6" fill="#6d2a2a"/><circle id="lampG" cx="200" cy="262" r="6" fill="#2b5b35"/>
+          <rect x="197" y="268" width="6" height="62" fill="#8d989c"/>
+        </g>
+
+        <!-- IBC(타정혼합물) + 호퍼 -->
+        <g>
+          <line x1="600" y1="300" x2="600" y2="356" stroke="#8d989c" stroke-width="5"/><line x1="672" y1="300" x2="672" y2="356" stroke="#8d989c" stroke-width="5"/>
+          <polygon points="596,196 676,196 676,272 596,272" fill="#e8eef0"/>
+          <g clip-path="url(#cIbc)"><rect id="ibcFill" x="596" y="198" width="80" height="74" fill="url(#pGran)"/></g>
+          <polygon points="596,196 676,196 676,272 596,272" fill="rgba(255,255,255,.22)" stroke="#8e9a9e"/>
+          <polygon points="676,196 708,181 708,258 676,272" fill="#c6ced2" stroke="#8e9a9e"/>
+          <polygon points="596,196 628,181 708,181 676,196" fill="#f5f7f8" stroke="#8e9a9e"/>
+          <polygon points="596,272 676,272 652,304 620,304" fill="#cfd7da" stroke="#8e9a9e"/>
+          <rect x="628" y="304" width="14" height="12" rx="2" fill="#5b6d74"/>
+          <text x="636" y="236" text-anchor="middle" class="lbl">IBC</text>
+          <text x="636" y="250" text-anchor="middle" class="lbl s">타정혼합물</text>
+          <path d="M635,318 C630,352 560,360 520,330 C494,310 490,250 486,198" stroke="#3a4a4e" stroke-width="7" fill="none" stroke-linecap="round"/>
+        </g>
+
+        <!-- 타정기 본체 -->
+        <ellipse cx="430" cy="420" rx="140" ry="16" fill="rgba(0,0,0,.12)"/>
+        <path d="M300,314 H570 L556,416 H314 Z" fill="url(#gMetalV)" stroke="#78858a"/>
+        <rect x="296" y="160" width="278" height="158" rx="8" fill="url(#gMetal)" stroke="#78858a"/>
+        <rect x="316" y="182" width="252" height="132" fill="#2b3a42"/>
+
+        <!-- 호퍼 -->
+        <path d="M440,120 L520,120 L500,176 L460,176 Z" fill="#cfd6da" stroke="#6f7c82" stroke-width="1.5"/>
+        <rect id="hopPowder" x="446" y="140" width="68" height="34" fill="url(#pGran)"/>
+        <path d="M440,120 L520,120 L500,176 L460,176 Z" fill="rgba(255,255,255,.18)" stroke="#6f7c82" stroke-width="1.5"/>
+        <text x="480" y="112" text-anchor="middle" class="lbl">호퍼 · 로터리 피더</text>
+
+        <!-- 내부: 다이 테이블 + 펀치 스테이션 -->
+        <g clip-path="url(#cWin)">
+          <!-- 상부 캠/레일 -->
+          <rect x="316" y="186" width="252" height="7" fill="#5c6f79"/>
+          <rect x="316" y="300" width="252" height="9" fill="#5c6f79"/>
+          <!-- 압축 롤러 -->
+          <g id="rollPre"><circle cx="404" cy="203" r="15" fill="#c9ced5" stroke="#4d5a62" stroke-width="2"/><circle cx="404" cy="203" r="4" fill="#7d8a92"/></g>
+          <g id="rollMain"><circle cx="492" cy="203" r="15" fill="#c9ced5" stroke="#4d5a62" stroke-width="2"/><circle cx="492" cy="203" r="4" fill="#7d8a92"/></g>
+          <text x="404" y="228" text-anchor="middle" font-size="8.5" fill="#9fb3bf">예압</text>
+          <text x="492" y="228" text-anchor="middle" font-size="8.5" fill="#9fb3bf">본압</text>
+          <!-- 다이 테이블 -->
+          <rect x="316" y="252" width="252" height="20" fill="#8e9aa2"/>
+          <rect x="316" y="252" width="252" height="3" fill="#b9c3c9"/>
+          <g id="stations"></g>
+          <!-- 피더 커버 -->
+          <rect x="330" y="232" width="52" height="22" rx="3" fill="#6d7d87" opacity=".92"/>
+          <text x="356" y="247" text-anchor="middle" font-size="8.5" fill="#dfe8ee">Feeder</text>
+        </g>
+        <rect x="316" y="182" width="252" height="132" fill="none" stroke="#66757d" stroke-width="3"/>
+        <text x="330" y="330" class="lbl">KORSCH XL 400FT</text>
+        <text x="470" y="330" class="lbl s">자산번호 140005274</text>
+
+        <!-- 배출 슈트 → 탈분기 → 금속탐지기 → 드럼 -->
+        <path d="M568,262 L600,262 L594,296 L574,296 Z" fill="#cfd6da" stroke="#6f7c82"/>
+        <g id="tabletsOut"></g>
+        <g>
+          <rect x="560" y="330" width="78" height="36" rx="6" fill="url(#gMetal)" stroke="#78858a"/>
+          <g id="dedRotor"><circle cx="599" cy="348" r="10" fill="none" stroke="#5b6a6f" stroke-width="2"/><line x1="589" y1="348" x2="609" y2="348" stroke="#5b6a6f" stroke-width="2"/><line x1="599" y1="338" x2="599" y2="358" stroke="#5b6a6f" stroke-width="2"/></g>
+          <text x="599" y="326" text-anchor="middle" class="lbl s">탈분기</text>
+          <rect x="560" y="370" width="78" height="26" rx="4" fill="#d6dde1" stroke="#78858a"/>
+          <rect id="mdBar" x="572" y="377" width="54" height="12" rx="2" fill="#7d8a92"/>
+          <text x="599" y="387" text-anchor="middle" font-size="8.5" fill="#1b2b33" font-weight="700">METAL Fe0.3/STS0.5</text>
+        </g>
+        <g clip-path="url(#cDrum)"><rect x="612" y="404" width="62" height="50" fill="#eef3f5"/><rect id="drumFill" x="612" y="454" width="62" height="0" fill="url(#pGran)"/></g>
+        <rect x="612" y="404" width="62" height="50" rx="4" fill="none" stroke="#6f8a9c" stroke-width="2"/>
+        <ellipse cx="643" cy="404" rx="31" ry="7" fill="rgba(255,255,255,.4)" stroke="#6f8a9c" stroke-width="2"/>
+        <text x="643" y="472" text-anchor="middle" class="lbl s">나정 반제품 용기</text>
+
+        <!-- 자동공정관리기 (IPC) -->
+        <g>
+          <rect x="96" y="398" width="96" height="14" rx="3" fill="#b3bec4"/>
+          <rect x="104" y="356" width="80" height="44" rx="5" fill="url(#gMetalV)" stroke="#78858a"/>
+          <rect id="ipcScreen" x="112" y="363" width="40" height="24" rx="2" fill="#1d3340"/>
+          <circle cx="170" cy="370" r="5" fill="#8fe08f"/><circle cx="170" cy="384" r="5" fill="#d8dde0"/>
+          <text x="144" y="428" text-anchor="middle" class="lbl">자동공정관리기</text>
+          <text x="144" y="441" text-anchor="middle" class="lbl s">질량·두께·직경·경도</text>
+        </g>
+
+        <!-- 작업자 -->
+        <g id="op" style="transform:translate(400px,470px) scale(1)">
+          <g id="opFlip">
+            <ellipse cx="0" cy="0" rx="22" ry="5" fill="rgba(0,0,0,.2)"/>
+            <g id="opBody">
+              <g class="leg leg-b"><rect x="-9" y="-40" width="9" height="40" rx="4" fill="#dfe6e9"/><rect x="-11" y="-5" width="13" height="6" rx="2" fill="#3f6f9a"/></g>
+              <g class="arm arm-b"><rect x="-17" y="-76" width="8" height="34" rx="4" fill="#dfe6e9"/></g>
+              <g class="leg leg-f"><rect x="1" y="-40" width="9" height="40" rx="4" fill="#f4f7f8" stroke="#cfd8dc"/><rect x="-1" y="-5" width="13" height="6" rx="2" fill="#4a7eab"/></g>
+              <rect x="-15" y="-80" width="30" height="46" rx="10" fill="#fafcfc" stroke="#cbd5d9"/>
+              <line x1="2" y1="-76" x2="2" y2="-40" stroke="#d5dde0"/>
+              <rect x="5" y="-70" width="7" height="5" rx="1" fill="#2d8a5f"/>
+              <circle cx="0" cy="-92" r="15" fill="#fbfdfd" stroke="#cbd5d9"/>
+              <ellipse cx="5" cy="-91" rx="8" ry="9" fill="#f0c7a2"/>
+              <rect x="-1" y="-97" width="15" height="5" rx="2" fill="#7fb6d6"/>
+              <rect x="1" y="-90" width="13" height="8" rx="3" fill="#8ec2e6"/>
+              <g class="arm arm-f"><rect x="8" y="-76" width="8" height="34" rx="4" fill="#f4f7f8" stroke="#cfd8dc"/><circle cx="12" cy="-41" r="4.5" fill="#5b8fd6"/></g>
+            </g>
+          </g>
+        </g>
+        <g id="bubble" style="transform:translate(400px,362px)">
+          <rect id="bubbleRect" x="-60" y="-24" width="120" height="26" rx="13" fill="#1a2a38"/>
+          <path d="M-5,2 L0,9 L5,2 Z" fill="#1a2a38"/>
+          <text id="bubbleText" x="0" y="-7" text-anchor="middle" font-size="12.5" fill="#fff" font-weight="700">안녕하세요</text>
+        </g>
+      </svg>
+    </div>
+
+    <section class="hmi" aria-label="교육용 HMI 화면">
+      <div class="hmi-top">
+        <span id="hClock">--/--/---- --:--:--</span>
+        <span class="fld">Recipe<span class="v" id="hRec">no_recipe</span></span>
+        <span class="fld">Batch<span class="v" id="hBat">no_charge</span></span>
+        <span class="fld">Operator<span class="v" id="hOp">none</span></span>
+        <span class="logo">KORSCH</span>
+      </div>
+      <div class="alarmwrap">
+        <div class="albox">
+          <div class="alhead">MACHINE ALARMS</div>
+          <div class="alrow ok" id="al1"><i>--:--:--</i><span>No active alarm</span></div>
+          <div class="alrow ok" id="al2"><i></i><span></span></div>
+        </div>
+        <div class="modecol">
+          <div class="mcell"><div class="pill" id="pRev">after 2 Rev.</div><div class="pill">Restart Auto</div></div>
+          <div class="mcell"><div class="pill man" id="pMode">Manual</div><div class="pill">Force Control</div></div>
+        </div>
+      </div>
+      <div class="hmi-body">
+        <div class="gauges">
+          <div class="g"><div class="gn">Pre<br>Force</div><div class="gt"><div class="gf" id="gPre" style="height:0"></div></div><div class="gv" id="vPre">0.0 kN</div></div>
+          <div class="g"><div class="gn">Main<br>Force</div><div class="gt"><div class="gf" id="gMain" style="height:0"></div><div class="gl" id="glHi" style="bottom:56%"></div><div class="gl lo" id="glLo" style="bottom:28%"></div></div><div class="gv" id="vMain">0.0 kN</div></div>
+          <div class="g"><div class="gn">S rel<br>%</div><div class="gt"><div class="gf" id="gSrel" style="height:0;background:#1d6fc0"></div></div><div class="gv" id="vSrel">0.0 %</div></div>
+        </div>
+        <div class="pgrid" id="pgrid"></div>
+        <div class="spec">
+          <b>표준규격 — 동화A</b><br>
+          질량 250.0 mg<br>평균 245.0~255.0<br>개별 237.5~262.5<br>
+          두께 2.9~3.3 mm<br>직경 8.8~9.2 mm<br>경도 8.0~12.0 KP<br>
+          <span style="color:#4a5866">충전 6.8 / 예압 2.5<br>본압 1.9 mm<br>속도 30~70 RPM<br>펀치수+1 = 45 T</span>
+        </div>
+      </div>
+      <div class="softkeys">
+        <span class="sk" id="skMain">Main</span><span class="sk">Product<br>Setup</span><span class="sk">Service</span>
+        <span class="sk" id="skForce">Force<br>Control</span><span class="sk">Calibrate</span><span class="sk">Event<br>Log</span>
+        <span class="sk" id="skAlarm">Alarm</span><span class="sk">Reset</span><span class="sk">Main-<br>tenance</span>
+      </div>
+      <div class="statbar">
+        <div class="auto" id="sAuto">Automatic OFF</div>
+        <div>PLC connected</div>
+        <div class="msg" id="sMsg">&nbsp;</div>
+        <div>C: 27% · X: 9%</div>
+      </div>
+    </section>
+  </div>
+
+  <section class="task" aria-live="polite">
+    <div><div class="code" id="tCode"></div><h2 id="tTitle"></h2><p id="tInstr"></p><div class="src" id="tSrc"></div></div>
+    <div class="work" id="tWork"></div>
+    <div class="act">
+      <div class="fb" id="fb"></div>
+      <button class="btn primary" id="runBtn" type="button">실행</button>
+      <div class="row"><button class="btn" id="prevBtn" type="button">이전 단계</button><button class="btn" id="nextBtn" type="button">다음 단계</button></div>
+    </div>
+  </section>
+
+  <nav class="rail" id="rail" aria-label="단계 선택"></nav>
+</div>
+<div class="modal" id="modal" hidden><div class="card" id="modalCard"></div></div>
+
+<script>
+(()=>{
+'use strict';
+const $=s=>document.querySelector(s);
+const $$=s=>Array.from(document.querySelectorAll(s));
+const scene=$('#scene');
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const cl=(v,a,b)=>Math.min(b,Math.max(a,v));
+
+/* 바닥 타일 */
+(()=>{let t='';for(let k=-7;k<=7;k++)t+=`<line x1="${400+k*44}" y1="250" x2="${400+k*120}" y2="500"/>`;
+[268,292,322,360,408,470].forEach(y=>{const f=(y-250)/250;t+=`<line x1="${110-110*f}" y1="${y}" x2="${690+110*f}" y2="${y}"/>`});$('#tiles').innerHTML=t;})();
+
+/* ───────── HMI 파라미터 타일 ───────── */
+const TILES=[['feeder','Feeder'],['rpm','Speed<br>Production'],['tpm','Tablet Output'],
+ ['dosing','Dosing<br>충전깊이'],['etPre','Edge Thick.<br>Pre'],['etMain','Edge Thick.<br>Main'],
+ ['urPre','Upper Roller<br>Pre'],['urMain','Upper Roller<br>Main'],['camSize','Fill Cam'],
+ ['prod','생산량'],['rej','Reject'],['yield','공정수율']];
+$('#pgrid').innerHTML=TILES.map(([k,l])=>`<div class="pbtn ${['tpm','prod','rej','yield','camSize'].includes(k)?'ro':''}" id="p-${k}"><div class="l">${l}</div><div class="v" id="v-${k}">—</div></div>`).join('');
+
+const IDLE={feeder:0,rpm:0,tpm:0,dosing:2.0,etPre:5.00,etMain:5.00,urPre:3.00,urMain:3.00,camSize:10,
+ preF:0,mainF:0,srel:0,prod:0,rej:0,yieldPct:0,mode:'Manual',auto:false,status:'IDLE',
+ recipe:'no_recipe',batch:'no_charge',op:'none'};
+const H=o=>Object.assign({},IDLE,o);
+
+/* 동화A 공정 상수 (MBR 기준) */
+const DIE=63.617, DENS=0.578, PUNCH=44, TARGET_T=800000, THEORY_KG=200.0;
+const weightOf=(dos,rpm,fee)=>dos*DIE*DENS*cl(1.0-0.0006*(rpm-30)+0.0010*(fee-25),.9,1.06);
+const forceOf =(et,w)=>10.5*Math.exp((1.90-et)/0.45)*Math.pow(Math.max(w,1)/250,1.8);
+
+/* ───────── 단계 정의 ───────── */
+const S=(o)=>o;
+const STEPS=[
+/* 준비 */
+S({code:'P1',group:'prep',name:'사전점검',title:'타정실 사전점검·라인클리어런스',loc:'panel',say:'점검부터 시작해요',
+  instr:'타정혼합물과 작업실 상태를 확인해요. 동화A는 주원료 흡습성이 커서 습도 관리가 특히 중요합니다.',
+  src:'제조지시·기록서 타정실 사전점검 기록표 11항목',
+  checks:['제조지시·기록서 확인 (제품명·제조번호·제조단위)','전 제품 잔여 반제품·불필요 물건 없음','타정혼합물 제품명·제조번호 일치','반제품 보관기간 확인 (최종혼합 완료 후 31일 이내)','작업실·용기·도구 청결, 청소표시서 떼어 첨부','온도 18~26℃ / 습도 50%RH 이하'],
+  run:{label:'현장 순회 점검',path:['press','ded','drum','ipc','panel'],dur:1100,say:'점검 끝!'},
+  hmi:H({status:'CHECKED'})}),
+S({code:'P2',group:'prep',name:'로그인',title:'로그인과 Recipe 선택',loc:'panel',say:'내 계정으로 로그인',
+  instr:'본인 계정으로 로그인하고 제품 Recipe를 호출해요. 계정 공유는 데이터 신뢰성(DI) 위반입니다.',
+  src:'Operating Instructions 6장 User Administration · 기록서 로그인 기재란',
+  q:'어떻게 시작할까요?',
+  opts:[['본인 OPERATOR 계정 + DWA_250 / Ver 확인',1,'맞아요. 계정·Recipe·버전을 함께 확인했어요. Recipe 이름과 Version은 기록서에 기재합니다.'],
+        ['선배 공용 계정 + DWA_250',0,'다른 사람의 ID/PASSWORD 사용은 금지예요. 감사 추적(Audit trail)이 실제 작업자를 가리키지 않게 됩니다.'],
+        ['본인 계정 + 직전 배치 Recipe 그대로 사용',0,'직전 배치 Recipe를 확인 없이 쓰면 다른 품목 조건으로 타정할 위험이 있어요.']],
+  run:{label:'Recipe Load · Batch 개설',anim:['panel-active'],dur:1500,say:'Recipe 로드'},
+  hmi:H({status:'LOADED',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM'})}),
+S({code:'P3',group:'prep',name:'펀치 확인',title:'펀치·다이 장착 상태 확인',loc:'press',say:'펀치부터 볼게요',
+  instr:'원형 9.0 mm 펀치와 각인 상태를 확인해요. 각인 문자는 기록서에 기재란만 있고 값이 비어 있어 배치별 실기재 항목입니다.',
+  src:'기록서 표준규격 (모양 상/중/하, 상·하펀치 각인) · OM 11.3 Tool Change',
+  checks:['펀치 수량·마모·손상 확인','상펀치 각인 = [확인 필요 · 기록서 실기재]','하펀치 각인 = [확인 필요 · 기록서 실기재]','펀치 윤활·이물 없음 확인'],
+  run:{label:'장착 상태 확인 완료',path:['press','panel'],dur:1100,say:'이상 없음'},
+  hmi:H({status:'READY',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM'})}),
+/* 세팅·시험타정 */
+S({code:'1',group:'set',name:'Feeder',title:'피더 설정과 예비운전',loc:'panel',say:'피더 먼저',
+  instr:'로터리 피더 속도를 설정하고 분체가 고르게 채워지도록 예비 운전합니다. 설정범위는 10~100 RPM입니다.',
+  src:'Operating Instructions 9.3 · Operating Manual 8장 Start-Up',
+  q:'피더에 분체가 없는 상태에서 바로 시험타정하면?',
+  opts:[['약 20초 예비운전으로 피더를 채운 뒤 시험타정',1,'맞아요. 매뉴얼 Start-Up 절차입니다. 채워지지 않은 상태의 초기 정제는 중량이 낮게 나와 판단을 흐립니다.'],
+        ['바로 타정하고 중량이 낮으면 충전깊이를 올린다',0,'원인이 피더 미충전인데 충전깊이를 올리면 이후 정상 충전 시 과중량이 됩니다.']],
+  run:{label:'Feeder 25 RPM · 예비운전',anim:['panel-active'],dur:1800,say:'피더 채우는 중'},
+  hmi:H({status:'FEEDER',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25})}),
+S({code:'2',group:'set',name:'충전깊이',title:'충전깊이(Dosing) 세팅',loc:'panel',say:'충전깊이 6.8',
+  instr:'충전깊이는 정제 질량을 결정합니다. 표준작업조건 약 6.8 mm를 입력해요.',
+  src:'기록서 타정 표준작업조건 (KORSCH XL-400FT 충전깊이 약 6.8 mm)',
+  q:'충전깊이와 정제 질량의 관계는?',
+  opts:[['질량 ≈ 충전깊이 × 다이 단면적 × 겉보기밀도 — 깊을수록 무겁다',1,'정확해요. 질량이 벗어나면 1차 조정 인자는 충전깊이입니다.'],
+        ['충전깊이는 경도를 결정하고 질량과는 무관하다',0,'경도를 결정하는 것은 본압간격(Edge Thickness Main)입니다.']],
+  run:{label:'Dosing 6.80 mm 입력',anim:['panel-active'],dur:1300,say:'6.80 입력'},
+  hmi:H({status:'SETTING',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:6.80})}),
+S({code:'3',group:'set',name:'간격 세팅',title:'예압·본압 간격 세팅',loc:'panel',say:'간격 입력',
+  instr:'예압 2.5 mm, 본압 1.9 mm를 입력해요. 설정범위는 0.3~11.5 mm입니다.',
+  src:'기록서 타정 표준작업조건 · Operating Instructions 9.3.4',
+  checks:['Edge Thickness Pre = 2.50 mm','Edge Thickness Main = 1.90 mm','Upper Roller Pre/Main 기본값 3.0 mm 확인'],
+  run:{label:'간격 입력 완료',anim:['panel-active'],dur:1400,say:'간격 세팅 완료'},
+  hmi:H({status:'SETTING',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:6.80,etPre:2.50,etMain:1.90})}),
+S({code:'4',group:'set',name:'기동',title:'MOTOR ON · Manual 모드 기동',loc:'press',say:'기동합니다',
+  instr:'조작반 MOTOR ON으로 기동해요. 기계는 기동 시 항상 Manual 모드로 시작합니다.',
+  src:'Operating Instructions 9.1.1 Restart Auto · 9.1.2 Force Control',
+  q:'기동 직후 Manual 모드인 이유는?',
+  opts:[['세팅 확인·시험타정 중에는 자동 정지가 잦아 부적합하기 때문',1,'맞아요. 매뉴얼에 명시된 내용입니다. 세팅이 끝난 뒤 Automatic으로 전환합니다.'],
+        ['Automatic 모드가 고장 나 있기 때문',0,'정상 설계 동작입니다. Restart Auto 설정 회전수 뒤 자동 전환도 가능합니다.'],
+        ['Manual이 생산성이 더 높기 때문',0,'생산 중 압축력 제어·감시가 필요하므로 본생산은 Automatic으로 운전합니다.']],
+  run:{label:'MOTOR ON · 30 RPM',anim:['run-state'],dur:2200,say:'저속 기동'},
+  hmi:H({status:'RUNNING',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:6.80,etPre:2.50,etMain:1.90,rpm:30,mode:'Manual'})}),
+S({code:'5',group:'set',name:'시험타정',title:'시험타정과 초기 정제 배출',loc:'press',say:'시험타정 시작',
+  instr:'저속으로 시험타정합니다. 3채널 배출슈트는 설정 수량만큼 정제를 리젝트 채널로 보낸 뒤 양품 채널로 전환됩니다.',
+  src:'Operating Manual 8장 Start-Up 5항 · 기록서 공정검사 요령',
+  checks:['배출 흐름 정상 확인','탈분기·금속탐지기 연속 통과 확인','드럼 주변 사람·물품 없음'],
+  run:{label:'시험타정 실행',anim:['run-state','dedust'],dur:2600,say:'정제 나옵니다'},
+  hmi:H({status:'RUNNING',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:6.80,etPre:2.50,etMain:1.90,rpm:30,mode:'Manual',rej:520})}),
+/* IPC */
+S({code:'6',group:'ipc',name:'IPC 측정',title:'자동공정관리기 공정검사',loc:'ipc',say:'검체 측정할게요',runFirst:true,
+  instr:'자동공정관리기로 성상·평균질량·개별질량·두께·직경·경도를 측정합니다. 결과를 보고 판정하세요.',
+  src:'내용고형제 공정관리(SOP) 5.2 · 자동공정관리기 가동방법(SOP-EQM-00058)',
+  ipc:true,
+  q:'측정 결과 평균질량 241.8 mg (기준 245.0~255.0), 경도 9.8 KP. 판정과 조치는?',
+  opts:[['질량 부적합 → 충전깊이를 올려 재측정',1,'맞아요. 질량 이탈의 1차 조정 인자는 충전깊이입니다. 경도는 기준 안이므로 본압은 건드리지 않습니다.'],
+        ['질량 부적합 → 본압간격을 좁혀 재측정',0,'본압을 좁히면 경도·압축력만 올라가고 질량은 거의 변하지 않습니다. 오히려 정상이던 경도가 상한을 넘습니다.'],
+        ['평균 241.8 mg은 개별편차(237.5~262.5) 안이므로 진행',0,'개별편차와 평균편차는 다른 기준입니다. 평균질량은 245.0~255.0을 만족해야 합니다.']],
+  run:{label:'검체 채취 · 측정',path:['press','ipc'],dur:2400,say:'241.8 mg'},
+  hmi:H({status:'IPC',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:6.80,etPre:2.50,etMain:1.90,rpm:30,mode:'Manual',rej:560})}),
+S({code:'7',group:'ipc',name:'보정',title:'충전깊이 보정과 재측정',loc:'panel',say:'충전깊이 보정',
+  instr:'충전깊이를 올려 질량을 규격 중심으로 맞춥니다. 보정 후에는 반드시 재측정합니다.',
+  src:'기록서 공정검사 요령 · 표준규격 250.0 mg ±2.0%',
+  checks:['Dosing 6.80 → 7.00 mm 보정','안정화 대기 후 재측정','재측정 결과 250.1 mg · 경도 10.0 KP — 전 항목 적합'],
+  run:{label:'보정 후 재측정',path:['panel','press','ipc'],dur:2600,say:'250.1 mg 적합!'},
+  hmi:H({status:'IPC OK',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:7.00,etPre:2.50,etMain:1.90,rpm:30,mode:'Manual',rej:610})}),
+S({code:'8',group:'ipc',name:'Start 승인',title:'펀치수+1 채취와 공정관리실 승인',loc:'press',say:'45정 채취',
+  instr:'전 항목이 규격에 맞으면 펀치수+1 정을 채취해 공정관리실로 보내고, Test Report에 Start 승인을 받은 뒤 작업을 진행합니다.',
+  src:'기록서 공정검사 요령 1·2항 (KORSCH 45정)',
+  q:'KORSCH XL 400FT에서 채취할 검체 수량은?',
+  opts:[['45정 (펀치수 44 + 1)',1,'맞아요. 기록서에 KIKUSUI-I 37정, KORSCH 45정으로 명시되어 있습니다.'],
+        ['37정 (KIKUSUI 기준)',0,'37정은 KIKUSUI-I 기준입니다. 설비마다 펀치수가 달라 채취 수량도 달라집니다.'],
+        ['10정 (PV 검체량)',0,'10T/10분은 PV 진행 시 성상·평균질량 검사에 적용되는 별도 조건입니다.']],
+  run:{label:'45정 채취 · 판정 요청',path:['press','panel'],dur:2200,say:'Start 승인!'},
+  hmi:H({status:'QC START',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:7.00,etPre:2.50,etMain:1.90,rpm:30,mode:'Manual',rej:660})}),
+/* 본생산 */
+S({code:'9',group:'run',name:'한계 설정',title:'압축력 한계와 최대 펀치하중 설정',loc:'panel',say:'한계값 설정',
+  instr:'Force Control 메뉴에서 평균 상·하한, S rel 정지한계, 최대 펀치하중을 설정합니다. 자동모드의 감시 기준이 됩니다.',
+  src:'Operating Instructions 10장 Force Control Menu',
+  checks:['Mean Upper / Lower Limit 입력','S rel % Stop Limit 입력','Max. Punch Load = 공구 제조사 기준 이내'],
+  q:'최대 펀치하중을 공구 기준보다 높게 설정하면?',
+  opts:[['펀치 파손·설비 손상 위험 — 공구 기준을 넘길 수 없다',1,'맞아요. 최대 펀치하중은 Manual·Automatic 양쪽에서 감시되며, 초과 시 기계가 정지합니다.'],
+        ['정지가 줄어 생산성이 올라간다',0,'감시 기능을 무력화하는 설정입니다. 펀치 파손은 금속 혼입으로 이어질 수 있습니다.']],
+  run:{label:'한계값 저장',anim:['panel-active'],dur:1500,say:'저장 완료'},
+  hmi:H({status:'LIMITS',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:7.00,etPre:2.50,etMain:1.90,rpm:30,mode:'Manual',rej:700})}),
+S({code:'10',group:'run',name:'자동 전환',title:'Automatic 모드 전환',loc:'panel',say:'자동 전환',
+  instr:'압축력 제어·감시를 작동시킵니다. 평균 한계 이탈, S rel 초과, 단일값 초과 누적 시 기계가 자동 정지합니다.',
+  src:'Operating Instructions 9.1.2 · 9.2 Compression Force Display',
+  q:'Automatic 모드에서 단일값 한계를 벗어난 정제는?',
+  opts:[['리젝트 채널로 선별 배출되고, 일정 수 누적 시 기계가 정지',1,'맞아요. 단일 선별(Single sorting)이 동작하고, 설정 수량을 넘으면 정지합니다.'],
+        ['그대로 양품 채널로 배출된다',0,'단일값 이탈 정제는 선별 배출됩니다. 그대로 흘려보내면 규격 외 정제가 섞입니다.']],
+  run:{label:'Force Control → Automatic',anim:['panel-active','run-state','dedust'],dur:1800,say:'Automatic ON'},
+  hmi:H({status:'AUTO',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:7.00,etPre:2.50,etMain:1.90,rpm:30,mode:'Automatic',auto:true,rej:720})}),
+S({code:'11',group:'run',name:'속도 판단',title:'타정속도 상승 — 교정 범위 판단',loc:'panel',say:'속도 올리기 전에',
+  instr:'표준작업조건은 30~70 RPM입니다. 그런데 이 설비의 최근 교정 회전속도 범위는 10~50 RPM입니다. 어떻게 할까요?',
+  src:'타정기 PQ 및 교정 상태 점검 DB (KORSCH 140005274) · 기록서 표준작업조건',
+  q:'70 RPM으로 올려서 생산해도 될까요?',
+  opts:[['교정 범위를 벗어나므로 팀장에게 보고하고 교정 범위 내(50 RPM 이하)로 운전',1,'맞아요. 교정 범위 밖 측정값은 신뢰할 수 없어 데이터 신뢰성 문제가 됩니다. 교정 범위 확대 또는 조건 조정을 팀장이 판단합니다.'],
+        ['기록서가 30~70 RPM을 허용하므로 70 RPM으로 올린다',0,'기록서 허용 범위와 설비 교정 범위는 다른 문제입니다. 교정되지 않은 구간의 속도·압력 데이터는 근거로 쓸 수 없습니다.'],
+        ['속도계는 참고값이므로 무시하고 올린다',0,'타정속도는 기록서 기재 항목이자 품질 영향 인자입니다. 참고값이 아닙니다.']],
+  run:{label:'50 RPM으로 상승 · 보고 완료',anim:['panel-active','run-state','dedust'],dur:2400,say:'50 RPM 유지'},
+  hmi:H({status:'AUTO',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:7.00,etPre:2.50,etMain:1.90,rpm:50,mode:'Automatic',auto:true,rej:760})}),
+S({code:'12',group:'run',name:'금속탐지',title:'금속탐지기 검출조건 확인',loc:'ded',say:'금속탐지기 확인',
+  instr:'타정 공정 전·후로 금속탐지기를 연속 통과시켜 금속 혼입 불량을 제거합니다.',
+  src:'기록서 타정 1항 (Fe 0.3 mm / STS 0.5 mm 검출)',
+  checks:['Fe 0.3 mm 검출 확인','STS 0.5 mm 검출 확인','금속불량 수량 기록란 확인'],
+  run:{label:'검출 테스트 실행',path:['ded'],anim:['run-state','dedust','mdreject'],dur:2200,say:'검출 정상'},
+  hmi:H({status:'AUTO',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:7.00,etPre:2.50,etMain:1.90,rpm:50,mode:'Automatic',auto:true,rej:820})}),
+S({code:'13',group:'run',name:'본생산',title:'본생산과 1시간 간격 공정검사',loc:'ipc',say:'주기 검사',
+  instr:'생산 중 정해진 주기로 공정검사를 수행합니다. 검사 주기를 확인하세요.',
+  src:'내용고형제 공정관리(SOP) 공정검사 항목 및 시기/빈도',
+  q:'타정 공정의 검사 주기로 맞는 것은?',
+  opts:[['성상·질량·두께·직경·경도 = 시험타정 및 1시간 간격 / 마손도·붕해 = 1일 1회',1,'맞아요. SOP와 기록서가 같은 주기를 규정합니다. 마손도·붕해는 별도 실시해 기록합니다.'],
+        ['전 항목 1시간 간격',0,'마손도와 붕해는 1일 1회입니다.'],
+        ['전 항목 작업 시작 시 1회만',0,'작업 중 조건 변동을 잡기 위해 1시간 간격 검사가 필요합니다.']],
+  run:{label:'주기 검사 · 생산 진행',path:['press','ipc'],anim:['run-state','dedust'],dur:3000,say:'적합 유지'},
+  hmi:H({status:'AUTO',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',feeder:25,dosing:7.00,etPre:2.50,etMain:1.90,rpm:50,mode:'Automatic',auto:true,prod:412000,rej:980})}),
+/* 마감 */
+S({code:'E1',group:'end',name:'정지·수율',title:'생산 종료와 공정수율 확인',loc:'panel',say:'정지합니다',
+  instr:'타정혼합물을 모두 소진하면 정지하고 나정 생산량·손실량을 확인합니다. 관리수율을 벗어나면 보고 대상입니다.',
+  src:'기록서 타정 3~7항 (이론량 200.0 kg / 800,000정, 관리수율 97.0~100.0%)',
+  q:'나정 생산량이 이론량의 96.2%로 나왔습니다. 어떻게 할까요?',
+  opts:[['관리수율(97.0~100.0%) 이탈 → 생산팀장 보고 후 사유·조치 기록',1,'맞아요. 기록서 지시사항 1항이 명시하고 있습니다. 임의 진행하지 않습니다.'],
+        ['96%면 거의 맞으니 그대로 다음 공정으로 넘긴다',0,'관리수율 이탈은 보고·기록 대상입니다. 손실 원인을 확인하지 않으면 다음 배치에서 반복됩니다.'],
+        ['수율이 맞을 때까지 리젝트 정제를 되섞는다',0,'리젝트 정제를 임의로 합치는 것은 명백한 품질 위반입니다.']],
+  run:{label:'MOTOR OFF · 수율 산출',anim:['panel-active'],dur:2000,say:'수율 확인'},
+  hmi:H({status:'STOPPED',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',dosing:7.00,etPre:2.50,etMain:1.90,prod:786400,rej:1180,yieldPct:98.3})}),
+S({code:'E2',group:'end',name:'리포트',title:'Report 출력과 첨부',loc:'panel',say:'기록 마감',
+  instr:'공정 완료 후 리포트를 출력해 이중 확인하고 제조지시·기록서에 첨부합니다.',
+  src:'기록서 타정 2항 (KORSCH: End of Batch / Force Trend Graphic / Audit trail event report)',
+  checks:['End of Batch 첨부','Force Trend Graphic 첨부','Audit trail event report 첨부','작업 Batch 일치 이중 확인'],
+  run:{label:'리포트 출력·첨부',anim:['panel-active'],dur:1600,say:'첨부 완료'},
+  hmi:H({status:'REPORT',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',dosing:7.00,etPre:2.50,etMain:1.90,prod:786400,rej:1180,yieldPct:98.3})}),
+S({code:'E3',group:'end',name:'반제품',title:'나정 반제품 입출고',loc:'drum',say:'반제품 처리',
+  instr:'정제를 반제품 보관용기에 넣어 무게를 확인하고, 건조제를 넣은 뒤 반제품표시서를 부착해 실온 창고로 옮깁니다.',
+  src:'기록서 타정 2항 · 타정실 주의사항 8항',
+  checks:['용기 무게 확인·용기번호 기재','건조제 투입수량 기재','반제품표시서 부착','실온 반제품창고 이송'],
+  run:{label:'반제품 처리 완료',path:['drum','panel'],dur:1800,say:'이송 완료'},
+  hmi:H({status:'DONE',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',dosing:7.00,etPre:2.50,etMain:1.90,prod:786400,rej:1180,yieldPct:98.3})}),
+S({code:'E4',group:'end',name:'로그아웃',title:'로그아웃',loc:'panel',say:'마지막 한 가지',
+  instr:'작업을 마치면 반드시 본인 계정에서 로그아웃합니다.',
+  src:'기록서 로그아웃 기재란 · SOP 접속권한 관리',
+  q:'작업 마감 시 마지막으로?',
+  opts:[['본인 계정 로그아웃',1,'첫 배치 완료!'],
+        ['다음 근무자를 위해 로그인 유지',0,'로그인 상태로 두면 다른 사람의 작업이 내 계정 기록으로 남습니다.']],
+  hmi:H({status:'LOGOUT',recipe:'DWA_250',batch:'DWA-2609A',op:'OP-KIM',prod:786400,rej:1180,yieldPct:98.3})})
+];
+const LAST=STEPS.length-1;
+const GROUPS=[['준비','prep'],['세팅·시험타정','set'],['공정검사','ipc'],['본생산','run'],['마감','end']];
+const LOC={panel:{x:212,y:452,d:-1},press:{x:330,y:462,d:1},ded:{x:560,y:448,d:1},drum:{x:614,y:478,d:1},ipc:{x:186,y:432,d:1},center:{x:400,y:470,d:1}};
+const st=STEPS.map(()=>({checks:new Set(),choice:false,ran:false}));
+const doneSet=new Set(); const log=[];
+let cur=0,running=false,errors=0,hold=false,fbMsg='',fbBad=false,moveTok=0;
+let opPos={x:400,y:470,d:1};
+let live=Object.assign({},IDLE);   // 현재 화면에 표시 중인 값
+let rpmLive=0, phase=0;
+
+const taskOk=i=>{const s=STEPS[i],x=st[i];return (s.checks||[]).every((_,k)=>x.checks.has(k))&&(!s.q||x.choice)};
+const isDone=i=>taskOk(i)&&(!STEPS[i].run||st[i].ran);
+
+/* ───────── 작업자 ───────── */
+const scaleAt=y=>.55+(y-250)/250*.55;
+function setOpT(){const s=scaleAt(opPos.y);$('#op').style.transform=`translate(${opPos.x}px,${opPos.y}px) scale(${s})`;$('#bubble').style.transform=`translate(${opPos.x}px,${opPos.y-118*s}px)`;}
+const flip=d=>$('#opFlip').style.transform=`scaleX(${d})`;
+function bubble(t){$('#bubbleText').textContent=t;const w=Math.min(290,t.length*12.5+26);const r=$('#bubbleRect');r.setAttribute('x',-w/2);r.setAttribute('width',w);}
+function moveTo(key,cb){const L=LOC[key]||LOC.center,tok=++moveTok,op=$('#op');
+ const dist=Math.hypot(L.x-opPos.x,L.y-opPos.y);const dur=Math.max(340,Math.min(1600,dist*4));
+ op.style.transitionDuration=dur+'ms';$('#bubble').style.transitionDuration=dur+'ms';
+ if(dist>4){flip(L.x<opPos.x?-1:1);op.classList.add('walking');}
+ opPos={...L};setOpT();
+ setTimeout(()=>{if(tok!==moveTok&&!cb)return;op.classList.remove('walking');flip(L.d);cb&&cb();},dist>4?dur:60);}
+function walkPath(arr,cb){let k=0;const nx=()=>k<arr.length?moveTo(arr[k++],()=>setTimeout(nx,110)):cb();nx();}
+const working=on=>$('#op').classList.toggle('working',on);
+
+/* ───────── 타정기 회전 애니메이션 (rAF) ───────── */
+const NST=6, SP=62, X0=308, XW=NST*SP;
+const DIE_TOP=252, DIE_BOT=272;
+(()=>{const ns='http://www.w3.org/2000/svg';const g=$('#stations');
+ for(let i=0;i<NST;i++){
+   const grp=document.createElementNS(ns,'g');grp.setAttribute('id','st'+i);
+   grp.innerHTML=`<rect id="up${i}" x="-6" y="196" width="12" height="40" fill="#b6bdc5" stroke="#46525a"/>
+     <rect x="-7" y="190" width="14" height="8" rx="2" fill="#8d98a1"/>
+     <rect x="-11" y="${DIE_TOP}" width="22" height="${DIE_BOT-DIE_TOP}" fill="#6f7d86"/>
+     <rect id="tb${i}" x="-9" y="262" width="18" height="8" fill="#f2cfcf" stroke="#c09a9a" opacity="0"/>
+     <rect id="lo${i}" x="-6" y="272" width="12" height="42" fill="#b6bdc5" stroke="#46525a"/>`;
+   g.appendChild(grp);
+ }})();
+function camUpper(x){
+  const pre=Math.exp(-Math.pow(x-404,2)/420), main=Math.exp(-Math.pow(x-492,2)/420);
+  const dPre=(5.2-cl(live.etPre,0.3,11.5))*3.4, dMain=(5.2-cl(live.etMain,0.3,11.5))*4.6;
+  return 206 - 10 + pre*Math.max(6,dPre) + main*Math.max(8,dMain);
+}
+function camLower(x){
+  const fill=cl(live.dosing,2,10)*3.4;
+  if(x<372) return DIE_TOP+fill;                        // 충전 구역
+  if(x>538) return DIE_TOP-2;                           // 배출(이젝션)
+  const pre=Math.exp(-Math.pow(x-404,2)/420), main=Math.exp(-Math.pow(x-492,2)/420);
+  const base=DIE_TOP+fill;
+  const upMain=camUpper(492)+30, gapM=Math.max(5,cl(live.etMain,0.3,11.5)*3.2);
+  const tgt=upMain+gapM;
+  return base+(tgt-base)*cl(pre*0.45+main*1.0,0,1)+(x>510?(x-510)*0.55:0);
+}
+let lastRaf=performance.now();
+function raf(now){
+  const dt=Math.min(.05,(now-lastRaf)/1000); lastRaf=now;
+  rpmLive += (( (running||live.rpm>0)?live.rpm:0) - rpmLive)*Math.min(1,dt*2.2);
+  phase = (phase + rpmLive*1.05*dt*SP) % XW;
+  for(let i=0;i<NST;i++){
+    const x=X0+((i*SP+phase)%XW);
+    const g=document.getElementById('st'+i); if(!g) continue;
+    g.setAttribute('transform',`translate(${x},0)`);
+    const uy=camUpper(x), ly=camLower(x);
+    const up=document.getElementById('up'+i), lo=document.getElementById('lo'+i), tb=document.getElementById('tb'+i);
+    up.setAttribute('y',uy-40); lo.setAttribute('y',ly);
+    const gap=Math.max(3,ly-(uy)); const on=rpmLive>0.6&&live.dosing>3;
+    tb.setAttribute('y',ly-gap); tb.setAttribute('height',Math.min(gap,14));
+    tb.setAttribute('opacity', on? (x>372?1:0.25) : 0);
+    tb.setAttribute('fill', x>500?'#f0c2c2':'#f6ddd6');
+  }
+  requestAnimationFrame(raf);
+}
+requestAnimationFrame(raf);
+
+/* 배출 정제 파티클 */
+const outG=$('#tabletsOut'); let partT=0;
+setInterval(()=>{
+  if(rpmLive<1) return;
+  partT++; if(partT%2) return;
+  const ns='http://www.w3.org/2000/svg';
+  const c=document.createElementNS(ns,'ellipse');
+  c.setAttribute('cx',584);c.setAttribute('cy',290);c.setAttribute('rx',4.5);c.setAttribute('ry',3);
+  c.setAttribute('fill','#f0c6c6');c.setAttribute('stroke','#c09a9a');
+  outG.appendChild(c);
+  const t0=performance.now();
+  const fly=()=>{const p=(performance.now()-t0)/900;
+    if(p>=1){c.remove();return;}
+    c.setAttribute('cx',584+ (599-584)*p);
+    c.setAttribute('cy',290+ (410-290)*p*p);
+    c.setAttribute('opacity',p>.8?(1-p)*5:1);
+    requestAnimationFrame(fly);};
+  requestAnimationFrame(fly);
+},90);
+
+/* ───────── 씬 상태 ───────── */
+function sceneAt(i){const sc={ibc:1,drum:0,hop:1};
+ for(let j=0;j<i;j++)Object.assign(sc,STEPS[j].set||{});
+ if(isDone(i))Object.assign(sc,STEPS[i].set||{});
+ const p=(STEPS[i].hmi||IDLE).prod||0;
+ sc.drum=cl(p/TARGET_T,0,1); sc.ibc=1-cl(p/TARGET_T,0,1)*.9;
+ return sc;}
+function applyScene(sc){
+ const ih=74*cl(sc.ibc,0,1);const f=$('#ibcFill');f.setAttribute('y',272-ih);f.setAttribute('height',ih);
+ const dh=50*cl(sc.drum,0,1);const d=$('#drumFill');d.setAttribute('y',454-dh);d.setAttribute('height',dh);}
+function lerp(a,b,p){const o={};for(const k in b){o[k]=(typeof a[k]==='number'&&typeof b[k]==='number')?a[k]+(b[k]-a[k])*p:b[k];}return o;}
+
+/* ───────── HMI 렌더 ───────── */
+function fmt(k,v){switch(k){
+ case 'feeder':case 'rpm':return Math.round(v)+' RPM';
+ case 'tpm':return Math.round(v).toLocaleString('en-US')+' TPM';
+ case 'dosing':case 'etPre':case 'etMain':case 'urPre':case 'urMain':return v.toFixed(2)+' mm';
+ case 'camSize':return Math.round(v)+' mm';
+ case 'prod':case 'rej':return Math.round(v).toLocaleString('en-US')+' T';
+ case 'yield':return v>0?v.toFixed(1)+' %':'—';
+ default:return String(v);}}
+function hmiRest(i){const s=STEPS[i];if(isDone(i))return s.hmi;
+ const p=i>0?STEPS[i-1].hmi:IDLE;
+ return Object.assign({},p,{rpm:0,tpm:0,preF:0,mainF:0,srel:0,status:s.group==='prep'&&i<2?'LOGIN':'READY'});}
+function renderHMI(v,i){
+ live=v;
+ const w=weightOf(v.dosing,v.rpm||30,v.feeder||25);
+ const mF=v.rpm>1?forceOf(v.etMain,w):0, pF=v.rpm>1?forceOf(v.etPre,w)*0.19:0;
+ const sr=v.rpm>1?1.1+0.030*Math.max(0,v.rpm-30):0;
+ v.preF=pF; v.mainF=mF; v.srel=sr; v.tpm=v.rpm*PUNCH;
+ const d=new Date();
+ $('#hClock').textContent=(d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear()+' '+d.toTimeString().slice(0,8);
+ $('#hRec').textContent=v.recipe;$('#hBat').textContent=v.batch;$('#hOp').textContent=v.op;
+ $('#vPre').textContent=pF.toFixed(1)+' kN';$('#vMain').textContent=mF.toFixed(1)+' kN';$('#vSrel').textContent=sr.toFixed(1)+' %';
+ $('#gPre').style.height=cl(pF/25*100,0,100)+'%';
+ $('#gMain').style.height=cl(mF/25*100,0,100)+'%';
+ $('#gSrel').style.height=cl(sr/8*100,0,100)+'%';
+ $('#gMain').style.background=hold?'#d00':'#12a012';
+ TILES.forEach(([k])=>{const val=k==='yield'?v.yieldPct:v[k];const el=document.getElementById('v-'+k);
+  el.textContent=fmt(k,val||0);
+  const p=document.getElementById('p-'+k);p.classList.toggle('hot',typeof val==='number'&&val>0&&['feeder','rpm'].includes(k));});
+ const mode=hold?'HOLD':v.mode;
+ $('#pMode').textContent=mode;$('#pMode').className='pill '+(hold?'man':(v.auto?'aut':'man'));
+ $('#sAuto').textContent='Automatic '+(v.auto&&!hold?'ON':'OFF');
+ $('#sAuto').classList.toggle('on',!!v.auto&&!hold);
+ $('#sMsg').textContent=hold?'ALARM · 가상 위험 상황 · 공정 HOLD':(STEPS[i]?STEPS[i].title:'');
+ ['skMain','skForce','skAlarm'].forEach(id=>$('#'+id).classList.remove('lit'));
+ const s=STEPS[i];
+ if(s&&s.run&&!st[i].ran&&(s.runFirst||taskOk(i))&&!running)$('#skMain').classList.add('lit');
+ if(hold)$('#skAlarm').classList.add('lit');
+ $('#al1').className='alrow'+(hold?'':' ok');
+ $('#al1').innerHTML=hold?`<i>${d.toTimeString().slice(0,8)}</i><span>[E-STOP] Emergency stop actuated - machine stopped</span>`
+   :`<i>--:--:--</i><span>No active alarm</span>`;
+}
+
+/* ───────── 과제 패널 ───────── */
+function renderTask(){
+ const s=STEPS[cur],x=st[cur],done=isDone(cur);
+ const lock=running||done||(s.runFirst&&!x.ran);
+ $('#tCode').textContent=`${s.code} · ${s.name}`;
+ $('#tTitle').textContent=s.title;$('#tInstr').textContent=s.instr;$('#tSrc').textContent='근거: '+s.src;
+ let h='';
+ if(s.runFirst&&!x.ran)h+=`<p class="muted">먼저 오른쪽 “${esc(s.run.label)}”을 눌러 측정하세요.</p>`;
+ if(s.ipc&&x.ran)h+=`<table class="ipc"><tr><th>항목</th><th>규격</th><th>측정</th><th>판정</th></tr>
+   <tr><td>평균질량</td><td>245.0~255.0 mg</td><td class="ng">241.8 mg</td><td>부적합</td></tr>
+   <tr><td>개별질량</td><td>237.5~262.5 mg</td><td class="okc">238.9~245.0</td><td>적합</td></tr>
+   <tr><td>경도</td><td>8.0~12.0 KP</td><td class="okc">9.8 KP</td><td>적합</td></tr>
+   <tr><td>두께</td><td>2.9~3.3 mm</td><td class="okc">3.09 mm</td><td>적합</td></tr>
+   <tr><td>직경</td><td>8.8~9.2 mm</td><td class="okc">9.01 mm</td><td>적합</td></tr></table>`;
+ if(s.checks)h+=s.checks.map((c,k)=>`<button type="button" class="chk" data-chk="${k}" aria-pressed="${x.checks.has(k)}" ${lock?'disabled':''}><span class="box">${x.checks.has(k)?'✓':''}</span>${esc(c)}</button>`).join('');
+ if(s.q)h+=`<div class="q">${esc(s.q)}</div>`+s.opts.map((o,k)=>`<button type="button" class="opt ${x.choice&&o[1]?'good':''}" data-opt="${k}" ${lock?'disabled':''}>${esc(o[0])}</button>`).join('');
+ if(!s.checks&&!s.q)h+='<p class="muted">확인 항목이 없습니다. 오른쪽 실행 버튼으로 진행하세요.</p>';
+ $('#tWork').innerHTML=h;
+ const rb=$('#runBtn');
+ if(s.run){rb.hidden=false;rb.textContent=x.ran?'실행 완료 ✓':s.run.label;rb.disabled=running||x.ran||!(s.runFirst||taskOk(cur));}else rb.hidden=true;
+ $('#prevBtn').disabled=running||cur===0;
+ const nb=$('#nextBtn');nb.disabled=running||!done;nb.textContent=cur===LAST?'결과 보기':'다음 단계';nb.classList.toggle('primary',done);
+ const fb=$('#fb');
+ fb.textContent=fbMsg||(done?'완료했어요. 다음 단계로 이동하세요.':(s.runFirst&&!x.ran)?'실행 후 결과를 판단해요.':'확인 항목과 질문을 마친 뒤 실행해요.');
+ fb.classList.toggle('bad',fbBad);
+ $('#progText').textContent=doneSet.size+' / '+STEPS.length+' 완료';
+ $('#progBar').style.width=(doneSet.size/STEPS.length*100)+'%';
+}
+function renderRail(){
+ $('#rail').innerHTML=GROUPS.map(([lab,g])=>`<div class="grp"><small>${lab}</small><div class="chips">${
+  STEPS.map((s,i)=>s.group!==g?'':`<button type="button" class="chip ${doneSet.has(i)?'done':''} ${i===cur?'cur':''}" data-go="${i}" ${running?'disabled':''} aria-current="${i===cur?'step':'false'}"><b>${esc(s.code)}</b>${esc(s.name)}</button>`).join('')
+ }</div></div>`).join('');
+ const c=document.querySelector('.chip.cur');c&&c.scrollIntoView({inline:'center',block:'nearest'});
+}
+function render(){renderTask();renderRail();if(!running){applyScene(sceneAt(cur));renderHMI(hmiRest(cur),cur);}}
+function say(t,bad){fbMsg=t;fbBad=!!bad;}
+function afterChange(){
+ if(isDone(cur)&&!doneSet.has(cur)){doneSet.add(cur);log.push([STEPS[cur].code,STEPS[cur].title]);
+  if(!fbBad)fbMsg=fbMsg||'완료!';
+  if(cur===LAST){render();setTimeout(summary,700);return;}}
+ render();}
+function setStep(i){if(running||i<0||i>LAST)return;cur=i;fbMsg='';fbBad=false;working(false);render();
+ const s=STEPS[i];moveTo(s.loc);bubble(s.say||s.title);}
+
+function runStep(){
+ const i=cur,s=STEPS[i];if(running||!s.run||st[i].ran)return;
+ if(!s.runFirst&&!taskOk(i)){say('먼저 확인 항목과 질문을 완료해 주세요.',true);render();return;}
+ const from=sceneAt(i),hFrom=hmiRest(i);
+ running=true;say(`${s.run.label}…`);render();
+ walkPath(s.run.path||[s.loc],()=>{
+   working(true);bubble(s.run.say||s.title);
+   const anim=s.run.anim||[];anim.forEach(c=>scene.classList.add(c));
+   const to=Object.assign({},from,s.set||{}),hTo=s.hmi,dur=s.run.dur||2200,t0=performance.now();
+   const frame=now=>{
+     const p=Math.min(1,(now-t0)/dur);
+     applyScene(lerp(from,to,p));
+     const hv=lerp(hFrom,hTo,Math.min(1,p*1.5));
+     hv.status='RUNNING';hv.recipe=hTo.recipe;hv.batch=hTo.batch;hv.op=hTo.op;hv.mode=hTo.mode;hv.auto=hTo.auto;
+     renderHMI(hv,i);
+     if(p<1)requestAnimationFrame(frame);
+     else{anim.forEach(c=>scene.classList.remove(c));working(false);st[i].ran=true;running=false;
+      say(s.q&&!st[i].choice?'실행을 마쳤어요. 이제 결과를 판단하세요.':(s.checks&&!taskOk(i))?'실행을 마쳤어요. 남은 확인 항목을 체크하세요.':'완료했어요. 다음 단계로 이동하세요.');
+      afterChange();}};
+   requestAnimationFrame(frame);});
+}
+
+/* ───────── 이벤트 ───────── */
+document.addEventListener('click',e=>{
+ const b=e.target.closest('button');if(!b||b.disabled)return;
+ if(b.dataset.go!=null){setStep(+b.dataset.go);return;}
+ if(b.dataset.chk!=null){const x=st[cur],k=+b.dataset.chk;x.checks.has(k)?x.checks.delete(k):x.checks.add(k);say('');afterChange();return;}
+ if(b.dataset.opt!=null){const o=STEPS[cur].opts[+b.dataset.opt];
+   if(o[1]){st[cur].choice=true;say(o[2]);bubble('좋아요!');}else{errors++;say(o[2],true);bubble('다시 볼까요?');}
+   afterChange();return;}
+ if(b.id==='runBtn')return runStep();
+ if(b.id==='nextBtn'){cur===LAST?summary():setStep(cur+1);return;}
+ if(b.id==='prevBtn')return setStep(cur-1);
+ if(b.id==='drillBtn')return drill(0);
+ if(b.id==='infoBtn')return info();
+ if(b.dataset.drill!=null)return drillAnswer(+b.dataset.drill);
+ if(b.dataset.close!=null){closeModal();return;}
+ if(b.dataset.reset!=null){location.reload();return;}
+});
+
+/* ───────── 모달 ───────── */
+const modal=$('#modal'),card=$('#modalCard');
+function openModal(h){card.innerHTML=h;modal.hidden=false;const f=card.querySelector('button');f&&f.focus();}
+function closeModal(){modal.hidden=true;if(hold){hold=false;scene.classList.remove('alarm');render();}}
+modal.addEventListener('click',e=>{if(e.target===modal)closeModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!modal.hidden)closeModal();});
+
+const DRILL=[
+ {q:'생산 중 정제 상부가 얇게 벗겨지는 캡핑(Capping)이 연속으로 발견됐어요. 가장 먼저 할 일은?',
+  opts:[['기계를 정지하고 해당 구간 정제를 격리',1],['속도를 낮추고 계속 생산',0],['선별 공정에서 걸러질 테니 그대로 진행',0]],
+  bad:'캡핑은 압축 조건·과립 물성 문제 신호입니다. 정지하고 해당 구간 정제를 격리해야 합니다. 선별에 떠넘기지 않습니다.'},
+ {q:'정지했습니다. 다음 행동은?',
+  opts:[['생산팀장에게 보고하고 조치 지시를 받는다',1],['예압·본압을 임의로 바꿔 다시 돌려본다',0]],
+  bad:'조건을 임의로 바꾸면 원인 파악이 어려워지고 변경 이력도 남지 않습니다. 기록서 지시사항대로 생산팀장 보고가 먼저입니다.'},
+ {q:'팀장 지시로 조건을 조정했습니다. 재개 전제 조건은?',
+  opts:[['시험타정 후 공정검사 재실시 → 적합 확인 후 재개, 조치내용 기록',1],['알람만 해제하고 바로 본생산 속도로 복귀',0]],
+  bad:'조건을 바꿨으면 그 조건에서의 품질을 다시 확인해야 합니다. 조치내용은 제조지시·기록서에 기록으로 남깁니다.'}];
+let drillPhase=0;
+function drill(p){
+ if(running)return;
+ drillPhase=p;hold=true;scene.classList.add('alarm');renderHMI(hmiRest(cur),cur);
+ moveTo('press');bubble('캡핑! 멈춰야 해요');
+ const d=DRILL[p];
+ openModal(`<h3>비상상황 훈련 ${p+1}/3</h3><p>제조 흐름과 별개인 가상 상황이에요.</p>
+  <div class="q">${d.q}</div>${d.opts.map((o,k)=>`<button type="button" class="opt" data-drill="${k}">${o[0]}</button>`).join('')}
+  <p id="drillFb" class="muted"></p>`);
+}
+function drillAnswer(k){
+ const d=DRILL[drillPhase];
+ if(!d.opts[k][1]){errors++;$('#drillFb').textContent=d.bad;$('#drillFb').style.color='var(--warn)';return;}
+ if(drillPhase<2){if(drillPhase===0)working(true);drill(drillPhase+1);return;}
+ working(false);log.push(['훈련','캡핑 발견 → 정지·격리 → 보고 → 재검사 후 재개']);
+ openModal('<h3>비상상황 대응 완료</h3><p>멈춤 → 격리 → 보고 → 재검사 확인 후 재개 순서를 확인했어요. 알람별 상세 조치는 현행 SOP와 책임자 지시를 따릅니다.</p><button type="button" class="btn primary" data-close>훈련으로 돌아가기</button>');
+}
+function info(){
+ openModal(`<h3>자료와 주의사항</h3>
+ <p>KORSCH XL 400FT <b>Operating Instructions / Operating Manual (K1500223)</b>, 사내 제조지시·기록서(동화A, MBRM-00013), <b>내용고형제 공정관리 SOP</b>, 타정기 PQ·교정 상태 점검 DB를 근거로 만든 교육용 초안입니다.</p>
+ <ul>
+ <li>HMI는 Operating Instructions 9장 <b>Main Menu</b> 구조(압축력 바그래프·파라미터 버튼·소프트키·상태바)를 재구성한 것으로, 실기 소프트웨어 버전과 배치·표기가 다를 수 있습니다.</li>
+ <li>충전깊이 6.8 / 예압 2.5 / 본압 1.9 mm, 30~70 RPM, 질량 250.0 mg ±2.0%, 두께 3.1±0.2 mm, 경도 10.0±2.0 KP, 펀치수+1 = 45정은 <b>기록서 지시값</b>입니다.</li>
+ <li>상·하펀치 각인, Recipe 이름·버전, 용기번호, 건조제 수량은 기록서상 공란이라 <b>[확인 필요 · 배치별 실기재]</b>로 두었습니다.</li>
+ <li>단계 11의 교정 범위 판단은 사내 <b>타정기 PQ·교정 상태 점검</b> 기록(최근 교정 10~50 RPM / 대다수 품목 30~70 RPM 사용)을 근거로 한 실제 쟁점입니다. 실제 판단은 팀장·QA 결정을 따릅니다.</li>
+ <li>화면에 표시되는 압축력·S rel·중량 변화는 교육용 근사 모델이며 실측값이 아닙니다.</li>
+ <li>제조번호·생산량은 가상 값이며, 훈련 완료는 작업 자격이나 전자서명을 뜻하지 않습니다.</li>
+ </ul><button type="button" class="btn primary" data-close>닫기</button>`);
+}
+function summary(){
+ openModal(`<h3>첫 배치 훈련 결과</h3>
+ <p>완료 ${doneSet.size} / ${STEPS.length} · 다시 선택한 횟수 ${errors}회</p>
+ ${log.map(l=>`<div class="logrow"><span>${esc(l[0])}</span><strong>${esc(l[1])}</strong></div>`).join('')}
+ <p style="margin-top:10px">가상 결과이며 새로 열면 사라집니다. 실제 작업 전에는 담당자의 교육과 자격 확인이 필요합니다.</p>
+ <div class="row"><button type="button" class="btn" data-close>닫기</button><button type="button" class="btn primary" data-reset>처음부터 다시</button></div>`);
+}
+
+setOpT();flip(1);
+setTimeout(()=>setStep(0),250);
+})();
+</script>
+</body>
+</html>
