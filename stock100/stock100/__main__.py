@@ -3,6 +3,7 @@
   python -m stock100 evening            # 장 마감 후: 상한가/천만주 복습 → 추적 → 모의매매 → 리포트
   python -m stock100 backfill --days 100   # 과거 100 거래일 복습을 한 번에 (지식 DB 구축)
   python -m stock100 theme              # 거래대금 상위 + 고등락률 종목 테마 분석 → 엑셀
+  python -m stock100 kiwoom             # 키움 REST API 연결 점검
   python -m stock100 status             # 현재 단계와 누적 성과
   python -m stock100 demo               # 네트워크 없이 가짜 데이터로 전체 흐름 시연
 """
@@ -121,6 +122,7 @@ def main(argv=None):
     p.add_argument("--date", help="YYYYMMDD (기본: 오늘)")
     p.add_argument("--value", type=float, help="거래대금 기준 (억 원)")
     p.add_argument("--pct", type=float, help="등락률 기준 (%%)")
+    sp.add_parser("kiwoom", help="키움 REST API 연결 점검")
     sp.add_parser("status")
     p = sp.add_parser("demo")
     p.add_argument("--days", type=int, default=60)
@@ -165,6 +167,9 @@ def _dispatch(app, a):
         app.backfill(a.days, to_date(a.end) if a.end else dt.date.today())
     elif a.cmd == "theme":
         app.theme_only(to_date(a.date) if a.date else dt.date.today())
+    elif a.cmd == "kiwoom":
+        from .sources.kiwoom import check
+        check(app.cfg)
     elif a.cmd == "status":
         app.status()
 
