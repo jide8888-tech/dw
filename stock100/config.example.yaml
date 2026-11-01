@@ -1,0 +1,46 @@
+# 주식 공부 100일 챌린지 자동화 설정
+# 복사해서 config.yaml 로 저장한 뒤 수정하세요.
+
+# full      : 100일을 마친 상태 — 복습/예습/추적/모의매매 모두 매일 자동 수행
+# challenge : 시작일(challenge_start) 기준 Day 단계에 맞춰 기능을 하나씩 켬
+mode: full
+challenge_start: 2026-11-02
+
+data_dir: data            # DB, 종목 노트, 차트, 리포트 저장 위치
+markets: [KOSPI, KOSDAQ]
+
+filters:
+  upper_limit_pct: 29.5   # 이 이상 오르면 상한가로 간주
+  volume_min: 10000000    # 거래량 천만 주
+
+# Day 3: 내 이력과 연결되는 주력 분야 (분야명: 키워드 목록)
+focus_sectors:
+  게임: [게임, 넥슨, 엔씨, 크래프톤, 넷마블, 퍼블리싱, 신작]
+  반도체: [반도체, HBM, 패키징, 장비, 웨이퍼, 파운드리]
+
+sources:
+  prices: auto            # auto | krx | naver | demo
+  news: [google, naver]   # naver 는 API 키가 있을 때만 사용
+
+# API 키 (환경변수가 있으면 환경변수가 우선)
+#   DART_API_KEY, NAVER_CLIENT_ID, NAVER_CLIENT_SECRET, KRX_ID, KRX_PW
+keys:
+  dart: ""
+  naver_client_id: ""
+  naver_client_secret: ""
+  krx_id: ""
+  krx_pw: ""
+
+morning:                  # Day 41~: 새벽 예습
+  queries: [특징주, 상한가, 공급계약, 수주, 합작, 세계 최초, 인수, 정부 지원]
+  min_score: 2            # 이 점수 이상인 종목만 시그널로 기록
+
+track:                    # Day 51~: 추정 → 관찰 → 기록
+  horizons: [1, 3, 5]     # 시그널 후 N 거래일 수익률 기록
+  hit_pct: 3.0            # 기간 중 최고가가 기준가 대비 +3% 이상이면 적중
+
+paper:                    # Day 71~: 소액 매매 (모의)
+  enabled: true
+  take_profit_pct: 3.0    # '더 가면 좋겠다' = 욕심 → 익절 라인
+  stop_loss_pct: 3.0
+  max_per_day: 1

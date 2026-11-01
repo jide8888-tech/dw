@@ -1,0 +1,3 @@
+# crontab -e 에 추가 (경로 수정). 평일 04:00 예습, 18:30 복습/추적/모의매매
+0 4 * * 1-5  cd /path/to/stock100 && python3 -m stock100 morning >> data/logs/morning.log 2>&1
+30 18 * * 1-5 cd /path/to/stock100 && python3 -m stock100 evening >> data/logs/evening.log 2>&1
