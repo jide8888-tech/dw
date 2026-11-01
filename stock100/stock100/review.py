@@ -15,7 +15,7 @@ def known_names(con) -> dict[str, str]:
 def run(cfg, con, src, news, dart, date, *, with_profile=True, with_chart=True, quiet=False) -> dict:
     d = iso(date)
     f = cfg["filters"]
-    movers = src.movers(date, f["upper_limit_pct"], f["volume_min"])
+    movers = src.movers(date, f)
     if movers.empty:
         if not quiet:
             print(f"[{d}] 대상 종목 없음 (휴장일이거나 데이터 없음)")
@@ -24,7 +24,7 @@ def run(cfg, con, src, news, dart, date, *, with_profile=True, with_chart=True, 
     names.update({r.name: r.code for r in movers.itertuples()})
     items = []
     for r in movers.itertuples():
-        types = ",".join(t for t, ok in (("상한가", r.is_upper), ("천만주", r.is_volume)) if ok)
+        types = ",".join(t for t, ok in (("상한가", r.is_upper), ("천만주", r.is_volume), ("대금상위", r.is_hot)) if ok)
         prev = con.execute("SELECT date, type, reason FROM events WHERE code=? AND date<? ORDER BY date DESC",
                            (r.code, d)).fetchall()
         arts = news.search(r.name, around=to_date(date))
@@ -33,6 +33,7 @@ def run(cfg, con, src, news, dart, date, *, with_profile=True, with_chart=True, 
         kws = analyze.keywords(titles, exclude={r.name})
         focus = analyze.focus_tags(" ".join(titles), cfg["focus_sectors"])
 
+        rerun = con.execute("SELECT 1 FROM events WHERE date=? AND code=?", (d, r.code)).fetchone()
         now = dt.datetime.now().isoformat(timespec="seconds")
         con.execute("""INSERT INTO stocks(code, name, market, marcap, first_seen, last_seen, updated)
                        VALUES (?,?,?,?,?,?,?)
@@ -46,12 +47,12 @@ def run(cfg, con, src, news, dart, date, *, with_profile=True, with_chart=True, 
         for a in arts:
             con.execute("INSERT OR IGNORE INTO news VALUES (?,?,?,?,?)",
                         (r.code, a.date or d, a.title, a.link, a.source))
-        for k, n in kws:
+        for k, n in ([] if rerun else kws):   # 같은 날 재실행 시 키워드 중복 집계 방지
             con.execute("""INSERT INTO keywords VALUES (?,?,?)
                            ON CONFLICT(code, keyword) DO UPDATE SET count=count+excluded.count""",
                         (r.code, k, n))
         for other, oc in names.items():          # 기사에 함께 나온 종목 → 연관 관계
-            if oc != r.code and len(other) >= 2 and any(other in t for t in titles):
+            if not rerun and oc != r.code and len(other) >= 2 and any(other in t for t in titles):
                 for a_, b_ in ((r.code, oc), (oc, r.code)):
                     con.execute("""INSERT INTO relations VALUES (?,?,1)
                                    ON CONFLICT(code_a, code_b) DO UPDATE SET count=count+1""", (a_, b_))
@@ -60,7 +61,8 @@ def run(cfg, con, src, news, dart, date, *, with_profile=True, with_chart=True, 
         items.append({"code": r.code, "name": r.name, "market": r.market, "types": types,
                       "close": r.close, "change_pct": r.change_pct, "volume": _i(r.volume),
                       "marcap": _i(r.marcap), "reason": reason, "keywords": [k for k, _ in kws],
-                      "focus": focus, "repeat": [dict(p) for p in prev[:3]], "repeat_n": len(prev)})
+                      "focus": focus, "value": _i(r.value), "is_hot": bool(r.is_hot),
+                      "articles": [vars(a) for a in arts], "repeat": [dict(p) for p in prev[:3]], "repeat_n": len(prev)})
     con.commit()
     for it in items:
         if with_chart:

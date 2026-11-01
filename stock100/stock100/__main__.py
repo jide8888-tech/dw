@@ -2,6 +2,7 @@
   python -m stock100 morning            # 새벽 4시: 뉴스 예습 → 시그널
   python -m stock100 evening            # 장 마감 후: 상한가/천만주 복습 → 추적 → 모의매매 → 리포트
   python -m stock100 backfill --days 100   # 과거 100 거래일 복습을 한 번에 (지식 DB 구축)
+  python -m stock100 theme              # 거래대금 상위 + 고등락률 종목 테마 분석 → 엑셀
   python -m stock100 status             # 현재 단계와 누적 성과
   python -m stock100 demo               # 네트워크 없이 가짜 데이터로 전체 흐름 시연
 """
@@ -11,7 +12,7 @@ import argparse
 import datetime as dt
 import sys
 
-from . import challenge, notes, preview, review, track
+from . import challenge, excel, notes, preview, review, theme, track
 from .config import Config
 from .db import connect
 from .sources.dart import Dart, NoDart
@@ -53,7 +54,24 @@ class App:
         path = notes.evening_report(self.cfg, self.con, st, rv, tr, pp)
         if not quiet:
             print(f"  → {path}")
+        if self.cfg.get("excel", True):
+            self.theme_excel(rv, quiet=quiet)
         return path
+
+    def theme_excel(self, rv, quiet=False):
+        res = theme.build(self.cfg, self.con, rv)
+        path = excel.write(self.cfg, res, self.cfg.sub("excel") / f"{rv['date']}_테마분석.xlsx")
+        if not quiet:
+            print(f"[{rv['date']}] 테마 분석: 대상 {len(res['items'])}종목 → 테마 {len(res['themes'])}개")
+            for t in res["themes"][:5]:
+                print(f"   - {t['theme']} [{t['status']}] {t['n']}종목, 대장 {t['leader']['name']} "
+                      f"{t['leader']['change_pct']:+.1f}%")
+            print(f"  → {path}")
+        return path
+
+    def theme_only(self, date):
+        rv = review.run(self.cfg, self.con, self.src, self.news, self.dart, date)
+        return self.theme_excel(rv)
 
     def backfill(self, days, end):
         dates = self.src.trading_days(end, days)
@@ -99,6 +117,10 @@ def main(argv=None):
     p = sp.add_parser("backfill")
     p.add_argument("--days", type=int, default=100)
     p.add_argument("--end", help="YYYYMMDD (기본: 오늘)")
+    p = sp.add_parser("theme", help="거래대금 상위 + 고등락률 종목 테마 분석 → 엑셀")
+    p.add_argument("--date", help="YYYYMMDD (기본: 오늘)")
+    p.add_argument("--value", type=float, help="거래대금 기준 (억 원)")
+    p.add_argument("--pct", type=float, help="등락률 기준 (%%)")
     sp.add_parser("status")
     p = sp.add_parser("demo")
     p.add_argument("--days", type=int, default=60)
@@ -106,7 +128,7 @@ def main(argv=None):
 
     if a.cmd == "demo":
         cfg = Config.load(a.config, {"sources": {"prices": "demo"}, "data_dir": "data_demo", "mode": "full",
-                                     "filters": {"volume_min": 3_000_000}})
+                                     "filters": {"volume_min": 3_000_000, "value_min_eok": 5, "hot_pct_min": 5}})
         app = App(cfg)
         days = app.src.trading_days(dt.date.today(), a.days)
         print(f"[데모] {days[0]} ~ {days[-1]} {len(days)} 거래일을 매일 새벽/저녁 루틴으로 재생합니다.")
@@ -117,7 +139,10 @@ def main(argv=None):
         print(f"결과 폴더: {cfg.data_dir}")
         return 0
 
-    cfg = Config.load(a.config)
+    over = {}
+    if getattr(a, "value", None) is not None or getattr(a, "pct", None) is not None:
+        over["filters"] = {k: v for k, v in (("value_min_eok", a.value), ("hot_pct_min", a.pct)) if v is not None}
+    cfg = Config.load(a.config, over)
     app = App(cfg)
     try:
         _dispatch(app, a)
@@ -138,6 +163,8 @@ def _dispatch(app, a):
         app.evening(to_date(a.date) if a.date else dt.date.today())
     elif a.cmd == "backfill":
         app.backfill(a.days, to_date(a.end) if a.end else dt.date.today())
+    elif a.cmd == "theme":
+        app.theme_only(to_date(a.date) if a.date else dt.date.today())
     elif a.cmd == "status":
         app.status()
 

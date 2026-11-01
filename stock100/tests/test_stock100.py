@@ -61,3 +61,35 @@ def test_demo_end_to_end(tmp_path):
     heads = [Article("삼성전자, 차세대 HBM 패키징 투자 확대", "x", "")]
     sc = {s["code"]: s for s in preview.score_headlines(app.con, heads, cfg["focus_sectors"])}
     assert "053610" in sc and "연관" in sc["053610"]["basis"][0] + "".join(sc["053610"]["basis"])
+
+
+def test_theme_assign_and_excel(tmp_path, monkeypatch):
+    from stock100 import excel, theme
+    monkeypatch.chdir(tmp_path)           # config.example.yaml 의 사용자 테마 영향 제거
+    cfg = Config.load(None, {"data_dir": str(tmp_path)})
+    mk = lambda code, name, pct, titles, kws: {  # noqa: E731
+        "code": code, "name": name, "market": "KOSDAQ", "types": "대금상위", "close": 1000, "change_pct": pct,
+        "volume": 1, "value": 300e8, "marcap": 1e11, "reason": titles[0], "keywords": kws, "focus": [],
+        "is_hot": True, "repeat": [], "repeat_n": 0,
+        "articles": [{"title": t, "link": "https://x/" + code, "date": "2026-10-30", "source": "s"} for t in titles]}
+    items = [mk("1", "가", 29.9, ["가, 휴머노이드 로봇 공개"], ["휴머노이드"]),
+             mk("2", "나", 15.0, ["나, 로봇 부품 공급"], ["부품"]),
+             mk("3", "다", 20.0, ["다, 양자암호 칩 개발"], ["양자암호", "칩"]),
+             mk("4", "라", 12.0, ["라, 양자암호 통신 수주"], ["양자암호", "통신"]),
+             mk("5", "마", 11.0, ["마, 최대주주 변경"], ["최대주주"])]
+    con = __import__("stock100.db", fromlist=["connect"]).connect(tmp_path / "kb.sqlite")
+    res = theme.build(cfg, con, {"date": "2026-10-30", "items": items})
+    by = {t["theme"]: t for t in res["themes"]}
+    assert by["로봇"]["n"] == 2 and by["로봇"]["leader"]["name"] == "가"
+    assert by["로봇"]["status"] == "신규 형성"
+    assert "#양자암호" in by and by["#양자암호"]["n"] == 2       # 사전에 없던 테마를 공통 키워드로 포착
+    assert by["개별 이슈"]["n"] == 1
+    p = excel.write(cfg, res, tmp_path / "t.xlsx")
+    import openpyxl
+    wb = openpyxl.load_workbook(p)
+    assert wb.sheetnames == ["테마요약", "종목상세", "뉴스", "테마흐름(20일)", "기준"]
+    assert wb["종목상세"].max_row == 6
+    # 다음 날 로봇 종목 3개 → 확산
+    items2 = [mk(c, n, 20, ["로봇 수혜 " + n], ["로봇"]) for c, n in (("1", "가"), ("2", "나"), ("6", "바"))]
+    res2 = theme.build(cfg, con, {"date": "2026-10-31", "items": items2})
+    assert res2["themes"][0]["status"] == "확산" and res2["themes"][0]["streak"] == 2

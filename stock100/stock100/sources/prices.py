@@ -52,7 +52,8 @@ def krx_ohlcv(code: str, start, end) -> pd.DataFrame:
 class BaseSource:
     name = "base"
 
-    def movers(self, date, upper_pct: float, vol_min: int) -> pd.DataFrame:
+    def movers(self, date, f: dict) -> pd.DataFrame:
+        """f = config filters. 상한가 / 천만주 / 대금상위(거래대금·등락률) 중 하나라도 해당하는 종목"""
         raise NotImplementedError
 
     def ohlcv(self, code: str, start, end) -> pd.DataFrame:
@@ -71,11 +72,20 @@ class BaseSource:
         return [d.date() for d in df.index[-n:]]
 
 
-def _filter(df: pd.DataFrame, upper_pct: float, vol_min: int) -> pd.DataFrame:
+FLAGS = ["is_upper", "is_volume", "is_hot"]
+
+
+def _filter(df: pd.DataFrame, f: dict) -> pd.DataFrame:
     df = df.copy()
-    df["is_upper"] = df["change_pct"] >= upper_pct
-    df["is_volume"] = df["volume"] >= vol_min
-    return df[df["is_upper"] | df["is_volume"]].reset_index(drop=True)
+    if "value" not in df or df["value"].isna().all():
+        df["value"] = df["close"] * df["volume"]          # 거래대금 근사치
+    else:
+        df["value"] = df["value"].fillna(df["close"] * df["volume"])
+    df["is_upper"] = df["change_pct"] >= f["upper_limit_pct"]
+    df["is_volume"] = df["volume"] >= f["volume_min"]
+    df["is_hot"] = (df["value"] >= f.get("value_min_eok", 100) * 1e8) & \
+                   (df["change_pct"] >= f.get("hot_pct_min", 10.0))
+    return df[df["is_upper"] | df["is_volume"] | df["is_hot"]].reset_index(drop=True)
 
 
 class KrxSource(BaseSource):
@@ -84,7 +94,7 @@ class KrxSource(BaseSource):
     def __init__(self, markets):
         self.markets = markets
 
-    def movers(self, date, upper_pct, vol_min):
+    def movers(self, date, f):
         from pykrx import stock
         d = ymd(date)
         frames = []
@@ -97,14 +107,14 @@ class KrxSource(BaseSource):
             o["market"] = m
             frames.append(o)
         if not frames:
-            return pd.DataFrame(columns=COLUMNS + ["is_upper", "is_volume"])
+            return pd.DataFrame(columns=COLUMNS + FLAGS)
         df = pd.concat(frames).reset_index()
         df = df.rename(columns={df.columns[0]: "code", "시가": "open", "고가": "high",
                                 "저가": "low", "종가": "close", "거래량": "volume",
                                 "거래대금": "value", "등락률": "change_pct", "시가총액": "marcap"})
-        df = _filter(df, upper_pct, vol_min)
+        df = _filter(df, f)
         df["name"] = [stock.get_market_ticker_name(c) for c in df["code"]]
-        return df[COLUMNS + ["is_upper", "is_volume"]]
+        return df[COLUMNS + FLAGS]
 
 
 class NaverSource(BaseSource):
@@ -137,7 +147,7 @@ class NaverSource(BaseSource):
         out["code"] = out["name"].map(names)
         return out.dropna(subset=["code", "close"])
 
-    def movers(self, date, upper_pct, vol_min):
+    def movers(self, date, f):
         if to_date(date) != dt.date.today():
             raise RuntimeError("네이버 소스는 오늘 데이터만 제공합니다. 과거 날짜는 KRX_ID/KRX_PW 를 설정하세요.")
         frames = []
@@ -145,13 +155,19 @@ class NaverSource(BaseSource):
         for i, t in enumerate(tables):
             frames.append(self._norm(t, names, "KOSPI" if i == 0 else "KOSDAQ"))
         for sosok, m in ((0, "KOSPI"), (1, "KOSDAQ")):
-            tables, names = self._tables(f"https://finance.naver.com/sise/sise_quant.naver?sosok={sosok}")
-            for t in tables:
-                frames.append(self._norm(t, names, m))
+            # 거래량 상위 + 상승 종목(등락률순). 상승 페이지엔 거래대금이 없어 종가×거래량으로 근사
+            for page in ("sise_quant", "sise_rise"):
+                try:
+                    tables, names = self._tables(f"https://finance.naver.com/sise/{page}.naver?sosok={sosok}")
+                except Exception as e:
+                    print(f"[warn] 네이버 {page} 실패: {e}")
+                    continue
+                for t in tables:
+                    frames.append(self._norm(t, names, m))
         df = pd.concat(frames, ignore_index=True)
         df = df.drop_duplicates("code", keep="last")
-        df = _filter(df, upper_pct, vol_min)
-        return df[COLUMNS + ["is_upper", "is_volume"]]
+        df = _filter(df, f)
+        return df[COLUMNS + FLAGS]
 
 
 class AutoSource(BaseSource):
@@ -162,13 +178,13 @@ class AutoSource(BaseSource):
         self.krx = KrxSource(markets)
         self.naver = NaverSource()
 
-    def movers(self, date, upper_pct, vol_min):
+    def movers(self, date, f):
         try:
-            return self.krx.movers(date, upper_pct, vol_min)
+            return self.krx.movers(date, f)
         except Exception as e:
             if to_date(date) == dt.date.today():
                 print(f"[info] KRX 실패({e.__class__.__name__}) → 네이버 금융 사용")
-                return self.naver.movers(date, upper_pct, vol_min)
+                return self.naver.movers(date, f)
             raise
 
 
