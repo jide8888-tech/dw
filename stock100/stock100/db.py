@@ -41,6 +41,10 @@ CREATE TABLE IF NOT EXISTS signals (            -- 지식 → 시그널 → 추�
     hit INTEGER, status TEXT DEFAULT 'open',
     UNIQUE (date, code)
 );
+CREATE TABLE IF NOT EXISTS theme_daily (        -- 날짜별 테마 구성 (테마 형성·확산 추적)
+    date TEXT, theme TEXT, code TEXT, change_pct REAL, value INTEGER, is_leader INTEGER,
+    PRIMARY KEY (date, theme, code)
+);
 CREATE TABLE IF NOT EXISTS paper_trades (       -- Day 71~ 소액 매매 (모의)
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     date TEXT, code TEXT, stage TEXT, qty INTEGER, entry REAL, exit REAL,

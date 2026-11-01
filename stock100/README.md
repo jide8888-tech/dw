@@ -11,6 +11,7 @@
 | Day 61~70 관찰·기록 | 시그널 후 D+1/3/5 수익률과 최고 수익률을 추적해 적중 여부와 누적 적중률 기록 | 18:30 |
 | Day 71~99 소액 매매 | 시그널 1위 종목을 **모의** 매매: 시가 매수 → +3% 익절(욕심 = 매도 시그널) / −3% 손절 / 종가 청산. 수량은 1주 → 10주 → 100만 원 → 500만 원 | 18:30 |
 | Day 100 | `status` 명령으로 누적 성과 확인 | 수시 |
+| **테마 분석 엑셀** | 거래대금 100억↑ & 등락률 10%↑ 종목의 뉴스를 모아 테마로 묶고(신규 형성·확산·지속·축소·재부각), 대장주와 20일 테마 흐름을 **엑셀**로 저장 | 18:30 (또는 `theme` 명령) |
 
 > 실제 주문은 내지 않습니다. 모의매매 결과로 충분히 검증한 뒤 증권사 API(키움 등) 연동을 검토하세요.
 
@@ -41,6 +42,8 @@ python -m stock100 demo                 # 네트워크 없이 가짜 데이터�
 python -m stock100 backfill --days 100  # 과거 100 거래일 복습을 한 번에 (지식 DB 구축, KRX 로그인 필요)
 python -m stock100 morning              # 새벽 예습 → data/reports/YYYY-MM-DD_morning.md
 python -m stock100 evening              # 복습 + 추적 + 모의매매 → data/reports/YYYY-MM-DD_evening.md
+python -m stock100 theme                # 오늘 거래대금 상위 + 고등락률 종목 테마 분석 → 엑셀
+python -m stock100 theme --value 300 --pct 15 --date 20261030   # 기준과 날짜 지정
 python -m stock100 status               # 단계, 누적 적중률, 모의 손익
 ```
 
@@ -60,6 +63,7 @@ python -m stock100 status               # 단계, 누적 적중률, 모의 손�
 - `notes/코드_종목명.md` — 종목 노트: 요약, 이벤트(왜 올랐나), 차트, 재무 추이, 공시, 시그널 기록, 관련 기사. **`## 내 메모` 아래에 쓴 내용은 자동 갱신 때도 보존됩니다.**
 - `charts/코드.png` — 1년 일봉, 이동평균선(5/20/60/120), 거래량. 상한가·천만주 날짜는 노란 세로선으로 표시
 - `reports/` — 새벽(morning)·저녁(evening) 리포트
+- `excel/날짜_테마분석.xlsx` — 시트: 테마요약(상태·연속일·대장주·대표 뉴스) / 종목상세 / 뉴스(링크) / 테마흐름(20일) / 기준
 - `kb.sqlite` — 지식 DB (stocks, events, news, keywords, relations, signals, paper_trades)
 
 Markdown 노트는 Obsidian이나 VS Code에서 열면 차트 이미지까지 함께 보입니다.

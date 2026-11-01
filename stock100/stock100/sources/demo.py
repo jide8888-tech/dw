@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from .news import Article
-from .prices import BaseSource, COLUMNS
+from .prices import BaseSource, COLUMNS, _filter
 from ..util import to_date
 
 UNIVERSE = [
@@ -71,7 +71,7 @@ class DemoPriceSource(BaseSource):
     def trading_days(self, end, n):
         return _bdays(to_date(end), n)
 
-    def movers(self, date, upper_pct, vol_min):
+    def movers(self, date, f):
         d = pd.Timestamp(to_date(date))
         rows = []
         for code, name, market, _ in UNIVERSE:
@@ -83,10 +83,7 @@ class DemoPriceSource(BaseSource):
                          "high": r.high, "low": r.low, "close": r.close,
                          "change_pct": round(r.change_pct, 2), "volume": int(r.volume),
                          "value": int(r.volume * r.close), "marcap": int(r.close * 3e6)})
-        df = pd.DataFrame(rows, columns=COLUMNS)
-        df["is_upper"] = df["change_pct"] >= upper_pct
-        df["is_volume"] = df["volume"] >= vol_min
-        return df[df.is_upper | df.is_volume].reset_index(drop=True)
+        return _filter(pd.DataFrame(rows, columns=COLUMNS), f)
 
 
 class DemoNews:
