@@ -1,0 +1,57 @@
+from __future__ import annotations
+
+import sqlite3
+from pathlib import Path
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS stocks (
+    code TEXT PRIMARY KEY, name TEXT, market TEXT, sector TEXT,
+    marcap INTEGER, major_holder_pct REAL, homepage TEXT,
+    first_seen TEXT, last_seen TEXT, updated TEXT
+);
+CREATE TABLE IF NOT EXISTS events (            -- 상한가 / 천만주 기록 (복습)
+    date TEXT, code TEXT, type TEXT, close REAL, change_pct REAL,
+    volume INTEGER, value INTEGER, marcap INTEGER, reason TEXT, keywords TEXT,
+    focus TEXT, PRIMARY KEY (date, code, type)
+);
+CREATE TABLE IF NOT EXISTS news (
+    code TEXT, date TEXT, title TEXT, link TEXT, source TEXT,
+    PRIMARY KEY (code, link)
+);
+CREATE TABLE IF NOT EXISTS keywords (
+    code TEXT, keyword TEXT, count INTEGER, PRIMARY KEY (code, keyword)
+);
+CREATE TABLE IF NOT EXISTS relations (          -- 기사에 함께 등장한 종목 (예: 에스엠랩 ↔ DSC인베스트먼트)
+    code_a TEXT, code_b TEXT, count INTEGER, PRIMARY KEY (code_a, code_b)
+);
+CREATE TABLE IF NOT EXISTS disclosures (
+    code TEXT, date TEXT, title TEXT, rcept_no TEXT PRIMARY KEY
+);
+CREATE TABLE IF NOT EXISTS financials (
+    code TEXT, year INTEGER, revenue INTEGER, op_income INTEGER, net_income INTEGER,
+    PRIMARY KEY (code, year)
+);
+CREATE TABLE IF NOT EXISTS headlines (          -- 새벽 예습에서 읽은 뉴스
+    date TEXT, title TEXT, link TEXT, source TEXT, PRIMARY KEY (date, link)
+);
+CREATE TABLE IF NOT EXISTS signals (            -- 지식 → 시그널 → 추정
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT, code TEXT, score REAL, basis TEXT, headline TEXT, link TEXT,
+    estimate TEXT, base_close REAL, ret_json TEXT, max_ret REAL,
+    hit INTEGER, status TEXT DEFAULT 'open',
+    UNIQUE (date, code)
+);
+CREATE TABLE IF NOT EXISTS paper_trades (       -- Day 71~ 소액 매매 (모의)
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT, code TEXT, stage TEXT, qty INTEGER, entry REAL, exit REAL,
+    exit_reason TEXT, pnl REAL, pnl_pct REAL, signal_id INTEGER,
+    UNIQUE (date, code)
+);
+"""
+
+
+def connect(path: Path) -> sqlite3.Connection:
+    con = sqlite3.connect(str(path))
+    con.row_factory = sqlite3.Row
+    con.executescript(SCHEMA)
+    return con
