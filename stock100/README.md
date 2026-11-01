@@ -53,7 +53,7 @@ python -m stock100 status               # 단계, 누적 적중률, 모의 손�
 
 ### 매일 자동 실행
 
-- Windows: `scripts\install_schedule_windows.bat` 실행 → 작업 스케줄러에 평일 04:00 / 18:30 등록. PC가 켜져 있어야 합니다.
+- Windows: (Python이 여러 개면 먼저 `setx PY_PYTHON 3.14`처럼 기본 버전 지정) `scripts\install_schedule_windows.bat` 실행 → 작업 스케줄러에 평일 04:00 / 18:30 등록. PC가 켜져 있어야 합니다.
 - Linux/mac: `scripts/crontab.example` 참고
 
 ### 챌린지 모드
