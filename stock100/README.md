@@ -27,10 +27,12 @@ copy config.example.yaml config.yaml      # (mac/linux: cp)
 
 | 키 | 용도 | 없으면 |
 |---|---|---|
+| `KIWOOM_APPKEY` / `KIWOOM_SECRETKEY` | 키움 REST API — 오늘의 거래대금·등락률·거래량 순위와 일봉을 정확하게 수집 (조회만, 주문 없음) | KRX/네이버 사용 |
 | `KRX_ID` / `KRX_PW` | KRX 정보데이터시스템 로그인(pykrx) — 과거 날짜 전종목 시세 | 오늘 데이터만 네이버 금융에서 수집, `backfill` 불가 |
 | `DART_API_KEY` | OpenDART — 최대주주 지분, 최근 공시, 재무 추이 | 노트에서 해당 항목 생략 |
 | `NAVER_CLIENT_ID` / `SECRET` | 네이버 검색 API 뉴스 | 구글 뉴스 RSS만 사용 |
 
+- 키움 REST API: https://openapi.kiwoom.com (키움 계좌 필요 → API 사용 신청 → 앱키/시크릿키, 접속 IP 등록). 연결 점검: `python -m stock100 kiwoom`
 - KRX 회원가입: https://data.krx.co.kr
 - OpenDART 키 발급: https://opendart.fss.or.kr
 - 네이버 API: https://developers.naver.com (검색 API)

@@ -171,14 +171,28 @@ class NaverSource(BaseSource):
 
 
 class AutoSource(BaseSource):
-    """과거 날짜면 KRX, 오늘이면 KRX → 실패 시 네이버."""
+    """오늘: 키움(키가 있으면) → KRX → 네이버 / 과거 날짜: KRX. 일봉: 키움 → 네이버 → KRX."""
     name = "auto"
 
-    def __init__(self, markets):
+    def __init__(self, markets, kiwoom=None):
         self.krx = KrxSource(markets)
         self.naver = NaverSource()
+        self.kiwoom = kiwoom
+
+    def ohlcv(self, code, start, end):
+        if self.kiwoom is not None:
+            try:
+                return self.kiwoom.ohlcv(code, start, end)
+            except Exception as e:
+                print(f"[info] 키움 일봉 실패({e.__class__.__name__}) → 네이버")
+        return super().ohlcv(code, start, end)
 
     def movers(self, date, f):
+        if self.kiwoom is not None and to_date(date) == dt.date.today():
+            try:
+                return self.kiwoom.movers(date, f)
+            except Exception as e:
+                print(f"[info] 키움 실패({e}) → KRX")
         try:
             return self.krx.movers(date, f)
         except Exception as e:
@@ -193,8 +207,16 @@ def make_source(cfg):
     if kind == "demo":
         from .demo import DemoPriceSource
         return DemoPriceSource()
+    kiwoom = None
+    if cfg.key.get("kiwoom_appkey") and cfg.key.get("kiwoom_secretkey"):
+        from .kiwoom import KiwoomSource
+        kiwoom = KiwoomSource(cfg)
+    if kind == "kiwoom":
+        if kiwoom is None:
+            raise RuntimeError("sources.prices=kiwoom 인데 키움 appkey/secretkey 가 없습니다.")
+        return AutoSource(cfg["markets"], kiwoom)
     if kind == "krx":
         return KrxSource(cfg["markets"])
     if kind == "naver":
         return NaverSource()
-    return AutoSource(cfg["markets"])
+    return AutoSource(cfg["markets"], kiwoom)

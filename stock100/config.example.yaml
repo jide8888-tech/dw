@@ -31,17 +31,24 @@ focus_sectors:
   반도체: [반도체, HBM, 패키징, 장비, 웨이퍼, 파운드리]
 
 sources:
-  prices: auto            # auto | krx | naver | demo
+  prices: auto            # auto | kiwoom | krx | naver | demo
+                          #  auto: 오늘 = 키움(키 있으면) → KRX → 네이버, 과거 = KRX
   news: [google, naver]   # naver 는 API 키가 있을 때만 사용
 
 # API 키 (환경변수가 있으면 환경변수가 우선)
-#   DART_API_KEY, NAVER_CLIENT_ID, NAVER_CLIENT_SECRET, KRX_ID, KRX_PW
+#   DART_API_KEY, NAVER_CLIENT_ID, NAVER_CLIENT_SECRET, KRX_ID, KRX_PW,
+#   KIWOOM_APPKEY, KIWOOM_SECRETKEY
 keys:
+  kiwoom_appkey: ""       # 키움 REST API (openapi.kiwoom.com) — 조회 전용, 주문 안 함
+  kiwoom_secretkey: ""
   dart: ""
   naver_client_id: ""
   naver_client_secret: ""
   krx_id: ""
   krx_pw: ""
+
+kiwoom:
+  mock: false             # true: 모의투자 서버(mockapi.kiwoom.com) — 모의투자용 키일 때
 
 morning:                  # Day 41~: 새벽 예습
   queries: [특징주, 상한가, 공급계약, 수주, 합작, 세계 최초, 인수, 정부 지원]

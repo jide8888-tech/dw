@@ -93,3 +93,70 @@ def test_theme_assign_and_excel(tmp_path, monkeypatch):
     items2 = [mk(c, n, 20, ["로봇 수혜 " + n], ["로봇"]) for c, n in (("1", "가"), ("2", "나"), ("6", "바"))]
     res2 = theme.build(cfg, con, {"date": "2026-10-31", "items": items2})
     assert res2["themes"][0]["status"] == "확산" and res2["themes"][0]["streak"] == 2
+
+
+def test_kiwoom_source_with_fake_server(tmp_path, monkeypatch):
+    """키움 서버 대신 가짜 응답으로 토큰·연속조회·단위 판별·필터를 검증."""
+    import json as _json
+    from stock100.sources import kiwoom as kw
+
+    class R:
+        def __init__(self, data, headers=None, status=200):
+            self._d, self.headers, self.status_code = data, headers or {}, status
+            self.content = _json.dumps(data).encode()
+            self.text = self.content.decode()
+
+        def json(self):
+            return self._d
+
+    calls = []
+    today = dt.date.today().strftime("%Y%m%d")
+
+    def fake_post(self, url, headers=None, json=None, timeout=None):
+        calls.append((url, (headers or {}).get("api-id"), (headers or {}).get("cont-yn")))
+        if url.endswith("/oauth2/token"):
+            return R({"token": "T", "expires_dt": "29991231235959", "return_code": 0})
+        api = headers["api-id"]
+        if api == "ka10032":   # 거래대금 상위 (백만원 단위) — 2페이지
+            if headers["cont-yn"] == "N":
+                return R({"trde_prica_upper": [
+                    {"stk_cd": "053610", "stk_nm": "프로텍", "cur_prc": "+27400", "flu_rt": "+29.86",
+                     "now_trde_qty": "2000000", "trde_prica": "54800"}], "return_code": 0},
+                    {"cont-yn": "Y", "next-key": "k1"})
+            return R({"trde_prica_upper": [
+                {"stk_cd": "A005930", "stk_nm": "삼성전자", "cur_prc": "-70000", "flu_rt": "-1.20",
+                 "now_trde_qty": "100000", "trde_prica": "7000"}], "return_code": 0})
+        if api == "ka10027":
+            return R({"pred_pre_flu_rt_upper": [
+                {"stk_cd": "111111", "stk_nm": "작은종목", "cur_prc": "+1000", "flu_rt": "+15.00",
+                 "now_trde_qty": "500000"}], "return_code": 0})
+        if api == "ka10030":
+            return R({"tdy_trde_qty_upper": [
+                {"stk_cd": "222222", "stk_nm": "대량종목", "cur_prc": "+500", "flu_rt": "+1.00",
+                 "trde_qty": "25000000"}], "return_code": 0})
+        if api == "ka10099":
+            return R({"list": [{"code": "053610", "name": "프로텍", "listCount": "0000000011000000"}],
+                      "return_code": 0})
+        if api == "ka10081":
+            return R({"stk_dt_pole_chart_qry": [
+                {"dt": today, "open_pric": "+100", "high_pric": "+110", "low_pric": "-95", "cur_prc": "+105",
+                 "trde_qty": "1000"}], "return_code": 0})
+        raise AssertionError(api)
+
+    monkeypatch.setattr(kw.requests.Session, "post", fake_post)
+    monkeypatch.setattr(kw.time, "sleep", lambda s: None)
+    monkeypatch.chdir(tmp_path)
+    cfg = Config.load(None, {"data_dir": str(tmp_path), "markets": ["KOSDAQ"],
+                             "keys": {"kiwoom_appkey": "AAAAAAAA", "kiwoom_secretkey": "S"}})
+    src = kw.KiwoomSource(cfg)
+    df = src.movers(dt.date.today(), cfg["filters"]).set_index("code")
+    assert set(df.index) == {"053610", "222222"}             # 삼성전자(하락)·작은종목(대금 미달) 제외
+    p = df.loc["053610"]
+    assert p.value == 54800e6 and p.is_hot and p.is_upper and p.marcap == 27400 * 11_000_000
+    assert df.loc["222222"].is_volume and not df.loc["222222"].is_hot
+    assert ("https://api.kiwoom.com/api/dostk/rkinfo", "ka10032", "Y") in calls   # 연속조회
+    o = src.ohlcv("053610", dt.date.today() - dt.timedelta(days=3), dt.date.today())
+    assert o.iloc[-1].low == 95 and o.iloc[-1].close == 105
+    n_token = sum(1 for c in calls if c[0].endswith("/oauth2/token"))
+    kw.KiwoomSource(cfg).c.token()                            # 캐시된 토큰 재사용
+    assert sum(1 for c in calls if c[0].endswith("/oauth2/token")) == n_token == 1

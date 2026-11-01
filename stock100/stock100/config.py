@@ -19,7 +19,8 @@ DEFAULTS = {
     "focus_sectors": {},
     "sources": {"prices": "auto", "news": ["google", "naver"]},
     "keys": {"dart": "", "naver_client_id": "", "naver_client_secret": "",
-             "krx_id": "", "krx_pw": ""},
+             "krx_id": "", "krx_pw": "", "kiwoom_appkey": "", "kiwoom_secretkey": ""},
+    "kiwoom": {"mock": False},
     "morning": {"queries": ["특징주", "상한가", "공급계약", "수주"], "min_score": 2},
     "track": {"horizons": [1, 3, 5], "hit_pct": 3.0},
     "paper": {"enabled": True, "take_profit_pct": 3.0, "stop_loss_pct": 3.0, "max_per_day": 1},
@@ -31,6 +32,8 @@ ENV_KEYS = {
     "naver_client_secret": "NAVER_CLIENT_SECRET",
     "krx_id": "KRX_ID",
     "krx_pw": "KRX_PW",
+    "kiwoom_appkey": "KIWOOM_APPKEY",
+    "kiwoom_secretkey": "KIWOOM_SECRETKEY",
 }
 
 
