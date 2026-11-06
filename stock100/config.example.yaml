@@ -50,6 +50,27 @@ keys:
 kiwoom:
   mock: false             # true: 모의투자 서버(mockapi.kiwoom.com) — 모의투자용 키일 때
 
+watch:                    # 장중 5분 감시 (python -m stock100 watch, 키움 REST API 필요)
+  interval_min: 5         # 5분마다 조회
+  start: "09:00"
+  end: "15:30"
+  # 감시 대상: 최근 lookback_days 거래일 안에 거래대금 top_n 위 이내 + 등락률 min_pct% 이상이었던 종목
+  lookback_days: 5        # 약 1주일
+  top_n: 100
+  min_pct: 20.0
+  extra_codes: []         # 직접 추가할 종목코드 예: ["053610", "005930"]
+  # 🔴 주목(빨간 음영): 5분 거래대금 증가 ≥ value_delta_eok 억 AND 5분 등락률 변화 ≥ pct_delta %p
+  value_delta_eok: 5.0
+  pct_delta: 1.5
+  # 순위 상승: 거래대금 순위가 rank_up_min 계단 이상 위로 (예: 34위 → 30위)
+  rank_basis: watchlist   # watchlist = 감시 종목 안에서의 순위 / market = 전체 시장 순위
+  rank_up_min: 1
+  # 매수 신호: both = 주목 + 순위 상승 동시 / rank_only = 순위 상승만
+  buy_rule: both
+  cash: 10000000          # 보유금 (원)
+  buy_ratio: 0.2          # 매수 신호 때 남은 보유금의 20% 제안 (실제 주문 안 함)
+  beep: true              # 매수 신호 때 알림음
+
 morning:                  # Day 41~: 새벽 예습
   queries: [특징주, 상한가, 공급계약, 수주, 합작, 세계 최초, 인수, 정부 지원]
   min_score: 2            # 이 점수 이상인 종목만 시그널로 기록

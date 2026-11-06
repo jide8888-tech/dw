@@ -3,6 +3,7 @@
   python -m stock100 evening            # 장 마감 후: 상한가/천만주 복습 → 추적 → 모의매매 → 리포트
   python -m stock100 backfill --days 100   # 과거 100 거래일 복습을 한 번에 (지식 DB 구축)
   python -m stock100 theme              # 거래대금 상위 + 고등락률 종목 테마 분석 → 엑셀
+  python -m stock100 watch              # 장중 5분 감시 (09:00~15:30, 키움 필요)
   python -m stock100 kiwoom             # 키움 REST API 연결 점검
   python -m stock100 status             # 현재 단계와 누적 성과
   python -m stock100 demo               # 네트워크 없이 가짜 데이터로 전체 흐름 시연
@@ -13,7 +14,7 @@ import argparse
 import datetime as dt
 import sys
 
-from . import challenge, excel, notes, preview, review, theme, track
+from . import challenge, excel, notes, preview, review, theme, track, watch
 from .config import Config
 from .db import connect
 from .sources.dart import Dart, NoDart
@@ -57,6 +58,11 @@ class App:
             print(f"  → {path}")
         if self.cfg.get("excel", True):
             self.theme_excel(rv, quiet=quiet)
+        try:   # 5분 감시 대상 선정용: 오늘 거래대금 상위 100 저장
+            watch.record_day(self.con, self.src, date, self.cfg["watch"]["top_n"])
+        except Exception as e:
+            if not quiet:
+                print(f"[info] 거래대금 상위 저장 생략 ({e.__class__.__name__})")
         return path
 
     def theme_excel(self, rv, quiet=False):
@@ -123,10 +129,19 @@ def main(argv=None):
     p.add_argument("--value", type=float, help="거래대금 기준 (억 원)")
     p.add_argument("--pct", type=float, help="등락률 기준 (%%)")
     sp.add_parser("kiwoom", help="키움 REST API 연결 점검")
+    p = sp.add_parser("watch", help="장중 5분 감시 (거래대금·등락률·순위 상승 → 매수 제안)")
+    p.add_argument("--once", action="store_true", help="한 번만 조회하고 종료")
+    p.add_argument("--list", action="store_true", help="오늘 감시 대상만 출력")
+    p.add_argument("--demo", action="store_true", help="가짜 데이터로 하루치 감시 재생")
     sp.add_parser("status")
     p = sp.add_parser("demo")
     p.add_argument("--days", type=int, default=60)
     a = ap.parse_args(argv)
+
+    if a.cmd == "watch" and a.demo:
+        cfg = Config.load(a.config, {"sources": {"prices": "demo"}, "data_dir": "data_demo"})
+        watch.run(App(cfg), demo=True)
+        return 0
 
     if a.cmd == "demo":
         cfg = Config.load(a.config, {"sources": {"prices": "demo"}, "data_dir": "data_demo", "mode": "full",
@@ -167,6 +182,8 @@ def _dispatch(app, a):
         app.backfill(a.days, to_date(a.end) if a.end else dt.date.today())
     elif a.cmd == "theme":
         app.theme_only(to_date(a.date) if a.date else dt.date.today())
+    elif a.cmd == "watch":
+        watch.run(app, once=a.once, list_only=a.list)
     elif a.cmd == "kiwoom":
         from .sources.kiwoom import check
         check(app.cfg)

@@ -160,3 +160,64 @@ def test_kiwoom_source_with_fake_server(tmp_path, monkeypatch):
     n_token = sum(1 for c in calls if c[0].endswith("/oauth2/token"))
     kw.KiwoomSource(cfg).c.token()                            # 캐시된 토큰 재사용
     assert sum(1 for c in calls if c[0].endswith("/oauth2/token")) == n_token == 1
+
+
+def test_watch_rules(tmp_path, monkeypatch):
+    """5분 감시: 대상 선정(1주일 내 거래대금 100위+20%) / 주목(5억+1.5%p) / 순위 상승 매수(보유금 20%)."""
+    import pandas as pd
+    from stock100 import watch
+    from stock100.db import connect
+    monkeypatch.chdir(tmp_path)
+    cfg = Config.load(None, {"data_dir": str(tmp_path)})
+    con = connect(tmp_path / "kb.sqlite")
+
+    class Src:
+        def trading_days(self, end, n):
+            return [dt.date(2026, 11, 2), dt.date(2026, 11, 3), dt.date(2026, 11, 4), dt.date(2026, 11, 5)][-n:]
+
+        def value_top(self, date, n=100):
+            return pd.DataFrame([
+                {"code": "A", "name": "에이", "market": "", "close": 1, "change_pct": 25.0, "value": 9e10, "rank": 3},
+                {"code": "B", "name": "비", "market": "", "close": 1, "change_pct": 21.0, "value": 5e10, "rank": 40},
+                {"code": "C", "name": "씨", "market": "", "close": 1, "change_pct": 5.0, "value": 8e10, "rank": 5},
+                {"code": "D", "name": "디", "market": "", "close": 1, "change_pct": 30.0, "value": 1e9, "rank": 101}])
+
+    today = dt.date(2026, 11, 6)
+    watch.ensure_history(cfg, con, Src(), today, quiet=True)
+    uni = watch.universe(cfg, con, Src(), today)
+    assert set(uni.code) == {"A", "B"}          # C: 등락률 미달, D: 100위 밖
+
+    class Feed:
+        def __init__(self):
+            self.ticks = [
+                {"A": (10000, 5.0, 100e8), "B": (5000, 3.0, 90e8)},
+                {"A": (10100, 6.0, 102e8), "B": (5200, 5.0, 96e8)},    # B: +6억, +2.0%p 인데 순위 그대로(2위) → 주목만
+                {"A": (10150, 6.5, 103e8), "B": (5400, 7.0, 104e8)},   # B: +8억, +2.0%p, 2위→1위 → 매수
+                {"A": (10200, 7.0, 104e8), "B": (5600, 9.0, 112e8)},   # B: 또 조건 충족 → 재신호
+            ]
+
+        def quotes(self, codes):
+            t = self.ticks.pop(0)
+            return pd.DataFrame([{"code": c, "name": "", "price": p, "pct": r, "value": v, "strength": 100}
+                                 for c, (p, r, v) in t.items()])
+
+        def market_rank(self, n=300):
+            return {}
+
+    w = watch.Watcher(cfg, con, Feed(), uni, today)
+    t0 = dt.datetime(2026, 11, 6, 9, 0)
+    r0 = w.tick(t0)
+    assert not r0["signals"]                       # 첫 회차 = 기준값
+    r1 = w.tick(t0 + dt.timedelta(minutes=5))
+    assert [(s["code"], s["kind"]) for s in r1["signals"]] == [("B", "주목")]
+    r2 = w.tick(t0 + dt.timedelta(minutes=10))
+    kinds = {(s["code"], s["kind"]) for s in r2["signals"]}
+    assert kinds == {("B", "주목"), ("B", "매수")}
+    buy = next(s for s in r2["signals"] if s["kind"] == "매수")
+    assert buy["rank_prev"] == 2 and buy["rank_now"] == 1
+    assert buy["qty"] == int(10_000_000 * 0.2 // 5400) and buy["cash_left"] == 10_000_000 - buy["qty"] * 5400
+    r3 = w.tick(t0 + dt.timedelta(minutes=15))
+    assert ("B", "재신호") not in {(s["code"], s["kind"]) for s in r3["signals"]}   # 1위 유지 → 순위 상승 없음
+    p = watch.write_excel(cfg, con, today, uni, tmp_path / "w.xlsx")
+    import openpyxl
+    assert openpyxl.load_workbook(p).sheetnames == ["실시간", "신호기록", "5분대금흐름(억)", "감시대상", "기준"]

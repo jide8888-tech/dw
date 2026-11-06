@@ -46,6 +46,16 @@ def _code(s: str) -> str:
     return s
 
 
+def _enough(n):
+    """연속조회 누적 n건 이상이면 중단"""
+    acc = []
+
+    def stop(page):
+        acc.extend(page)
+        return len(acc) >= n
+    return stop
+
+
 class KiwoomError(RuntimeError):
     pass
 
@@ -201,6 +211,36 @@ class KiwoomSource(BaseSource):
         if "value" not in df:
             df["value"] = None
         return _filter(df[COLUMNS], f)[COLUMNS + ["is_upper", "is_volume", "is_hot"]]
+
+    def value_top(self, date, n=100):
+        """오늘 거래대금 상위 n (전체 시장, ka10032)"""
+        if to_date(date) != dt.date.today():
+            raise KiwoomError("키움 순위 API 는 오늘 데이터만 제공합니다.")
+        rows = self.c.call("/api/dostk/rkinfo", "ka10032", {"mrkt_tp": "000", "mang_stk_incls": "1", "stex_tp": "1"},
+                           max_pages=10, stop=_enough(n))
+        out = []
+        for i, r in enumerate(rows[:n], 1):
+            out.append({"code": _code(r.get("stk_cd", "")), "name": (r.get("stk_nm") or "").strip(), "market": "",
+                        "close": abs(_num(r.get("cur_prc")) or 0), "change_pct": _num(r.get("flu_rt")) or 0,
+                        "value": self._value(r), "rank": int(_num(r.get("now_rank")) or i)})
+        return pd.DataFrame(out, columns=["code", "name", "market", "close", "change_pct", "value", "rank"])
+
+    # ---------------- 5분 감시용 현재가 (관심종목정보 ka10095, 여러 종목 한 번에)
+    def quotes(self, codes: list[str], chunk: int = 30) -> pd.DataFrame:
+        out = []
+        for i in range(0, len(codes), chunk):
+            rows = self.c.call("/api/dostk/stkinfo", "ka10095", {"stk_cd": "|".join(codes[i:i + chunk])},
+                               max_pages=3)
+            for r in rows:
+                out.append({"code": _code(r.get("stk_cd", "")), "name": (r.get("stk_nm") or "").strip(),
+                            "price": abs(_num(r.get("cur_prc")) or 0), "pct": _num(r.get("flu_rt")) or 0.0,
+                            "value": self._value(r), "strength": _num(r.get("cntr_str"))})
+        return pd.DataFrame(out, columns=["code", "name", "price", "pct", "value", "strength"])
+
+    def market_rank(self, n: int = 300) -> dict[str, int]:
+        rows = self.c.call("/api/dostk/rkinfo", "ka10032", {"mrkt_tp": "000", "mang_stk_incls": "1", "stex_tp": "1"},
+                           max_pages=10, stop=_enough(n))
+        return {_code(r.get("stk_cd", "")): int(_num(r.get("now_rank")) or i) for i, r in enumerate(rows[:n], 1)}
 
     @staticmethod
     def _value(r) -> float:
