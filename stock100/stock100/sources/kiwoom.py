@@ -93,7 +93,12 @@ class KiwoomClient:
                               "secretkey": self.secretkey})
         data = r.json() if r.content else {}
         if r.status_code != 200 or not data.get("token"):
-            raise KiwoomError(f"토큰 발급 실패 (HTTP {r.status_code}): {data.get('return_msg') or r.text[:200]}")
+            msg = data.get('return_msg') or r.text[:200]
+            hint = ""
+            if "8001" in str(msg) or "Key" in str(msg):
+                hint = (f"\n  확인: ① 키를 다시 복사(앱키/시크릿키 바뀜 여부) ② 모의투자용 키면 config 에 kiwoom: mock: true "
+                        f"(지금 접속: {'모의' if self.base == MOCK else '실전'} 서버) ③ 환경변수 KIWOOM_APPKEY 가 옛 값인지")
+            raise KiwoomError(f"토큰 발급 실패 (HTTP {r.status_code}): {msg}{hint}")
         self._token = data["token"]
         exp = data.get("expires_dt")
         self._exp = dt.datetime.strptime(exp, "%Y%m%d%H%M%S") if exp else now + dt.timedelta(hours=12)

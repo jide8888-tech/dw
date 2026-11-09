@@ -76,6 +76,8 @@ class Config:
         for k, env in ENV_KEYS.items():
             if os.getenv(env):
                 merged["keys"][k] = os.environ[env]
+        # 복사·붙여넣기 때 섞인 앞뒤 공백/줄바꿈 제거
+        merged["keys"] = {k: (str(v).strip() if v is not None else "") for k, v in merged["keys"].items()}
         # pykrx 는 KRX_ID / KRX_PW 환경변수로 로그인한다
         if merged["keys"].get("krx_id") and not os.getenv("KRX_ID"):
             os.environ["KRX_ID"] = merged["keys"]["krx_id"]
