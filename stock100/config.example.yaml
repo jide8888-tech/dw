@@ -54,20 +54,27 @@ watch:                    # 장중 5분 감시 (python -m stock100 watch, 키움
   interval_min: 5         # 5분마다 조회
   start: "09:00"
   end: "15:30"
-  # 감시 대상: 최근 lookback_days 거래일 안에 거래대금 top_n 위 이내 + 등락률 min_pct% 이상이었던 종목
-  lookback_days: 5        # 약 1주일
-  top_n: 100
-  min_pct: 20.0
-  extra_codes: []         # 직접 추가할 종목코드 예: ["053610", "005930"]
+  groups:                 # 감시 종목을 고르는 두 방식을 동시에 돌려 성과 비교
+    expected:             # ① 장전 예상체결 등락률 상위
+      enabled: true
+      top_n: 100
+      pick_times: ["08:55", "08:59"]   # 1차 선정 → 확정 (08:55 이전에 켜 두기)
+      min_qty: 10000      # 예상체결량 1만 주 이상
+      min_price: 1000     # 1천 원 미만 동전주 제외
+      exclude_pref_spac: true          # 우선주·스팩 제외 (ETF·ETN 은 항상 제외)
+    history:              # ② 최근 거래대금 상위 + 급등 이력
+      enabled: true
+      lookback_days: 10   # 최근 10거래일
+      top_n: 100          # 거래대금 100위 이내
+      min_pct: 15.0       # 등락률 15% 이상
+  extra_codes: []         # ②에 직접 추가할 종목코드 예: ["053610"]
   # 🔴 주목(빨간 음영): 5분 거래대금 증가 ≥ value_delta_eok 억 AND 5분 등락률 변화 ≥ pct_delta %p
   value_delta_eok: 5.0
   pct_delta: 1.5
-  # 순위 상승: 거래대금 순위가 rank_up_min 계단 이상 위로 (예: 34위 → 30위)
-  rank_basis: watchlist   # watchlist = 감시 종목 안에서의 순위 / market = 전체 시장 순위
-  rank_up_min: 1
-  # 매수 신호: both = 주목 + 순위 상승 동시 / rank_only = 순위 상승만
-  buy_rule: both
-  cash: 10000000          # 보유금 (원)
+  rank_basis: watchlist   # watchlist = 그룹 안 거래대금 순위 / market = 전체 시장 순위
+  rank_up_min: 1          # 순위 몇 계단 이상 올라야 순위 상승으로 볼지
+  buy_rule: both          # both = 주목 + 순위 상승 / rank_only = 순위 상승만
+  cash: 10000000          # 그룹별 모의 보유금 (원)
   buy_ratio: 0.2          # 매수 신호 때 남은 보유금의 20% 제안 (실제 주문 안 함)
   beep: true              # 매수 신호 때 알림음
 

@@ -60,6 +60,26 @@ CREATE TABLE IF NOT EXISTS watch_signals (
     rank_prev INTEGER, rank_now INTEGER, qty INTEGER, amount REAL, cash_left REAL,
     PRIMARY KEY (date, time, code, kind)
 );
+CREATE TABLE IF NOT EXISTS watch_universe (     -- 그룹별 그날 감시 종목
+    date TEXT, grp TEXT, code TEXT, name TEXT, rank INTEGER, reason TEXT, picked_at TEXT,
+    PRIMARY KEY (date, grp, code)
+);
+CREATE TABLE IF NOT EXISTS watch_ticks2 (
+    date TEXT, time TEXT, grp TEXT, code TEXT, name TEXT, price REAL, pct REAL, value REAL, strength REAL,
+    wl_rank INTEGER, mk_rank INTEGER, d_value REAL, d_pct REAL, d_strength REAL, per_won REAL,
+    rank_prev INTEGER, rank_up INTEGER, red INTEGER, buy INTEGER,
+    PRIMARY KEY (date, time, grp, code)
+);
+CREATE TABLE IF NOT EXISTS watch_signals2 (
+    date TEXT, time TEXT, grp TEXT, code TEXT, name TEXT, kind TEXT, price REAL, pct REAL, d_value REAL,
+    d_pct REAL, rank_prev INTEGER, rank_now INTEGER, qty INTEGER, amount REAL, cash_left REAL,
+    PRIMARY KEY (date, time, grp, code, kind)
+);
+CREATE TABLE IF NOT EXISTS watch_outcomes (     -- 매수 신호 이후 성과 (그룹 비교용)
+    date TEXT, grp TEXT, time TEXT, code TEXT, name TEXT, entry REAL, qty INTEGER,
+    r30 REAL, r60 REAL, rclose REAL, rmax REAL,
+    PRIMARY KEY (date, grp, time, code)
+);
 CREATE TABLE IF NOT EXISTS paper_trades (       -- Day 71~ 소액 매매 (모의)
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     date TEXT, code TEXT, stage TEXT, qty INTEGER, entry REAL, exit REAL,

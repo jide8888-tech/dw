@@ -58,8 +58,9 @@ class App:
             print(f"  → {path}")
         if self.cfg.get("excel", True):
             self.theme_excel(rv, quiet=quiet)
-        try:   # 5분 감시 대상 선정용: 오늘 거래대금 상위 100 저장
-            watch.record_day(self.con, self.src, date, self.cfg["watch"]["top_n"])
+        try:   # 5분 감시 ②그룹 재료: 오늘 거래대금 상위 100 저장 + 오늘 매수 신호의 종가 수익률 채우기
+            watch.record_day(self.con, self.src, date, watch.gcfg(self.cfg, "history")["top_n"])
+            watch.fill_close(self.con, self.src, date)
         except Exception as e:
             if not quiet:
                 print(f"[info] 거래대금 상위 저장 생략 ({e.__class__.__name__})")

@@ -22,7 +22,16 @@ DEFAULTS = {
              "krx_id": "", "krx_pw": "", "kiwoom_appkey": "", "kiwoom_secretkey": ""},
     "kiwoom": {"mock": False},
     "watch": {"interval_min": 5, "start": "09:00", "end": "15:30",
-              "lookback_days": 5, "top_n": 100, "min_pct": 20.0, "extra_codes": [],
+              "groups": {
+                  # ① 장 시작 직전 예상체결 등락률 상위
+                  "expected": {"enabled": True, "label": "①예상체결", "top_n": 100,
+                               "pick_times": ["08:55", "08:59"], "min_qty": 10000, "min_price": 1000,
+                               "exclude_pref_spac": True},
+                  # ② 최근 N거래일 거래대금 상위 + 급등 이력
+                  "history": {"enabled": True, "label": "②거래대금이력", "lookback_days": 10, "top_n": 100,
+                              "min_pct": 15.0},
+              },
+              "extra_codes": [],
               "value_delta_eok": 5.0, "pct_delta": 1.5,
               "rank_basis": "watchlist", "rank_up_min": 1, "buy_rule": "both",
               "cash": 10_000_000, "buy_ratio": 0.2, "beep": True},
