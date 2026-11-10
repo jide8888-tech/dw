@@ -86,6 +86,20 @@ class DemoPriceSource(BaseSource):
         return _filter(pd.DataFrame(rows, columns=COLUMNS), f)
 
 
+    def value_top(self, date, n=100):
+        d = pd.Timestamp(to_date(date))
+        rows = []
+        for code, name, market, _ in UNIVERSE:
+            s = self._series(code, to_date(date))
+            if d in s.index:
+                r = s.loc[d]
+                rows.append({"code": code, "name": name, "market": market, "close": r.close,
+                             "change_pct": round(r.change_pct, 2), "value": float(r.volume * r.close)})
+        df = pd.DataFrame(rows).sort_values("value", ascending=False).head(n).reset_index(drop=True)
+        df["rank"] = range(1, len(df) + 1)
+        return df
+
+
 class DemoNews:
     def search(self, query, around=None, days_before=3, limit=20):
         code = next((c for c, n in NAMES.items() if n == query), None)

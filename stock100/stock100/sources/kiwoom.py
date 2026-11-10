@@ -46,6 +46,16 @@ def _code(s: str) -> str:
     return s
 
 
+def _enough(n):
+    """연속조회 누적 n건 이상이면 중단"""
+    acc = []
+
+    def stop(page):
+        acc.extend(page)
+        return len(acc) >= n
+    return stop
+
+
 class KiwoomError(RuntimeError):
     pass
 
@@ -83,7 +93,12 @@ class KiwoomClient:
                               "secretkey": self.secretkey})
         data = r.json() if r.content else {}
         if r.status_code != 200 or not data.get("token"):
-            raise KiwoomError(f"토큰 발급 실패 (HTTP {r.status_code}): {data.get('return_msg') or r.text[:200]}")
+            msg = data.get('return_msg') or r.text[:200]
+            hint = ""
+            if "8001" in str(msg) or "Key" in str(msg):
+                hint = (f"\n  확인: ① 키를 다시 복사(앱키/시크릿키 바뀜 여부) ② 모의투자용 키면 config 에 kiwoom: mock: true "
+                        f"(지금 접속: {'모의' if self.base == MOCK else '실전'} 서버) ③ 환경변수 KIWOOM_APPKEY 가 옛 값인지")
+            raise KiwoomError(f"토큰 발급 실패 (HTTP {r.status_code}): {msg}{hint}")
         self._token = data["token"]
         exp = data.get("expires_dt")
         self._exp = dt.datetime.strptime(exp, "%Y%m%d%H%M%S") if exp else now + dt.timedelta(hours=12)
@@ -201,6 +216,50 @@ class KiwoomSource(BaseSource):
         if "value" not in df:
             df["value"] = None
         return _filter(df[COLUMNS], f)[COLUMNS + ["is_upper", "is_volume", "is_hot"]]
+
+    def value_top(self, date, n=100):
+        """오늘 거래대금 상위 n (전체 시장, ka10032)"""
+        if to_date(date) != dt.date.today():
+            raise KiwoomError("키움 순위 API 는 오늘 데이터만 제공합니다.")
+        rows = self.c.call("/api/dostk/rkinfo", "ka10032", {"mrkt_tp": "000", "mang_stk_incls": "1", "stex_tp": "1"},
+                           max_pages=10, stop=_enough(n))
+        out = []
+        for i, r in enumerate(rows[:n], 1):
+            out.append({"code": _code(r.get("stk_cd", "")), "name": (r.get("stk_nm") or "").strip(), "market": "",
+                        "close": abs(_num(r.get("cur_prc")) or 0), "change_pct": _num(r.get("flu_rt")) or 0,
+                        "value": self._value(r), "rank": int(_num(r.get("now_rank")) or i)})
+        return pd.DataFrame(out, columns=["code", "name", "market", "close", "change_pct", "value", "rank"])
+
+    # ---------------- 5분 감시용 현재가 (관심종목정보 ka10095, 여러 종목 한 번에)
+    def quotes(self, codes: list[str], chunk: int = 30) -> pd.DataFrame:
+        out = []
+        for i in range(0, len(codes), chunk):
+            rows = self.c.call("/api/dostk/stkinfo", "ka10095", {"stk_cd": "|".join(codes[i:i + chunk])},
+                               max_pages=3)
+            for r in rows:
+                out.append({"code": _code(r.get("stk_cd", "")), "name": (r.get("stk_nm") or "").strip(),
+                            "price": abs(_num(r.get("cur_prc")) or 0), "pct": _num(r.get("flu_rt")) or 0.0,
+                            "value": self._value(r), "strength": _num(r.get("cntr_str"))})
+        return pd.DataFrame(out, columns=["code", "name", "price", "pct", "value", "strength"])
+
+    def expected_top(self, n: int = 100) -> pd.DataFrame:
+        """장전 예상체결 등락률 상위 (ka10029). ETF·ETN 제외, 1만 주·1천 원 이상은 서버에서 거른다.
+        우선주·스팩은 서버 조건 하나로 같이 못 거르므로 watch 쪽에서 이름/코드로 거른다."""
+        rows = self.c.call("/api/dostk/rkinfo", "ka10029",
+                           {"mrkt_tp": "000", "sort_tp": "1", "trde_qty_cnd": "10", "stk_cnd": "16",
+                            "crd_cnd": "0", "pric_cnd": "8", "stex_tp": "1"},
+                           max_pages=10, stop=_enough(int(n * 1.6)))     # 거른 뒤 100개가 남도록 넉넉히
+        out = []
+        for i, r in enumerate(rows, 1):
+            out.append({"code": _code(r.get("stk_cd", "")), "name": (r.get("stk_nm") or "").strip(),
+                        "price": abs(_num(r.get("exp_cntr_pric")) or 0), "pct": _num(r.get("flu_rt")) or 0.0,
+                        "qty": _num(r.get("exp_cntr_qty")) or 0, "rank": i})
+        return pd.DataFrame(out, columns=["code", "name", "price", "pct", "qty", "rank"])
+
+    def market_rank(self, n: int = 300) -> dict[str, int]:
+        rows = self.c.call("/api/dostk/rkinfo", "ka10032", {"mrkt_tp": "000", "mang_stk_incls": "1", "stex_tp": "1"},
+                           max_pages=10, stop=_enough(n))
+        return {_code(r.get("stk_cd", "")): int(_num(r.get("now_rank")) or i) for i, r in enumerate(rows[:n], 1)}
 
     @staticmethod
     def _value(r) -> float:

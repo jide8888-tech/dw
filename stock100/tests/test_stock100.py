@@ -160,3 +160,133 @@ def test_kiwoom_source_with_fake_server(tmp_path, monkeypatch):
     n_token = sum(1 for c in calls if c[0].endswith("/oauth2/token"))
     kw.KiwoomSource(cfg).c.token()                            # 캐시된 토큰 재사용
     assert sum(1 for c in calls if c[0].endswith("/oauth2/token")) == n_token == 1
+
+
+def _watch_env(tmp_path, monkeypatch, over=None):
+    from stock100.db import connect
+    monkeypatch.chdir(tmp_path)
+    cfg = Config.load(None, {"data_dir": str(tmp_path), **(over or {})})
+    return cfg, connect(tmp_path / "kb.sqlite")
+
+
+def test_watch_history_universe(tmp_path, monkeypatch):
+    """② 최근 10거래일 거래대금 100위 이내 + 15% 이상 (+extra_codes), 판다스 경고 없음"""
+    import warnings
+    import pandas as pd
+    from stock100 import watch
+    cfg, con = _watch_env(tmp_path, monkeypatch, {"watch": {"extra_codes": ["4090"]}})
+    days = [dt.date(2026, 10, 27) + dt.timedelta(days=i) for i in range(12)]
+
+    class Src:
+        def trading_days(self, end, n):
+            return [d for d in days if d <= end][-n:]
+
+        def value_top(self, date, n=100):
+            rows = [{"code": "A00000", "name": "에이", "change_pct": 16.0, "rank": 3},     # 15%↑ → 포함
+                    {"code": "B00000", "name": "비", "change_pct": 14.9, "rank": 5},       # 15% 미만 → 제외
+                    {"code": "C00000", "name": "씨", "change_pct": 30.0, "rank": 101}]     # 100위 밖 → 제외
+            if date == days[0]:                                                          # 11거래일 전 → 기간 밖
+                rows.append({"code": "D00000", "name": "디", "change_pct": 25.0, "rank": 1})
+            return pd.DataFrame([{**r, "market": "", "close": 1, "value": 1e9} for r in rows])
+
+    today = days[-1]
+    watch.ensure_history(cfg, con, Src(), today, quiet=True)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        uni = watch.history_universe(cfg, con, Src(), today)
+    assert list(uni.code) == ["A00000", "004090"]
+
+
+def test_watch_expected_pick_filters(tmp_path, monkeypatch):
+    """① 예상체결: 우선주·스팩·1만 주 미만·1천 원 미만 제외 후 상위 100, 저장/재사용"""
+    import pandas as pd
+    from stock100 import watch
+    cfg, con = _watch_env(tmp_path, monkeypatch)
+    assert watch.is_pref_or_spac("005935", "삼성전자우") and watch.is_pref_or_spac("18064K", "한진칼우")
+    assert watch.is_pref_or_spac("123450", "하나스팩10호") and not watch.is_pref_or_spac("005930", "삼성전자")
+
+    class Feed:
+        def expected_top(self, n):
+            rows = [{"code": f"{i:05d}0", "name": f"종목{i}", "price": 5000, "pct": 30 - i * 0.1, "qty": 20000}
+                    for i in range(1, 130)]
+            rows[0].update(code="000015", name="뭐뭐우")       # 우선주
+            rows[1].update(name="엔에이치스팩")                  # 스팩
+            rows[2].update(qty=9999)                            # 거래량 미달
+            rows[3].update(price=990)                           # 동전주
+            df = pd.DataFrame(rows)
+            df["rank"] = range(1, len(df) + 1)
+            return df
+
+    uni = watch.pick_expected(cfg, con, Feed(), dt.date(2026, 11, 10), "확정", quiet=True)
+    assert len(uni) == 100 and uni.iloc[0].code == "000050" and list(uni["rank"])[:3] == [1, 2, 3]
+    assert len(watch.load_universe(con, dt.date(2026, 11, 10), "expected")) == 100
+
+
+def test_watch_signals_and_outcomes(tmp_path, monkeypatch):
+    """주목(5억+1.5%p) / 순위 상승 매수(그룹 보유금 20%) / 30분·1시간·종가 성과 / 그룹 비교"""
+    import pandas as pd
+    from stock100 import watch
+    cfg, con = _watch_env(tmp_path, monkeypatch)
+    uni = pd.DataFrame({"code": ["A", "B"], "name": ["에이", "비"], "rank": [None, None], "reason": ["", ""]})
+    path = [{"A": (10000, 5.0, 100e8), "B": (5000, 3.0, 90e8)},
+            {"A": (10100, 6.0, 102e8), "B": (5200, 5.0, 96e8)},    # B 주목만 (순위 그대로)
+            {"A": (10150, 6.5, 103e8), "B": (5400, 7.0, 104e8)}]   # B 2위→1위 매수
+    path += [{"A": (10150, 6.5, 103e8 + i * 1e7), "B": (5400 + 54 * (i + 1), 7.0, 105e8 + i * 1e7)}
+             for i in range(15)]                                   # 이후 B 1%씩 상승
+
+    class Feed:
+        def quotes(self, codes):
+            t = path.pop(0)
+            return pd.DataFrame([{"code": c, "name": "", "price": p, "pct": r, "value": v, "strength": 100}
+                                 for c, (p, r, v) in t.items() if c in codes])
+
+        def market_rank(self, n=300):
+            return {}
+
+    tf = watch.TickFeed(Feed())
+    w = watch.Watcher(cfg, con, tf, uni, dt.date(2026, 11, 10), "history")
+    t0 = dt.datetime(2026, 11, 10, 9, 0)
+    res = []
+    for k in range(18):
+        tf.begin(["A", "B"])
+        res.append(w.tick(t0 + dt.timedelta(minutes=5 * k), final=(k == 17)))
+    assert not res[0]["signals"]
+    assert [(s["code"], s["kind"]) for s in res[1]["signals"]] == [("B", "주목")]
+    buy = next(s for s in res[2]["signals"] if s["kind"] == "매수")
+    assert (buy["rank_prev"], buy["rank_now"]) == (2, 1) and buy["qty"] == int(2_000_000 // 5400)
+    o = dict(con.execute("SELECT * FROM watch_outcomes").fetchone())
+    assert o["time"] == "09:10" and o["entry"] == 5400
+    assert o["r30"] == 6.0 and o["r60"] == 12.0 and o["rclose"] == 15.0 and o["rmax"] == 15.0
+    out, sig = watch.compare_rows(con)
+    assert out["history"]["n"] == 1 and out["history"]["win"] == 1 and sig["history"] == 2   # 09:05, 09:10 주목
+    p = watch.write_excel(cfg, con, dt.date(2026, 11, 10), {"history": uni}, tmp_path / "w.xlsx")
+    import openpyxl
+    assert openpyxl.load_workbook(p).sheetnames[:2] == ["성과비교", "실시간_②거래대금이력"]
+
+
+def test_watch_premarket_timing(tmp_path, monkeypatch):
+    """08:50 시작 → 08:55 1차 선정 → 08:59 확정 → 09:00~15:30 5분 간격 → 종료"""
+    from stock100 import watch
+    from stock100.__main__ import App
+    monkeypatch.chdir(tmp_path)
+    cfg = Config.load(None, {"data_dir": str(tmp_path), "sources": {"prices": "demo"}})
+    app = App(cfg)
+    feed = watch.DemoFeed()
+    monkeypatch.setattr(watch, "_feed", lambda a, demo: feed)
+    picks = []
+    real = watch.pick_expected
+    monkeypatch.setattr(watch, "pick_expected",
+                        lambda c, con, f, d, tag, quiet=False: (picks.append((now[0].strftime("%H:%M"), tag)),
+                                                                real(c, con, f, d, tag, quiet=True))[1])
+    monkeypatch.setattr(watch, "ensure_history", lambda *a, **k: watch._demo_history(cfg, app.con, app.src, a[3]))
+    now = [dt.datetime.combine(dt.date.today(), dt.time(8, 50))]
+
+    def sleep(sec):
+        now[0] += dt.timedelta(seconds=sec + 2)
+
+    watch.run(app, clock=lambda: now[0], sleep=sleep)
+    assert picks == [("08:55", "1차"), ("08:59", "확정")]
+    times = [r[0] for r in app.con.execute("SELECT DISTINCT time FROM watch_ticks2 ORDER BY time")]
+    assert times[0] == "09:00" and times[-1] == "15:30" and len(times) == 79
+    grps = {r[0] for r in app.con.execute("SELECT DISTINCT grp FROM watch_ticks2")}
+    assert grps == {"expected", "history"}

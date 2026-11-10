@@ -56,6 +56,10 @@ class BaseSource:
         """f = config filters. 상한가 / 천만주 / 대금상위(거래대금·등락률) 중 하나라도 해당하는 종목"""
         raise NotImplementedError
 
+    def value_top(self, date, n: int = 100) -> pd.DataFrame:
+        """그날 거래대금 상위 n 종목: code, name, market, close, change_pct, value, rank"""
+        raise NotImplementedError
+
     def ohlcv(self, code: str, start, end) -> pd.DataFrame:
         start, end = to_date(start), to_date(end)
         days = (dt.date.today() - start).days
@@ -88,7 +92,33 @@ def _filter(df: pd.DataFrame, f: dict) -> pd.DataFrame:
     return df[df["is_upper"] | df["is_volume"] | df["is_hot"]].reset_index(drop=True)
 
 
-class KrxSource(BaseSource):
+def _rank(df: pd.DataFrame, n: int) -> pd.DataFrame:
+    df = df.sort_values("value", ascending=False).head(n).reset_index(drop=True)
+    df["rank"] = range(1, len(df) + 1)
+    return df
+
+
+class KrxValueTop:
+    def value_top(self, date, n=100):
+        from pykrx import stock
+        d = ymd(date)
+        frames = []
+        for m in self.markets:
+            o = stock.get_market_ohlcv_by_ticker(d, market=m)
+            if o.empty or (o[["시가", "고가", "저가", "종가"]] == 0).all(axis=None):
+                continue
+            o["market"] = m
+            frames.append(o)
+        if not frames:
+            return pd.DataFrame(columns=["code", "name", "market", "close", "change_pct", "value", "rank"])
+        df = pd.concat(frames).reset_index()
+        df = df.rename(columns={df.columns[0]: "code", "종가": "close", "등락률": "change_pct", "거래대금": "value"})
+        df = _rank(df[["code", "market", "close", "change_pct", "value"]], n)
+        df["name"] = [stock.get_market_ticker_name(c) for c in df["code"]]
+        return df
+
+
+class KrxSource(KrxValueTop, BaseSource):
     name = "krx"
 
     def __init__(self, markets):
@@ -178,6 +208,14 @@ class AutoSource(BaseSource):
         self.krx = KrxSource(markets)
         self.naver = NaverSource()
         self.kiwoom = kiwoom
+
+    def value_top(self, date, n=100):
+        if self.kiwoom is not None and to_date(date) == dt.date.today():
+            try:
+                return self.kiwoom.value_top(date, n)
+            except Exception as e:
+                print(f"[info] 키움 거래대금 순위 실패({e}) → KRX")
+        return self.krx.value_top(date, n)
 
     def ohlcv(self, code, start, end):
         if self.kiwoom is not None:

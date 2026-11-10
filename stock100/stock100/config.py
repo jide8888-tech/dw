@@ -21,6 +21,20 @@ DEFAULTS = {
     "keys": {"dart": "", "naver_client_id": "", "naver_client_secret": "",
              "krx_id": "", "krx_pw": "", "kiwoom_appkey": "", "kiwoom_secretkey": ""},
     "kiwoom": {"mock": False},
+    "watch": {"interval_min": 5, "start": "09:00", "end": "15:30",
+              "groups": {
+                  # ① 장 시작 직전 예상체결 등락률 상위
+                  "expected": {"enabled": True, "label": "①예상체결", "top_n": 100,
+                               "pick_times": ["08:55", "08:59"], "min_qty": 10000, "min_price": 1000,
+                               "exclude_pref_spac": True},
+                  # ② 최근 N거래일 거래대금 상위 + 급등 이력
+                  "history": {"enabled": True, "label": "②거래대금이력", "lookback_days": 10, "top_n": 100,
+                              "min_pct": 15.0},
+              },
+              "extra_codes": [],
+              "value_delta_eok": 5.0, "pct_delta": 1.5,
+              "rank_basis": "watchlist", "rank_up_min": 1, "buy_rule": "both",
+              "cash": 10_000_000, "buy_ratio": 0.2, "beep": True},
     "morning": {"queries": ["특징주", "상한가", "공급계약", "수주"], "min_score": 2},
     "track": {"horizons": [1, 3, 5], "hit_pct": 3.0},
     "paper": {"enabled": True, "take_profit_pct": 3.0, "stop_loss_pct": 3.0, "max_per_day": 1},
@@ -71,6 +85,8 @@ class Config:
         for k, env in ENV_KEYS.items():
             if os.getenv(env):
                 merged["keys"][k] = os.environ[env]
+        # 복사·붙여넣기 때 섞인 앞뒤 공백/줄바꿈 제거
+        merged["keys"] = {k: (str(v).strip() if v is not None else "") for k, v in merged["keys"].items()}
         # pykrx 는 KRX_ID / KRX_PW 환경변수로 로그인한다
         if merged["keys"].get("krx_id") and not os.getenv("KRX_ID"):
             os.environ["KRX_ID"] = merged["keys"]["krx_id"]
