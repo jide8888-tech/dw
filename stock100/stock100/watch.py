@@ -64,15 +64,19 @@ def universe(cfg, con, src, today) -> pd.DataFrame:
                FROM value_rank_daily WHERE date>=? AND date<? AND rank<=? AND change_pct>=?
                GROUP BY code ORDER BY last_date DESC, max_pct DESC""",
             (iso(days[0]), iso(today), w["top_n"], w["min_pct"])).fetchall()
-    df = pd.DataFrame([dict(r) for r in rows],
-                      columns=["code", "name", "last_date", "best_rank", "max_pct", "n_days"])
-    df["reason"] = [f"{r.last_date} 거래대금 {r.best_rank}위, {r.max_pct:+.1f}%" for r in df.itertuples()]
-    extra = [str(c).zfill(6) for c in (w.get("extra_codes") or []) if str(c).strip()]
-    for c in extra:
-        if c not in set(df["code"]):
-            nm = con.execute("SELECT name FROM stocks WHERE code=?", (c,)).fetchone()
-            df.loc[len(df)] = [c, nm["name"] if nm else "", "", None, None, 0, "직접 추가(extra_codes)"]
-    return df.reset_index(drop=True)
+    recs = [dict(r) for r in rows]
+    for r in recs:
+        r["reason"] = f"{r['last_date']} 거래대금 {r['best_rank']}위, {r['max_pct']:+.1f}%"
+    have = {r["code"] for r in recs}
+    for c in (str(c).strip().zfill(6) for c in (w.get("extra_codes") or []) if str(c).strip()):
+        if c in have:
+            continue
+        have.add(c)
+        nm = con.execute("SELECT name FROM stocks WHERE code=? UNION ALL "
+                         "SELECT name FROM value_rank_daily WHERE code=? LIMIT 1", (c, c)).fetchone()
+        recs.append({"code": c, "name": nm[0] if nm else "", "last_date": "", "best_rank": None,
+                     "max_pct": None, "n_days": 0, "reason": "직접 추가(extra_codes)"})
+    return pd.DataFrame(recs, columns=["code", "name", "last_date", "best_rank", "max_pct", "n_days", "reason"])
 
 
 # ------------------------------------------------------------------ 감시 로직
@@ -107,6 +111,10 @@ class Watcher:
             return {"time": now.strftime("%H:%M"), "rows": q, "signals": []}
         q = q.drop_duplicates("code").set_index("code")
         q["name"] = [n or self.names.get(c, c) for c, n in zip(q.index, q["name"])]
+        blank = self.uni["name"].fillna("") == ""
+        if blank.any():          # 직접 추가 종목처럼 이름을 몰랐던 종목은 시세 응답의 이름으로 채움
+            self.uni.loc[blank, "name"] = self.uni.loc[blank, "code"].map(q["name"]).fillna("")
+            self.names.update({c: n for c, n in zip(self.uni["code"], self.uni["name"]) if n})
         q["wl_rank"] = q["value"].rank(ascending=False, method="first").astype(int)
         try:
             mk = self.feed.market_rank(300)

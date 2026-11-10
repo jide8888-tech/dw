@@ -221,3 +221,21 @@ def test_watch_rules(tmp_path, monkeypatch):
     p = watch.write_excel(cfg, con, today, uni, tmp_path / "w.xlsx")
     import openpyxl
     assert openpyxl.load_workbook(p).sheetnames == ["실시간", "신호기록", "5분대금흐름(억)", "감시대상", "기준"]
+
+
+def test_watch_universe_extra_codes_without_warning(tmp_path, monkeypatch):
+    import warnings
+    from stock100 import watch
+    from stock100.db import connect
+    monkeypatch.chdir(tmp_path)
+    cfg = Config.load(None, {"data_dir": str(tmp_path), "watch": {"extra_codes": ["4090", "053610"]}})
+    con = connect(tmp_path / "kb.sqlite")
+
+    class Src:
+        def trading_days(self, end, n):
+            return [dt.date(2026, 11, 5)]
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")          # 판다스 FutureWarning 이 나오면 실패
+        uni = watch.universe(cfg, con, Src(), dt.date(2026, 11, 10))
+    assert list(uni.code) == ["004090", "053610"] and set(uni.reason) == {"직접 추가(extra_codes)"}
