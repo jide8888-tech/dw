@@ -49,9 +49,14 @@ python -m stock100 theme                # 오늘 거래대금 상위 + 고등락
 python -m stock100 theme --value 300 --pct 15 --date 20261030   # 기준과 날짜 지정
 python -m stock100 watch                # 장중 5분 감시 (키움 필요). --list 대상만, --once 1회, --demo 가짜 장
 python -m stock100 status               # 단계, 누적 적중률, 모의 손익
+python -m stock100 update               # GitHub 최신 코드로 업데이트 (config.yaml·data 유지, scripts\update.bat 더블클릭도 가능)
 ```
 
 처음에는 `backfill --days 100`으로 "100일치 복습"을 먼저 채우는 것을 권장합니다. 그래야 다음 날 새벽부터 예습 시그널이 나옵니다.
+
+### 업데이트
+
+`python -m stock100 update` 한 번이면 GitHub `main`의 최신 코드로 바뀝니다. 바뀐 파일만 덮어쓰고 이전 파일은 `backup/날짜시각/`에 남깁니다. `config.yaml`과 `data` 폴더는 건드리지 않고, `requirements.txt`가 바뀌면 패키지도 설치합니다. `--check`는 새 버전이 있는지만 봅니다.
 
 ### 매일 자동 실행
 

@@ -310,3 +310,41 @@ def test_watch_midday_start_aligns_to_grid(tmp_path, monkeypatch):
     watch.run(app, clock=lambda: now[0], sleep=sleep)
     times = [r[0] for r in app.con.execute("SELECT DISTINCT time FROM watch_ticks2 ORDER BY time")]
     assert times[:3] == ["12:10", "12:15", "12:20"] and times[-1] == "15:30"
+
+
+def test_update_keeps_config_and_data(tmp_path):
+    """update: 바뀐 코드만 반영 + 백업, config.yaml/data 보존, CRLF 그대로, 같은 버전이면 아무것도 안 함"""
+    import io
+    import zipfile
+    from stock100 import update
+
+    root = tmp_path / "stock100"
+    (root / "stock100").mkdir(parents=True)
+    (root / "stock100" / "__init__.py").write_text("old")
+    (root / "stock100" / "same.py").write_text("same")
+    (root / "config.yaml").write_text("keys: secret")
+    (root / "data").mkdir()
+    (root / "data" / "kb.sqlite").write_bytes(b"db")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("dw-main/", "")
+        z.writestr("dw-main/index.html", "other project")                 # 저장소의 다른 파일 → 무시
+        z.writestr("dw-main/stock100/stock100/__init__.py", "new")
+        z.writestr("dw-main/stock100/stock100/same.py", "same")
+        z.writestr("dw-main/stock100/scripts/run_watch.bat", b"@echo off\r\nrem x\r\n")
+        z.writestr("dw-main/stock100/config.yaml", "keys: SHOULD NOT OVERWRITE")  # 보호
+        z.writestr("dw-main/stock100/data/kb.sqlite", b"SHOULD NOT")             # 보호
+    zb = buf.getvalue()
+
+    rc = update.run(root=root, pip=False, _download=lambda r, b: zb, _sha=lambda r, b: "a" * 40)
+    assert rc == 0
+    assert (root / "stock100" / "__init__.py").read_text() == "new"
+    assert (root / "scripts" / "run_watch.bat").read_bytes() == b"@echo off\r\nrem x\r\n"
+    assert (root / "config.yaml").read_text() == "keys: secret"
+    assert (root / "data" / "kb.sqlite").read_bytes() == b"db"
+    assert not (root / "index.html").exists()
+    backups = list((root / "backup").glob("*/stock100/__init__.py"))
+    assert len(backups) == 1 and backups[0].read_text() == "old"
+    assert (root / ".version").read_text() == "a" * 40
+    assert update.plan(zb, root) == []                                    # 두 번째 실행: 바뀐 것 없음
