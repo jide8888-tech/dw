@@ -182,7 +182,7 @@ class TickFeed:
 
 # ------------------------------------------------------------------ 그룹별 감시
 class Watcher:
-    def __init__(self, cfg, con, feed, uni: pd.DataFrame, date, grp: str):
+    def __init__(self, cfg, con, feed, uni: pd.DataFrame, date, grp: str, now: dt.datetime | None = None):
         self.cfg, self.con, self.feed, self.uni, self.grp = cfg, con, feed, uni, grp
         self.w = cfg["watch"]
         self.date = iso(date)
@@ -195,6 +195,9 @@ class Watcher:
         self.bought = {r["code"] for r in con.execute(
             "SELECT DISTINCT code FROM watch_signals2 WHERE date=? AND grp=? AND kind='매수'", (self.date, grp))}
         t = con.execute("SELECT MAX(time) FROM watch_ticks2 WHERE date=? AND grp=?", (self.date, grp)).fetchone()[0]
+        step = dt.timedelta(minutes=self.w["interval_min"])
+        if t and now is not None and _at(self.date, t) < now - step * 2:
+            t = None   # 오래 꺼져 있었으면 그 사이 변화가 한 번에 잡히지 않도록 새 기준값부터 시작
         if t:      # 같은 날 재시작: 마지막 스냅샷부터 이어서 비교
             rows = con.execute("SELECT code, price, pct, value, strength, wl_rank, mk_rank FROM watch_ticks2 "
                                "WHERE date=? AND grp=? AND time=?", (self.date, grp, t)).fetchall()
@@ -556,7 +559,7 @@ def run(app, once=False, demo=False, list_only=False, clock=None, sleep=_time.sl
               "필요합니다. 급하면 config 의 watch.extra_codes 에 종목코드를 넣으세요.")
         return unis
     tf = TickFeed(feed)
-    watchers = {g: Watcher(cfg, con, tf, u, today, g) for g, u in unis.items()}
+    watchers = {g: Watcher(cfg, con, tf, u, today, g, now=clock()) for g, u in unis.items()}
     union = sorted({c for u in unis.values() for c in u["code"]})
     path = cfg.sub("watch") / f"{iso(today)}_실시간감시.xlsx"
     step = dt.timedelta(minutes=w["interval_min"])
@@ -576,6 +579,7 @@ def run(app, once=False, demo=False, list_only=False, clock=None, sleep=_time.sl
         print(f"  → {write_excel(cfg, con, today, unis, path)}")
         return unis
 
+    first = True
     while True:
         now = clock()
         if not once and now < start:
@@ -585,6 +589,15 @@ def run(app, once=False, demo=False, list_only=False, clock=None, sleep=_time.sl
         if not once and now > end + dt.timedelta(minutes=1):
             print(f"[감시] 장 종료({w['end']}). 오늘 결과: {path}")
             break
+        off = (now - start) % step
+        if not once and dt.timedelta(seconds=30) < off and first:
+            # 장중에 켠 경우: 12:09 → 12:10 처럼 1분짜리 비교가 생기지 않도록 다음 정각(12:10)에 기준값을 잡는다
+            nxt = now - off + step
+            print(f"[감시] 5분 간격을 맞추기 위해 {nxt:%H:%M} 부터 시작합니다.")
+            first = False
+            sleep(max(1.0, (nxt - now).total_seconds()))
+            continue
+        first = False
         try:
             results = one(now, final=(now + step > end + dt.timedelta(minutes=1)))
             for res in results:

@@ -290,3 +290,23 @@ def test_watch_premarket_timing(tmp_path, monkeypatch):
     assert times[0] == "09:00" and times[-1] == "15:30" and len(times) == 79
     grps = {r[0] for r in app.con.execute("SELECT DISTINCT grp FROM watch_ticks2")}
     assert grps == {"expected", "history"}
+
+
+def test_watch_midday_start_aligns_to_grid(tmp_path, monkeypatch):
+    """12:09 에 켜도 첫 비교가 1분짜리가 되지 않게 12:10 에 기준값, 12:15 부터 5분 비교"""
+    from stock100 import watch
+    from stock100.__main__ import App
+    monkeypatch.chdir(tmp_path)
+    cfg = Config.load(None, {"data_dir": str(tmp_path), "sources": {"prices": "demo"},
+                             "watch": {"groups": {"expected": {"enabled": False}}}})
+    app = App(cfg)
+    monkeypatch.setattr(watch, "_feed", lambda a, demo: watch.DemoFeed())
+    monkeypatch.setattr(watch, "ensure_history", lambda *a, **k: watch._demo_history(cfg, app.con, app.src, a[3]))
+    now = [dt.datetime.combine(dt.date.today(), dt.time(12, 9, 10))]
+
+    def sleep(sec):
+        now[0] += dt.timedelta(seconds=sec + 2)
+
+    watch.run(app, clock=lambda: now[0], sleep=sleep)
+    times = [r[0] for r in app.con.execute("SELECT DISTINCT time FROM watch_ticks2 ORDER BY time")]
+    assert times[:3] == ["12:10", "12:15", "12:20"] and times[-1] == "15:30"
