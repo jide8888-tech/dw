@@ -104,6 +104,14 @@ def ensure_history(cfg, con, src, today, quiet=False):
                       f"과거 날짜는 KRX 로그인이 필요하고, 매일 evening 을 돌리면 자동으로 쌓입니다.")
 
 
+_ETF = re.compile(r"^(KODEX|TIGER|KBSTAR|RISE|ACE|SOL|HANARO|ARIRANG|KOSEF|PLUS|TIMEFOLIO|KOACT|WOORI|BNK|FOCUS|"
+                  r"TREX|UNICORN|VITA|KIWOOM|1Q|WON|TRUSTON|ITF|HK|에셋플러스|마이티|히어로즈|파워)\b|ETN|레버리지|인버스")
+
+
+def is_etf(name: str) -> bool:
+    return bool(_ETF.search(str(name or "")))
+
+
 def history_universe(cfg, con, src, today) -> pd.DataFrame:
     h = gcfg(cfg, "history")
     days = lookback_dates(src, today, h["lookback_days"])
@@ -114,6 +122,8 @@ def history_universe(cfg, con, src, today) -> pd.DataFrame:
                    FROM value_rank_daily WHERE date>=? AND date<? AND rank<=? AND change_pct>=?
                    GROUP BY code ORDER BY last_date DESC, max_pct DESC""",
                 (iso(days[0]), iso(today), h["top_n"], h["min_pct"])):
+            if h.get("exclude_etf", True) and is_etf(r["name"]):
+                continue
             recs.append({"code": r["code"], "name": r["name"], "rank": None,
                          "reason": f"{r['last_date']} 거래대금 {r['best_rank']}위, {r['max_pct']:+.1f}%"})
     have = {r["code"] for r in recs}
@@ -226,6 +236,8 @@ class Watcher:
         q["buy"] = False
         if self.prev is not None:
             p = self.prev.reindex(q.index)
+            # 09:00 기준값이 장 시작 전(거래대금 0)이면 비교하지 않는다 → 시초가 갭 전체가 '5분 변화'로 잡히는 것 방지
+            p = p.where(p["value"].fillna(0) > 0)
             q["d_value"] = q["value"] - p["value"]
             q["d_pct"] = (q["pct"] - p["pct"]).round(2)
             q["d_strength"] = (q["strength"] - p["strength"]).round(2)
@@ -244,7 +256,8 @@ class Watcher:
             for k in kinds:
                 qty = amount = 0
                 if k == "매수" and r.price > 0:
-                    qty = int(math.floor(self.cash * w["buy_ratio"] / r.price))
+                    base = float(w["cash"]) if w.get("sizing", "fixed") == "fixed" else self.cash
+                    qty = int(math.floor(base * w["buy_ratio"] / r.price))
                     amount = qty * r.price
                     self.cash -= amount
                     self.bought.add(c)
@@ -289,9 +302,10 @@ class Watcher:
 
 
 def fill_close(con, src, date) -> int:
-    """감시를 중간에 껐어도 저녁에 종가 수익률을 채운다"""
+    """저녁에 실제 종가로 종가 수익률을 덮어쓴다 (15:20~15:30 동시호가 동안은 장중 시세가 멈춰 있어
+    감시 마지막 값은 15:20 무렵 가격이다. 감시를 중간에 껐을 때도 여기서 채워진다)"""
     n = 0
-    for o in con.execute("SELECT * FROM watch_outcomes WHERE date=? AND rclose IS NULL", (iso(date),)).fetchall():
+    for o in con.execute("SELECT * FROM watch_outcomes WHERE date=?", (iso(date),)).fetchall():
         try:
             df = src.ohlcv(o["code"], date, date)
         except Exception:
@@ -319,8 +333,7 @@ def print_tick(cfg, res):
         msg = (f"   ▶ {s['kind']} {s['name']}({s['code']}) {s['price']:,.0f}원 {s['pct']:+.2f}% · "
                f"5분 대금 {(_f(s['d_value']) or 0) / 1e8:+.1f}억 · 등락 {(_f(s['d_pct']) or 0):+.2f}%p · {rk}")
         if s["kind"] == "매수":
-            msg += (f"\n     → 보유금 {w['buy_ratio'] * 100:.0f}% 매수 제안: {s['qty']:,}주 "
-                    f"({s['amount']:,.0f}원), 그룹 남은 보유금 {s['cash_left']:,.0f}원")
+            msg += (f"\n     → 보유금 {w['buy_ratio'] * 100:.0f}% 매수 제안: {s['qty']:,}주 ({s['amount']:,.0f}원)")
         print(msg)
 
 
@@ -330,6 +343,35 @@ def beep():
         winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
     except Exception:
         print("\a", end="")
+
+
+def simulate_exit(con, cfg, date=None) -> dict:
+    """신호마다 '익절 +tp% / 손절 -sl% / end 시각 정리' 로 팔았다면의 수익률 (5분 시세 기준).
+    5분마다 본 가격으로 판정하므로 실제 체결과는 다를 수 있다. 반환: {(date, grp, time, code): (수익률, 사유, 시각)}"""
+    e = cfg["watch"].get("exit", {})
+    tp, sl, end = float(e.get("take_profit_pct", 3.0)), float(e.get("stop_loss_pct", 3.0)), e.get("end_time", "15:20")
+    cond, args = ("WHERE date=?", (iso(date),)) if date else ("", ())
+    out = {}
+    for o in con.execute(f"SELECT * FROM watch_outcomes {cond}", args).fetchall():
+        if not o["entry"]:
+            continue
+        ticks = con.execute("SELECT time, price FROM watch_ticks2 WHERE date=? AND grp=? AND code=? AND time>? "
+                            "AND time<=? ORDER BY time", (o["date"], o["grp"], o["code"], o["time"], end)).fetchall()
+        res = None
+        for t in ticks:
+            ret = round((t["price"] / o["entry"] - 1) * 100, 2)
+            if ret >= tp:
+                res = (ret, "익절", t["time"])
+                break
+            if ret <= -sl:
+                res = (ret, "손절", t["time"])
+                break
+        if res is None and ticks:
+            last = ticks[-1]
+            res = (round((last["price"] / o["entry"] - 1) * 100, 2), f"{end} 정리", last["time"])
+        if res:
+            out[(o["date"], o["grp"], o["time"], o["code"])] = res
+    return out
 
 
 def compare_rows(con, date=None):
@@ -363,20 +405,31 @@ def write_excel(cfg, con, date, unis: dict, path):
     wb.remove(wb.active)
 
     # 성과비교
+    ex = w.get("exit", {})
     ws = _sheet(wb, "성과비교", ["그룹", "기간", "감시 종목 수", "주목 신호", "매수 신호", "30분 평균(%)",
-                             "1시간 평균(%)", "종가 평균(%)", "종가 적중률(%)", "평균 최고수익(%)", "모의 손익(원)", "일수"],
-                [16, 8, 11, 9, 9, 11, 11, 11, 12, 13, 13, 6])
+                             "1시간 평균(%)", "종가 평균(%)", "종가 적중률(%)", "평균 최고수익(%)", "모의 손익(원)",
+                             "규칙 평균(%)", "규칙 승률(%)", "익절/손절/정리", "일수"],
+                [16, 8, 11, 9, 9, 11, 11, 11, 12, 13, 13, 11, 11, 13, 6])
     for period, dd in (("오늘", date), ("누적", None)):
         out, sig = compare_rows(con, dd)
+        sim = simulate_exit(con, cfg, dd)
         for g in GROUPS:
             o = out.get(g, {})
             nc = o.get("nc") or 0
+            rs = [v for k, v in sim.items() if k[1] == g]
             ws.append([label(cfg, g), period, len(unis.get(g, [])) if period == "오늘" else None, sig.get(g, 0),
                        o.get("n", 0), _r(o.get("a30")), _r(o.get("a60")), _r(o.get("ac")),
                        _r((o.get("win") or 0) / nc * 100) if nc else None, _r(o.get("amax")),
-                       round(o["pnl"]) if o.get("pnl") is not None else None, o.get("days")])
+                       round(o["pnl"]) if o.get("pnl") is not None else None,
+                       _r(sum(v[0] for v in rs) / len(rs)) if rs else None,
+                       _r(sum(v[0] > 0 for v in rs) / len(rs) * 100) if rs else None,
+                       "/".join(str(sum(v[1].startswith(x) for v in rs)) for x in ("익절", "손절", ex.get("end_time", "15:20")))
+                       if rs else None, o.get("days")])
     ws.append([])
-    ws.append(["적중 = 매수 신호가 난 가격보다 종가가 높음. 모의 손익 = 제안 수량 × (종가 − 신호 가격)."])
+    ws.append(["적중 = 매수 신호가 난 가격보다 종가가 높음. 모의 손익 = 제안 수량 × (종가 − 신호 가격). "
+               "종가는 저녁 작업(evening)에서 실제 종가로 바뀝니다."])
+    ws.append([f"규칙 = 신호 가격에 사서 +{ex.get('take_profit_pct', 3.0)}% 익절 / -{ex.get('stop_loss_pct', 3.0)}% 손절 / "
+               f"{ex.get('end_time', '15:20')} 정리로 팔았다면 (5분 시세 기준, 실제 체결과 다를 수 있음)."])
 
     # 그룹별 실시간
     for g in GROUPS:
@@ -405,11 +458,14 @@ def write_excel(cfg, con, date, unis: dict, path):
         ws.cell(1, 16, f"기준 시각 {d} {t}")
 
     # 신호 성과
+    sim = simulate_exit(con, cfg, date)
     ws = _sheet(wb, "신호성과", ["그룹", "신호시각", "종목명", "코드", "신호가격", "제안수량", "30분(%)", "1시간(%)",
-                             "종가(%)", "최고(%)"], [16, 8, 16, 9, 11, 9, 9, 9, 9, 9])
+                             "종가(%)", "최고(%)", "규칙 청산(%)", "청산 사유", "청산 시각"],
+                [16, 8, 16, 9, 11, 9, 9, 9, 9, 9, 11, 10, 9])
     for r in con.execute("SELECT * FROM watch_outcomes WHERE date=? ORDER BY time", (d,)):
+        x = sim.get((r["date"], r["grp"], r["time"], r["code"]), (None, None, None))
         ws.append([label(cfg, r["grp"]), r["time"], r["name"], r["code"], r["entry"], r["qty"], r["r30"], r["r60"],
-                   r["rclose"], r["rmax"]])
+                   r["rclose"], r["rmax"], *x])
 
     # 신호기록
     ws = _sheet(wb, "신호기록", ["그룹", "시각", "구분", "종목명", "코드", "현재가", "등락률", "5분 대금증가(억)",
