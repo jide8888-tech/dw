@@ -243,10 +243,10 @@ class KiwoomSource(BaseSource):
         return pd.DataFrame(out, columns=["code", "name", "price", "pct", "value", "strength"])
 
     def expected_top(self, n: int = 100) -> pd.DataFrame:
-        """장전 예상체결 등락률 상위 (ka10029). ETF·ETN 제외, 1만 주·1천 원 이상은 서버에서 거른다.
+        """장전 예상체결 등락률 상위 (ka10029). ETF·ETN 제외, 1천 주·1천 원 이상은 서버에서 거른다.
         우선주·스팩은 서버 조건 하나로 같이 못 거르므로 watch 쪽에서 이름/코드로 거른다."""
         rows = self.c.call("/api/dostk/rkinfo", "ka10029",
-                           {"mrkt_tp": "000", "sort_tp": "1", "trde_qty_cnd": "10", "stk_cnd": "16",
+                           {"mrkt_tp": "000", "sort_tp": "1", "trde_qty_cnd": "1", "stk_cnd": "16",
                             "crd_cnd": "0", "pric_cnd": "8", "stex_tp": "1"},
                            max_pages=10, stop=_enough(int(n * 1.6)))     # 거른 뒤 100개가 남도록 넉넉히
         out = []

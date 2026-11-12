@@ -59,7 +59,7 @@ watch:                    # 장중 5분 감시 (python -m stock100 watch, 키움
       enabled: true
       top_n: 100
       pick_times: ["08:55", "08:59"]   # 1차 선정 → 확정 (08:55 이전에 켜 두기)
-      min_qty: 10000      # 예상체결량 1만 주 이상
+      min_qty: 1000       # 예상체결량 1천 주 이상 (장전엔 거래가 적어 1만 주는 너무 엄격)
       min_price: 1000     # 1천 원 미만 동전주 제외
       exclude_pref_spac: true          # 우선주·스팩 제외 (ETF·ETN 은 항상 제외)
     history:              # ② 최근 거래대금 상위 + 급등 이력
@@ -67,6 +67,7 @@ watch:                    # 장중 5분 감시 (python -m stock100 watch, 키움
       lookback_days: 10   # 최근 10거래일
       top_n: 100          # 거래대금 100위 이내
       min_pct: 15.0       # 등락률 15% 이상
+      exclude_etf: true   # ETF·ETN·레버리지·인버스 제외
   extra_codes: []         # ②에 직접 추가할 종목코드 예: ["053610"]
   # 🔴 주목(빨간 음영): 5분 거래대금 증가 ≥ value_delta_eok 억 AND 5분 등락률 변화 ≥ pct_delta %p
   value_delta_eok: 5.0
@@ -75,7 +76,12 @@ watch:                    # 장중 5분 감시 (python -m stock100 watch, 키움
   rank_up_min: 1          # 순위 몇 계단 이상 올라야 순위 상승으로 볼지
   buy_rule: both          # both = 주목 + 순위 상승 / rank_only = 순위 상승만
   cash: 10000000          # 그룹별 모의 보유금 (원)
-  buy_ratio: 0.2          # 매수 신호 때 남은 보유금의 20% 제안 (실제 주문 안 함)
+  buy_ratio: 0.2          # 매수 신호 때 보유금의 20% 제안 (실제 주문 안 함)
+  sizing: fixed           # fixed = 신호마다 같은 금액(보유금×20%) / remaining = 남은 보유금의 20%
+  exit:                   # 매도 규칙 시뮬레이션 (엑셀 성과비교·신호성과의 '규칙' 열)
+    take_profit_pct: 3.0  # +3% 익절
+    stop_loss_pct: 3.0    # -3% 손절
+    end_time: "15:20"     # 그때까지 안 팔렸으면 정리
   beep: true              # 매수 신호 때 알림음
 
 morning:                  # Day 41~: 새벽 예습

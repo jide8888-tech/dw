@@ -211,7 +211,7 @@ def test_watch_expected_pick_filters(tmp_path, monkeypatch):
                     for i in range(1, 130)]
             rows[0].update(code="000015", name="뭐뭐우")       # 우선주
             rows[1].update(name="엔에이치스팩")                  # 스팩
-            rows[2].update(qty=9999)                            # 거래량 미달
+            rows[2].update(qty=999)                             # 거래량 미달 (1천 주 미만)
             rows[3].update(price=990)                           # 동전주
             df = pd.DataFrame(rows)
             df["rank"] = range(1, len(df) + 1)
@@ -310,3 +310,87 @@ def test_watch_midday_start_aligns_to_grid(tmp_path, monkeypatch):
     watch.run(app, clock=lambda: now[0], sleep=sleep)
     times = [r[0] for r in app.con.execute("SELECT DISTINCT time FROM watch_ticks2 ORDER BY time")]
     assert times[:3] == ["12:10", "12:15", "12:20"] and times[-1] == "15:30"
+
+
+def test_update_keeps_config_and_data(tmp_path):
+    """update: 바뀐 코드만 반영 + 백업, config.yaml/data 보존, CRLF 그대로, 같은 버전이면 아무것도 안 함"""
+    import io
+    import zipfile
+    from stock100 import update
+
+    root = tmp_path / "stock100"
+    (root / "stock100").mkdir(parents=True)
+    (root / "stock100" / "__init__.py").write_text("old")
+    (root / "stock100" / "same.py").write_text("same")
+    (root / "config.yaml").write_text("keys: secret")
+    (root / "data").mkdir()
+    (root / "data" / "kb.sqlite").write_bytes(b"db")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("dw-main/", "")
+        z.writestr("dw-main/index.html", "other project")                 # 저장소의 다른 파일 → 무시
+        z.writestr("dw-main/stock100/stock100/__init__.py", "new")
+        z.writestr("dw-main/stock100/stock100/same.py", "same")
+        z.writestr("dw-main/stock100/scripts/run_watch.bat", b"@echo off\r\nrem x\r\n")
+        z.writestr("dw-main/stock100/config.yaml", "keys: SHOULD NOT OVERWRITE")  # 보호
+        z.writestr("dw-main/stock100/data/kb.sqlite", b"SHOULD NOT")             # 보호
+    zb = buf.getvalue()
+
+    rc = update.run(root=root, pip=False, _download=lambda r, b: zb, _sha=lambda r, b: "a" * 40)
+    assert rc == 0
+    assert (root / "stock100" / "__init__.py").read_text() == "new"
+    assert (root / "scripts" / "run_watch.bat").read_bytes() == b"@echo off\r\nrem x\r\n"
+    assert (root / "config.yaml").read_text() == "keys: secret"
+    assert (root / "data" / "kb.sqlite").read_bytes() == b"db"
+    assert not (root / "index.html").exists()
+    backups = list((root / "backup").glob("*/stock100/__init__.py"))
+    assert len(backups) == 1 and backups[0].read_text() == "old"
+    assert (root / ".version").read_text() == "a" * 40
+    assert update.plan(zb, root) == []                                    # 두 번째 실행: 바뀐 것 없음
+
+
+def test_watch_day2_fixes(tmp_path, monkeypatch):
+    """11-12 실사용에서 찾은 문제: 장전 기준값(대금 0) 비교 제외, 같은 금액 매수, ETF 제외, 실제 종가, 익절·손절 규칙"""
+    import pandas as pd
+    from stock100 import watch
+    cfg, con = _watch_env(tmp_path, monkeypatch)
+    assert watch.is_etf("KODEX 반도체레버리지") and watch.is_etf("TIGER 2차전지") and not watch.is_etf("한진칼우")
+
+    uni = pd.DataFrame({"code": ["A", "B", "C"], "name": ["에이", "비", "씨"], "rank": None, "reason": ""})
+    path = [{"A": (10000, 0.0, 0.0), "B": (5000, 0.0, 0.0), "C": (3000, 0.0, 0.0)},          # 09:00 장 시작 전
+            {"A": (11000, 10.0, 50e8), "B": (5200, 4.0, 40e8), "C": (3000, 0.0, 1e8)},       # 09:05 갭 → 신호 없어야
+            {"A": (11100, 11.0, 52e8), "B": (5400, 8.0, 53e8), "C": (3000, 0.0, 1e8)},       # 09:10 B: +13억 +4%p, 2위→1위
+            {"A": (11100, 11.0, 53e8), "B": (5600, 12.0, 54e8), "C": (3000, 0.0, 1e8)},      # 09:15 B +3.7%
+            {"A": (11100, 11.0, 54e8), "B": (5100, 2.0, 55e8), "C": (3000, 0.0, 1e8)}]       # 09:20
+
+    class Feed:
+        def quotes(self, codes):
+            t = path.pop(0)
+            return pd.DataFrame([{"code": c, "name": "", "price": p, "pct": r, "value": v, "strength": 100}
+                                 for c, (p, r, v) in t.items()])
+
+        def market_rank(self, n=300):
+            return {}
+
+    tf = watch.TickFeed(Feed())
+    w = watch.Watcher(cfg, con, tf, uni, dt.date(2026, 11, 12), "history")
+    t0 = dt.datetime(2026, 11, 12, 9, 0)
+    res = []
+    for k in range(5):
+        tf.begin(["A", "B", "C"])
+        res.append(w.tick(t0 + dt.timedelta(minutes=5 * k)))
+    assert res[1]["signals"] == []                         # 09:05: 시초가 갭은 5분 변화가 아님
+    buy = next(s for s in res[2]["signals"] if s["kind"] == "매수")
+    assert buy["code"] == "B" and buy["qty"] == int(10_000_000 * 0.2 // 5400)    # 시작 보유금 기준 같은 금액
+    sim = watch.simulate_exit(con, cfg, dt.date(2026, 11, 12))
+    ret, why, at = sim[("2026-11-12", "history", "09:10", "B")]
+    assert (ret, why, at) == (3.7, "익절", "09:15")
+
+    class Src:
+        def ohlcv(self, code, s, e):
+            return pd.DataFrame({"close": [5940.0]}, index=pd.DatetimeIndex(["2026-11-12"]))
+
+    con.execute("UPDATE watch_outcomes SET rclose=-1.0")
+    assert watch.fill_close(con, Src(), dt.date(2026, 11, 12)) == 1
+    assert con.execute("SELECT rclose FROM watch_outcomes").fetchone()[0] == 10.0   # 5400→5940 실제 종가로 덮어씀

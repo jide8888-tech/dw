@@ -5,14 +5,21 @@
   python -m stock100 theme              # 거래대금 상위 + 고등락률 종목 테마 분석 → 엑셀
   python -m stock100 watch              # 장중 5분 감시 (09:00~15:30, 키움 필요)
   python -m stock100 kiwoom             # 키움 REST API 연결 점검
+  python -m stock100 update             # GitHub 최신 코드로 업데이트 (config.yaml·data 유지)
   python -m stock100 status             # 현재 단계와 누적 성과
   python -m stock100 demo               # 네트워크 없이 가짜 데이터로 전체 흐름 시연
 """
 from __future__ import annotations
 
+import sys
+
+if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1] == "update":
+    # 업데이트는 다른 모듈(판다스 등)을 불러오기 전에 처리 → 패키지가 바뀌어도 업데이트는 항상 동작
+    from .update import main as _update_main
+    sys.exit(_update_main(sys.argv[2:]))
+
 import argparse
 import datetime as dt
-import sys
 
 from . import challenge, excel, notes, preview, review, theme, track, watch
 from .config import Config
@@ -58,12 +65,18 @@ class App:
             print(f"  → {path}")
         if self.cfg.get("excel", True):
             self.theme_excel(rv, quiet=quiet)
-        try:   # 5분 감시 ②그룹 재료: 오늘 거래대금 상위 100 저장 + 오늘 매수 신호의 종가 수익률 채우기
+        try:   # 5분 감시 ②그룹 재료: 오늘 거래대금 상위 100 저장
             watch.record_day(self.con, self.src, date, watch.gcfg(self.cfg, "history")["top_n"])
-            watch.fill_close(self.con, self.src, date)
         except Exception as e:
             if not quiet:
                 print(f"[info] 거래대금 상위 저장 생략 ({e.__class__.__name__})")
+        try:   # 오늘 매수 신호의 종가 수익률을 실제 종가로
+            n = watch.fill_close(self.con, self.src, date)
+            if n and not quiet:
+                print(f"[감시] 매수 신호 {n}건 종가 수익률을 실제 종가로 갱신")
+        except Exception as e:
+            if not quiet:
+                print(f"[info] 종가 갱신 생략 ({e.__class__.__name__})")
         return path
 
     def theme_excel(self, rv, quiet=False):
@@ -134,10 +147,17 @@ def main(argv=None):
     p.add_argument("--once", action="store_true", help="한 번만 조회하고 종료")
     p.add_argument("--list", action="store_true", help="오늘 감시 대상만 출력")
     p.add_argument("--demo", action="store_true", help="가짜 데이터로 하루치 감시 재생")
+    p = sp.add_parser("update", help="GitHub 최신 코드로 업데이트 (config.yaml·data 유지)")
+    p.add_argument("--check", action="store_true", help="새 버전이 있는지만 확인")
+    p.add_argument("--no-pip", action="store_true")
     sp.add_parser("status")
     p = sp.add_parser("demo")
     p.add_argument("--days", type=int, default=60)
     a = ap.parse_args(argv)
+
+    if a.cmd == "update":          # --config 를 앞에 붙여 실행한 경우
+        from .update import main as update_main
+        return update_main((["--check"] if a.check else []) + (["--no-pip"] if a.no_pip else []))
 
     if a.cmd == "watch" and a.demo:
         cfg = Config.load(a.config, {"sources": {"prices": "demo"}, "data_dir": "data_demo"})
