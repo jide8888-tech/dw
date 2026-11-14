@@ -116,6 +116,13 @@ details ul{margin:8px 0 2px;padding-left:18px;display:flex;flex-direction:column
       <h2 id="winText"></h2>
       <button class="throw" id="againBtn" type="button" style="padding-inline:28px">한 판 더</button>
     </div>
+    <div class="overlay" id="startBox" hidden>
+      <h2>누가 먼저?</h2>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+        <button class="throw" id="first0" type="button" style="padding-inline:28px;background:var(--p1);color:#fff">홍 먼저</button>
+        <button class="throw" id="first1" type="button" style="padding-inline:28px;background:var(--p2);color:#fff">청 먼저</button>
+      </div>
+    </div>
   </div>
 
   <aside class="side">
@@ -141,6 +148,7 @@ details ul{margin:8px 0 2px;padding-left:18px;display:flex;flex-direction:column
         <li>모서리나 한가운데(방)에서 출발하면 지름길로 들어갑니다.</li>
         <li>내 말끼리 같은 자리면 업혀서 함께 움직이고, 상대 말 자리에 멈추면 잡아서 대기석으로 돌려보냅니다.</li>
         <li>출발점(참먹이)을 지나야 골인. 정확히 멈추면 다음 이동 때 바로 골인합니다.</li>
+        <li>판을 시작할 때 홍과 청 중 먼저 할 쪽을 고릅니다.</li>
         <li>말 네 개를 먼저 모두 골인시키면 승리. 스페이스바로도 던질 수 있어요.</li>
       </ul>
     </details>
@@ -166,7 +174,7 @@ const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 let S;
 function fresh(){
-  return {cur:0,throwsLeft:1,results:[],sel:0,winner:null,msg:"",sticks:null,last:null,
+  return {begun:false,cur:0,throwsLeft:1,results:[],sel:0,winner:null,msg:"",sticks:null,last:null,
     players:[0,1].map(()=>({pieces:[0,1,2,3].map(()=>({node:-1,path:[],started:false,done:false}))}))};
 }
 
@@ -229,7 +237,7 @@ function nextTurn(){
 }
 let busy=false;
 async function doThrow(){
-  if(busy||S.throwsLeft<=0||S.winner!=null)return;
+  if(busy||!S.begun||S.throwsLeft<=0||S.winner!=null)return;
   busy=true;S.msg="";render();
   const st=$("sticks");st.classList.remove("toss");void st.offsetWidth;st.classList.add("toss");
   $("result").textContent="";
@@ -344,7 +352,7 @@ function render(){
   sticks.forEach((s,k)=>{const f=S.sticks?S.sticks[k]:false;s.classList.toggle("flat",f);s.classList.toggle("round",!f);});
   $("result").innerHTML=S.last==null?'<small>윷을 던져 시작하세요</small>':NAMES[S.last]+`<small>${S.last<0?"한 칸 뒤로":S.last+"칸"}</small>`;
   const tb=$("throwBtn");
-  const canThrow=!busy&&S.throwsLeft>0&&S.winner==null;
+  const canThrow=S.begun&&!busy&&S.throwsLeft>0&&S.winner==null;
   tb.disabled=!canThrow;
   tb.textContent=S.throwsLeft>1?`윷 던지기 (${S.throwsLeft}번 남음)`:"윷 던지기";
   // 결과 칩
@@ -359,7 +367,8 @@ function render(){
   // 상태
   $("whoDot").style.background=`var(--p${S.cur+1})`;
   let st;
-  if(S.winner!=null)st=S.msg;
+  if(!S.begun)st="누가 먼저 할지 고르세요.";
+  else if(S.winner!=null)st=S.msg;
   else if(busy)st=S.msg||`${PNAMES[S.cur]} 말이 움직이는 중…`;
   else if(S.throwsLeft>0)st=(S.msg?S.msg+" ":"")+(S.msg.includes("던지세요")?"":`${PNAMES[S.cur]}, 윷을 던지세요.`);
   else st=(S.msg?S.msg+" ":"")+`${PNAMES[S.cur]}, ${NAMES[r]}(으)로 움직일 말을 누르세요.`;
@@ -384,16 +393,20 @@ function render(){
     P.appendChild(card);
   });
   // 승리
+  $("startBox").hidden=S.begun;
   const wb=$("winBox");wb.hidden=S.winner==null;
   if(S.winner!=null){$("winText").textContent=`${PNAMES[S.winner]} 승리`;$("winText").style.color=`var(--p${S.winner+1})`;}
 }
 
 /* ---------- 시작 ---------- */
 let armed=null;
-function newGame(){S=fresh();S.msg="홍부터 시작합니다.";tokEls.flat().forEach(g=>{g.dataset.shown="";});busy=false;hideTarget();render();}
+function choose(k){if(S.begun)return;S.begun=true;S.cur=k;S.msg=PNAMES[k]+"부터 시작합니다.";render();}
+function newGame(){S=fresh();tokEls.flat().forEach(g=>{g.dataset.shown="";});busy=false;hideTarget();render();}
 function start(data){
   drawBoard();makeToks();
-  if(data&&data.S&&data.S.players)S=data.S;else{S=fresh();S.msg="홍부터 시작합니다.";}
+  if(data&&data.S&&data.S.players){S=data.S;if(S.begun===undefined)S.begun=true;}else S=fresh();
+  $("first0").addEventListener("click",()=>choose(0));
+  $("first1").addEventListener("click",()=>choose(1));
   $("throwBtn").addEventListener("click",doThrow);
   $("againBtn").addEventListener("click",newGame);
   $("newBtn").addEventListener("click",()=>{
