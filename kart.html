@@ -61,6 +61,9 @@ body{background:var(--night);color:var(--ink);font-family:var(--f-body);font-siz
 .ctrl h3 i{width:12px;height:12px;border-radius:3px}
 .row{display:flex;justify-content:space-between;gap:8px;font-size:14px;color:var(--muted)}
 kbd{font-family:inherit;font-size:13px;color:var(--ink);background:rgba(255,255,255,.1);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 7px}
+.auto{display:flex;gap:12px;align-items:flex-start;background:rgba(255,201,60,.1);border:1.5px solid var(--gold);border-radius:10px;padding:12px 14px;cursor:pointer;font-size:14px;color:var(--muted)}
+.auto input{width:22px;height:22px;margin:0;flex:none;accent-color:var(--gold);cursor:pointer}
+.auto b{display:block;color:var(--ink);font-weight:400;font-family:var(--f-display);font-size:18px}
 .items{display:flex;gap:10px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
 .items b{color:var(--ink);font-weight:400;font-family:var(--f-display);margin-right:4px}
 .go{font-family:var(--f-display);font-size:24px;border:0;border-radius:10px;padding:14px 28px;background:var(--gold);color:#1d1606;cursor:pointer;align-self:flex-start}
@@ -106,6 +109,7 @@ kbd{font-family:inherit;font-size:13px;color:var(--ink);background:rgba(255,255,
           <div class="row">아이템 <span><kbd>오른쪽 Shift</kbd> <kbd>Enter</kbd> <kbd>O</kbd></span></div>
         </div>
       </div>
+      <label class="auto" for="autoGas"><input type="checkbox" id="autoGas" checked><span><b>자동 가속</b>앞으로는 저절로 가요. 좌우 키만 누르면 됩니다. 뒤 키(S·↓)를 누르면 멈추거나 후진해요.</span></label>
       <div class="items"><span><b>부스터</b>잠깐 빨라짐</span><span><b>기름</b>뒤에 뿌려 상대를 미끄러뜨림</span><span><b>추적탄</b>2위만 나옴, 상대를 쫓아감</span></div>
       <button class="go" id="startBtn" type="button">레이스 시작</button>
       <p class="note">키보드가 필요합니다. 주황 화살표 발판을 밟으면 가속, 잔디에 들어가면 느려집니다. <kbd>P</kbd> 또는 <kbd>Esc</kbd>로 일시정지.</p>
@@ -288,6 +292,9 @@ function rocketMesh(){
 
 /* ---------- 입력 ---------- */
 const keys={};
+let autoGas=true;
+try{const v=localStorage.getItem("kart.autoGas");if(v!==null)autoGas=v==="1";}catch(e){}
+{const cb=document.getElementById("autoGas");cb.checked=autoGas;cb.addEventListener("change",()=>{autoGas=cb.checked;try{localStorage.setItem("kart.autoGas",autoGas?"1":"0");}catch(e){}});}
 // 같은 키를 e.code · e.key · keyCode 세 가지로 기록해 키보드/브라우저마다 다른 값에도 반응하게 함
 const BIND=[{up:["KeyW","k:w","k:W","c:87"],down:["KeyS","k:s","k:S","c:83"],left:["KeyA","k:a","k:A","c:65"],right:["KeyD","k:d","k:D","c:68"],item:["ShiftLeft","KeyQ","c:81"]},
             {up:["ArrowUp","k:ArrowUp","k:Up","c:38","Numpad8","KeyI","c:73"],down:["ArrowDown","k:ArrowDown","k:Down","c:40","Numpad5","Numpad2","KeyK","c:75"],
@@ -353,7 +360,7 @@ function spinOut(k,t,text){if(k.finished)return;k.spin=t;k.boost=0;say(k,text,1.
 function updateKart(k,dt){
   const i=k.id,racing=state==="race"&&!k.finished;
   let up=0,down=0,steer=0;
-  if(racing&&k.spin<=0){up=held(i,"up")?1:0;down=held(i,"down")?1:0;steer=(held(i,"left")?1:0)-(held(i,"right")?1:0);}
+  if(racing&&k.spin<=0){down=held(i,"down")?1:0;up=(held(i,"up")||(autoGas&&!down))?1:0;steer=(held(i,"left")?1:0)-(held(i,"right")?1:0);}
   if(k.finished){ // 골인 후 자동 주행
     const t=P[(k.idx+14)%N],want=Math.atan2(t.x-k.x,t.z-k.z);let d=want-k.h;d=Math.atan2(Math.sin(d),Math.cos(d));
     k.h+=Math.max(-2*dt,Math.min(2*dt,d));k.speed+=(18-k.speed)*Math.min(1,dt*1.5);
