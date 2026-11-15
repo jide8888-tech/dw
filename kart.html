@@ -84,7 +84,7 @@ kbd{font-family:inherit;font-size:13px;color:var(--ink);background:rgba(255,255,
   </div></div>
   <div class="hud p1" id="hud1"><div class="in">
     <div class="tl"><span class="tag">2P</span><div class="rank"><b>2</b>위</div><div class="lap">랩 <b>1</b>/3</div><div class="time">0:00.00</div></div>
-    <div class="item"><span>-</span><small>Shift · Enter</small></div>
+    <div class="item"><span>-</span><small>Enter · O</small></div>
     <div class="speed"><b>0</b><small>km/h</small></div>
     <div class="msg"></div>
   </div></div>
@@ -101,9 +101,9 @@ kbd{font-family:inherit;font-size:13px;color:var(--ink);background:rgba(255,255,
           <div class="row">아이템 <span><kbd>왼쪽 Shift</kbd> <kbd>Q</kbd></span></div>
         </div>
         <div class="ctrl"><h3><i style="background:var(--p2)"></i>2P · 파랑</h3>
-          <div class="row">가속 / 후진 <span><kbd>↑</kbd> <kbd>↓</kbd></span></div>
-          <div class="row">핸들 <span><kbd>←</kbd> <kbd>→</kbd></span></div>
-          <div class="row">아이템 <span><kbd>오른쪽 Shift</kbd> <kbd>Enter</kbd></span></div>
+          <div class="row">가속 / 후진 <span><kbd>↑</kbd> <kbd>↓</kbd> 또는 <kbd>I</kbd> <kbd>K</kbd></span></div>
+          <div class="row">핸들 <span><kbd>←</kbd> <kbd>→</kbd> 또는 <kbd>J</kbd> <kbd>L</kbd></span></div>
+          <div class="row">아이템 <span><kbd>오른쪽 Shift</kbd> <kbd>Enter</kbd> <kbd>O</kbd></span></div>
         </div>
       </div>
       <div class="items"><span><b>부스터</b>잠깐 빨라짐</span><span><b>기름</b>뒤에 뿌려 상대를 미끄러뜨림</span><span><b>추적탄</b>2위만 나옴, 상대를 쫓아감</span></div>
@@ -288,19 +288,25 @@ function rocketMesh(){
 
 /* ---------- 입력 ---------- */
 const keys={};
-const BIND=[{up:["KeyW"],down:["KeyS"],left:["KeyA"],right:["KeyD"],item:["ShiftLeft","KeyQ"]},
-            {up:["ArrowUp"],down:["ArrowDown"],left:["ArrowLeft"],right:["ArrowRight"],item:["ShiftRight","Enter","NumpadEnter"]}];
+// 같은 키를 e.code · e.key · keyCode 세 가지로 기록해 키보드/브라우저마다 다른 값에도 반응하게 함
+const BIND=[{up:["KeyW","k:w","k:W","c:87"],down:["KeyS","k:s","k:S","c:83"],left:["KeyA","k:a","k:A","c:65"],right:["KeyD","k:d","k:D","c:68"],item:["ShiftLeft","KeyQ","c:81"]},
+            {up:["ArrowUp","k:ArrowUp","k:Up","c:38","Numpad8","KeyI","c:73"],down:["ArrowDown","k:ArrowDown","k:Down","c:40","Numpad5","Numpad2","KeyK","c:75"],
+             left:["ArrowLeft","k:ArrowLeft","k:Left","c:37","Numpad4","KeyJ","c:74"],right:["ArrowRight","k:ArrowRight","k:Right","c:39","Numpad6","KeyL","c:76"],
+             item:["ShiftRight","Enter","NumpadEnter","k:Enter","c:13","KeyO","c:79","Numpad0"]}];
 const held=(i,a)=>BIND[i][a].some(c=>keys[c]);
-const BLOCK=new Set(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","ShiftLeft","ShiftRight","Enter"]);
+const ids=e=>{const r=[];if(e.code)r.push(e.code);if(e.key)r.push("k:"+e.key);if(e.keyCode)r.push("c:"+e.keyCode);return r;};
+const BLOCK=new Set(["c:37","c:38","c:39","c:40","c:32","c:16","c:13"]);
+const lastIds={};
 addEventListener("keydown",e=>{
-  if(BLOCK.has(e.code)&&state!=="menu"&&state!=="done")e.preventDefault();
-  if(e.repeat){keys[e.code]=true;return;}
-  keys[e.code]=true;
+  const id=ids(e);
+  if(id.some(x=>BLOCK.has(x))&&state!=="menu"&&state!=="done")e.preventDefault();
+  id.forEach(x=>keys[x]=true);if(e.code)lastIds[e.code]=id;
+  if(e.repeat)return;
   if((e.code==="KeyP"||e.code==="Escape")&&(state==="race"||state==="count")){setPaused(true);return;}
   if((e.code==="KeyP"||e.code==="Escape")&&state==="paused"){setPaused(false);return;}
-  if(state==="race")for(let i=0;i<2;i++)if(BIND[i].item.includes(e.code))useItem(karts[i]);
-});
-addEventListener("keyup",e=>{keys[e.code]=false;});
+  if(state==="race")for(let i=0;i<2;i++)if(BIND[i].item.some(c=>id.includes(c)))useItem(karts[i]);
+},true);
+addEventListener("keyup",e=>{ids(e).concat(lastIds[e.code]||[]).forEach(x=>keys[x]=false);},true);
 addEventListener("blur",()=>{for(const k in keys)keys[k]=false;});
 
 /* ---------- 게임 상태 ---------- */
@@ -519,7 +525,8 @@ function toMenu(){state="menu";$("result").hidden=true;$("pause").hidden=true;$(
 function showcase(){ // 메뉴 뒤 배경: 출발선에 서 있는 두 카트
   const si=N-12;karts.forEach((k,i)=>{const o=i?-3.6:3.6;k.x=P[si].x+NM[si].x*o;k.z=P[si].z+NM[si].z*o;k.h=headAt(si);k.speed=0;k.idx=si;k.prog=-12;k.boost=0;k.spin=0;k.spinVis=0;k.item=null;k.msgT=0;snapCam(k);});
 }
-$("startBtn").addEventListener("click",()=>{resetRace();$("startBtn").blur();});
+$("startBtn").addEventListener("click",()=>{resetRace();$("startBtn").blur();try{window.focus();}catch(e){}});
+$("game").addEventListener("pointerdown",()=>{try{window.focus();}catch(e){}});
 $("againBtn").addEventListener("click",()=>{resetRace();$("againBtn").blur();});
 $("menuBtn").addEventListener("click",toMenu);
 $("resumeBtn").addEventListener("click",()=>setPaused(false));
