@@ -1,0 +1,399 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>셋이서 축구</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap">
+<style>
+/* Layout: 태블릿 화면 전체가 경기장. 점수판은 위에 작게 겹쳐 놓음. 경기장은 일부러 한 가지 색(잔디)만 씀 */
+:root{
+  --bg:#123B24; --board:rgba(8,30,18,.82); --ink:#FFFFFF; --muted:#BFE3C9;
+  --o:#FF8A1F; --b:#2F7BF0; --gold:#FFD23F; --panel:rgba(8,30,18,.94);
+  --f-display:"Jua","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --f-body:"Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+  padding-left:max(0px,env(safe-area-inset-left,0px));padding-right:max(0px,env(safe-area-inset-right,0px))}
+.fieldbox{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:max(6px,env(safe-area-inset-top,0px)) max(6px,env(safe-area-inset-right,0px)) max(6px,env(safe-area-inset-bottom,0px)) max(6px,env(safe-area-inset-left,0px))}
+canvas{display:block;border-radius:14px;touch-action:none}
+.score{position:fixed;top:max(8px,env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:3;display:flex;align-items:center;gap:16px;
+  font-family:var(--f-display);background:var(--board);border-radius:14px;padding:4px 16px;pointer-events:none}
+.score b{font-weight:400;font-size:clamp(28px,5vw,44px);line-height:1;font-variant-numeric:tabular-nums;min-width:1em;text-align:center}
+.score i{width:16px;height:16px;border-radius:50%;border:3px solid #fff}
+.clock{font-size:clamp(16px,2.6vw,22px);color:var(--muted);font-variant-numeric:tabular-nums;min-width:3.2em;text-align:center}
+.pausebtn{position:fixed;z-index:3;top:max(8px,env(safe-area-inset-top,0px));right:max(10px,env(safe-area-inset-right,0px));font-family:var(--f-display);font-size:17px;border:0;border-radius:12px;padding:8px 14px;background:rgba(0,0,0,.4);color:#fff;cursor:pointer}
+.overlay{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;background:rgba(6,22,13,.8);overflow:auto;
+  padding:max(14px,env(safe-area-inset-top,0px)) max(14px,env(safe-area-inset-right,0px)) max(14px,env(safe-area-inset-bottom,0px)) max(14px,env(safe-area-inset-left,0px));-webkit-user-select:auto;user-select:auto}
+.card{width:min(680px,100%);background:var(--panel);border:2px solid rgba(255,255,255,.12);border-radius:22px;padding:20px;display:flex;flex-direction:column;gap:14px;margin:auto}
+.card h1{font-family:var(--f-display);font-weight:400;font-size:clamp(40px,8vw,64px);line-height:1;margin:0}
+.card h1 span{color:var(--gold)}
+.lead{margin:0;color:var(--muted);font-size:15px}
+.rows{display:flex;flex-direction:column;gap:10px}
+.prow{display:flex;gap:10px;align-items:center;background:rgba(255,255,255,.06);border-radius:14px;padding:8px 10px;border-left:8px solid var(--o)}
+.prow.b{border-left-color:var(--b)}
+.prow .num{font-family:var(--f-display);font-size:22px;width:1.2em;text-align:center;color:var(--muted)}
+.prow input{flex:1;min-width:0;font:inherit;font-family:var(--f-display);font-size:22px;background:rgba(255,255,255,.1);border:0;border-radius:10px;color:#fff;padding:6px 10px}
+.tg{display:flex;gap:6px;flex:none}
+.tg button{font:inherit;font-family:var(--f-display);font-size:18px;border:2px solid rgba(255,255,255,.25);background:transparent;color:#fff;border-radius:10px;padding:5px 12px;cursor:pointer}
+.tg button.on.o{background:var(--o);border-color:var(--o)}
+.tg button.on.b{background:var(--b);border-color:var(--b)}
+.warn{color:var(--gold);font-size:14px;margin:0;min-height:1.2em}
+.opt{display:flex;flex-direction:column;gap:6px}
+.opt .lb{font-size:14px;color:var(--muted)}
+.seg{display:flex;gap:8px;flex-wrap:wrap}
+.seg button{font:inherit;font-family:var(--f-display);font-size:19px;color:#fff;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.2);border-radius:12px;padding:6px 16px;cursor:pointer}
+.seg button.on{background:var(--gold);border-color:var(--gold);color:#2a2000}
+.go{font-family:var(--f-display);font-size:30px;border:0;border-radius:16px;padding:14px;background:var(--gold);color:#2a2000;cursor:pointer;box-shadow:0 6px 0 rgba(0,0,0,.35)}
+.go:active{transform:translateY(3px);box-shadow:0 3px 0 rgba(0,0,0,.35)}
+.go:disabled{opacity:.4}
+.go.sub{background:rgba(255,255,255,.12);color:#fff;font-size:20px;padding:10px}
+button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.final{font-family:var(--f-display);font-size:clamp(40px,10vw,80px);text-align:center;line-height:1;display:flex;justify-content:center;align-items:center;gap:18px}
+.final span{font-size:.5em;color:var(--muted)}
+.msg{text-align:center;font-family:var(--f-display);font-size:clamp(24px,5vw,36px);margin:0}
+</style>
+
+<div class="fieldbox" id="fieldbox"><canvas id="cv"></canvas></div>
+<div class="score"><i style="background:var(--o)"></i><b id="oScore">0</b><span class="clock" id="clock">2:00</span><b id="bScore">0</b><i style="background:var(--b)"></i></div>
+<button class="pausebtn" id="pauseBtn" type="button" hidden>일시정지</button>
+
+<div class="overlay" id="menu">
+  <div class="card">
+    <h1>셋이서 <span>축구</span></h1>
+    <p class="lead">한 태블릿에서 셋이 같이 해요. 자기 선수를 손가락으로 꾹 누른 채 끌면 따라와요. 다른 곳을 눌러도 아무 일도 안 생겨서 여러 손가락으로 동시에 해도 괜찮아요.</p>
+    <div class="rows" id="rows"></div>
+    <p class="warn" id="warn"></p>
+    <div class="opt"><span class="lb">경기 시간</span>
+      <div class="seg" id="optTime"><button type="button" data-v="60">1분</button><button type="button" data-v="120" class="on">2분</button><button type="button" data-v="180">3분</button></div></div>
+    <div class="opt"><span class="lb">도움 받을 팀 (아이들 팀을 고르면 상대 골대가 커지고 상대가 느려져요)</span>
+      <div class="seg" id="optTeam"><button type="button" data-v="none">없음</button><button type="button" data-v="o">주황팀</button><button type="button" data-v="b">파랑팀</button></div></div>
+    <div class="opt" id="helpBox"><span class="lb">도움 정도</span>
+      <div class="seg" id="optHelp"><button type="button" data-v="1">조금</button><button type="button" data-v="2">많이</button></div></div>
+    <button class="go" id="startBtn" type="button">경기 시작!</button>
+    <p class="lead" style="font-size:13px">태블릿을 가로로 두면 경기장이 커져요.</p>
+  </div>
+</div>
+
+<div class="overlay" id="pause" hidden>
+  <div class="card" style="width:min(380px,100%)">
+    <p class="msg">잠깐 쉬는 중</p>
+    <button class="go" id="resumeBtn" type="button">계속하기</button>
+    <button class="go sub" id="quitBtn" type="button">처음 화면으로</button>
+  </div>
+</div>
+
+<div class="overlay" id="end" hidden>
+  <div class="card" style="width:min(480px,100%)">
+    <p class="msg" id="endMsg"></p>
+    <div class="final"><b id="fO" style="color:var(--o)">0</b><span>:</span><b id="fB" style="color:var(--b)">0</b></div>
+    <button class="go" id="againBtn" type="button">한 판 더!</button>
+    <button class="go sub" id="menuBtn" type="button">처음 화면으로</button>
+  </div>
+</div>
+
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const FW=1000,FH=600,GD=46,GOAL=210,BR=17,CUT=100,PR=38;
+const VX=-70,VY=-20,VW=FW+140,VH=FH+40;
+const COL={o:"#FF8A1F",b:"#2F7BF0"};
+const TEAMN={o:"주황팀",b:"파랑팀"};
+// 도움: 메뉴에서 고른 팀을 도와줌
+const HELP=[{spd:1,goal:1,kick:1},{spd:.82,goal:1.25,kick:1.2},{spd:.68,goal:1.5,kick:1.4}];
+let opt={time:120,help:2,helpTeam:"none"};
+let roster=[{name:"선수1",team:"o"},{name:"선수2",team:"o"},{name:"선수3",team:"b"}];
+try{const o=JSON.parse(localStorage.getItem("soccer3")||"null");if(o){if(o.opt)opt={...opt,...o.opt};if(o.roster&&o.roster.length===3)roster=o.roster;}}catch(e){}
+const save=()=>{try{localStorage.setItem("soccer3",JSON.stringify({opt,roster}));}catch(e){}};
+
+const cv=$("cv"),ctx=cv.getContext("2d");
+let scale=1,dpr=1;
+
+/* ---------- 소리 ---------- */
+let ac=null;
+function initAudio(){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();if(ac.state==="suspended")ac.resume();}catch(e){ac=null;}}
+function tone(f,t0,dur,type="square",vol=.08){if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.value=f;
+  g.gain.setValueAtTime(vol,ac.currentTime+t0);g.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+t0+dur);o.connect(g);g.connect(ac.destination);o.start(ac.currentTime+t0);o.stop(ac.currentTime+t0+dur+.02);}
+let lastKick=0;
+const sKick=()=>{const n=performance.now();if(n-lastKick<90)return;lastKick=n;tone(180,0,.08,"triangle",.18);};
+const sWall=()=>tone(110,0,.05,"triangle",.08);
+const sGoal=()=>[523,659,784,1047].forEach((f,i)=>tone(f,i*.11,.18,"square",.07));
+const sWhistle=()=>{tone(1800,0,.18,"sine",.06);tone(1800,.24,.35,"sine",.06);};
+
+/* ---------- 상태 ---------- */
+let players=[];
+const ball={x:FW/2,y:FH/2,vx:0,vy:0,rot:0};
+const ballRef={x:FW/2,y:FH/2};
+let score={o:0,b:0},timeLeft=120,state="menu",stateT=0,lastScorer=null,stuckT=0,confetti=[],prevState="play";
+let weak=null; // 도움 받는 팀
+const helpFor=t=>t===weak?HELP[opt.help]:HELP[0];
+const strongSlow=t=>weak&&t!==weak?HELP[opt.help].spd:1;
+// 왼쪽 골대 = 파랑팀이 지킴(주황팀이 넣는 곳), 오른쪽 골대 = 주황팀이 지킴
+const leftGoalH=()=>GOAL*(weak==="o"?HELP[opt.help].goal:weak==="b"?1/HELP[opt.help].goal:1);
+const rightGoalH=()=>GOAL*(weak==="b"?HELP[opt.help].goal:weak==="o"?1/HELP[opt.help].goal:1);
+
+function makePlayers(){
+  players=roster.map((r,i)=>({name:(r.name||"").trim()||`선수${i+1}`,team:r.team,num:i+1,x:0,y:0,vx:0,vy:0,r:PR,face:0,pid:null,tx:0,ty:0,hx:0,hy:0}));
+  const no=players.filter(p=>p.team==="o").length,nb=3-no;
+  weak=opt.helpTeam==="none"?null:opt.helpTeam;
+  ["o","b"].forEach(t=>{const team=players.filter(p=>p.team===t);const n=team.length;
+    team.forEach((p,k)=>{p.hx=t==="o"?(n===1?740:k===0?640:820):(n===1?260:k===0?360:180);p.hy=n===1?FH/2:n===2?FH/2+(k?130:-130):[150,300,450][k];p.face=t==="o"?Math.PI:0;});});
+}
+function kickoff(){
+  players.forEach(p=>{p.x=p.hx;p.y=p.hy;p.vx=p.vy=0;p.pid=null;p.face=p.team==="o"?Math.PI:0;});
+  grabs.clear();
+  ball.x=FW/2;ball.y=FH/2;ball.vx=ball.vy=0;stuckT=0;ballRef.x=ball.x;ballRef.y=ball.y;
+  state="ready";stateT=1.3;
+}
+function startGame(){
+  roster.forEach((r,i)=>{r.name=$("nm"+i).value;});save();
+  makePlayers();
+  score={o:0,b:0};timeLeft=opt.time;confetti=[];
+  $("menu").hidden=true;$("end").hidden=true;$("pause").hidden=true;$("pauseBtn").hidden=false;
+  initAudio();sWhistle();kickoff();updateBoard();
+}
+
+/* ---------- 터치: 선수를 눌러야만 잡힘 ---------- */
+const grabs=new Map(); // pointerId -> player
+function toWorld(e){const r=cv.getBoundingClientRect();return {x:VX+(e.clientX-r.left)/r.width*VW,y:VY+(e.clientY-r.top)/r.height*VH};}
+cv.addEventListener("pointerdown",e=>{
+  if(state!=="play"&&state!=="ready"&&state!=="goal")return;
+  e.preventDefault();
+  const w=toWorld(e);let best=null,bd=1e9;
+  for(const p of players){if(p.pid!==null)continue;const d=Math.hypot(w.x-p.x,w.y-p.y);if(d<p.r+34&&d<bd){bd=d;best=p;}}
+  if(!best)return; // 선수가 아닌 곳을 누르면 무시
+  best.pid=e.pointerId;best.tx=w.x;best.ty=w.y;grabs.set(e.pointerId,best);
+  try{cv.setPointerCapture(e.pointerId);}catch(_){}
+  initAudio();
+});
+cv.addEventListener("pointermove",e=>{const p=grabs.get(e.pointerId);if(!p)return;e.preventDefault();const w=toWorld(e);p.tx=w.x;p.ty=w.y;});
+function release(e){const p=grabs.get(e.pointerId);if(p){p.pid=null;grabs.delete(e.pointerId);}}
+cv.addEventListener("pointerup",release);cv.addEventListener("pointercancel",release);cv.addEventListener("lostpointercapture",release);
+["touchstart","touchmove","gesturestart","contextmenu"].forEach(t=>cv.addEventListener(t,e=>e.preventDefault(),{passive:false}));
+
+/* ---------- 물리 ---------- */
+function bevel(o,r,vel){
+  for(const [cx,cy,nx,ny] of [[0,0,1,1],[FW,0,-1,1],[0,FH,1,-1],[FW,FH,-1,-1]]){
+    const d=((o.x-cx)*nx+(o.y-cy)*ny)/Math.SQRT2,need=CUT/Math.SQRT2+r;
+    if(d<need){const ux=nx/Math.SQRT2,uy=ny/Math.SQRT2,pen=need-d;o.x+=ux*pen;o.y+=uy*pen;
+      if(vel){const v=o.vx*ux+o.vy*uy;if(v<0){o.vx-=1.8*v*ux;o.vy-=1.8*v*uy;}}}
+  }
+}
+function movePlayer(p,dt){
+  const max=520*strongSlow(p.team);
+  if(p.pid!==null&&state!=="goal"){
+    const dx=p.tx-p.x,dy=p.ty-p.y,d=Math.hypot(dx,dy);
+    const sp=Math.min(max,d*12),ux=d?dx/d:0,uy=d?dy/d:0;
+    const a=Math.min(1,dt*16);p.vx+=(ux*sp-p.vx)*a;p.vy+=(uy*sp-p.vy)*a;
+  }else{const a=Math.min(1,dt*7);p.vx-=p.vx*a;p.vy-=p.vy*a;}
+  if(state==="ready"){p.vx=p.vy=0;}
+  p.x+=p.vx*dt;p.y+=p.vy*dt;
+  p.x=Math.max(p.r,Math.min(FW-p.r,p.x));p.y=Math.max(p.r,Math.min(FH-p.r,p.y));bevel(p,p.r,false);
+  if(Math.hypot(p.vx,p.vy)>40)p.face=Math.atan2(p.vy,p.vx);
+}
+function hitBall(p){
+  const dx=ball.x-p.x,dy=ball.y-p.y,d=Math.hypot(dx,dy),m=p.r+BR;
+  if(d>=m||d===0)return;
+  const nx=dx/d,ny=dy/d;ball.x=p.x+nx*m;ball.y=p.y+ny*m;
+  const rel=(ball.vx-p.vx)*nx+(ball.vy-p.vy)*ny;
+  if(rel<0){ball.vx-=1.5*rel*nx;ball.vy-=1.5*rel*ny;}
+  const ps=Math.hypot(p.vx,p.vy);
+  const power=(110+ps*0.6)*helpFor(p.team).kick;
+  ball.vx+=nx*power*0.5;ball.vy+=ny*power*0.5;
+  const bs=Math.hypot(ball.vx,ball.vy);if(bs>1000){ball.vx*=1000/bs;ball.vy*=1000/bs;}
+  if(ps>60||bs>200)sKick();
+}
+function post(px,py){
+  const dx=ball.x-px,dy=ball.y-py,d=Math.hypot(dx,dy),m=BR+7;
+  if(d<m&&d>0){const nx=dx/d,ny=dy/d;ball.x=px+nx*m;ball.y=py+ny*m;const v=ball.vx*nx+ball.vy*ny;if(v<0){ball.vx-=1.8*v*nx;ball.vy-=1.8*v*ny;sWall();}}
+}
+function moveBall(dt){
+  ball.x+=ball.vx*dt;ball.y+=ball.vy*dt;
+  const f=Math.exp(-dt*(state==="goal"?5:0.85));ball.vx*=f;ball.vy*=f;
+  ball.rot+=Math.hypot(ball.vx,ball.vy)*dt/BR;
+  const bounce=ax=>{ball[ax]*=-0.8;if(Math.abs(ball[ax])>80)sWall();};
+  if(ball.y<BR){ball.y=BR;if(ball.vy<0)bounce("vy");}
+  if(ball.y>FH-BR){ball.y=FH-BR;if(ball.vy>0)bounce("vy");}
+  const lh=leftGoalH()/2,rh=rightGoalH()/2,cy=FH/2;
+  if(ball.x<BR){
+    if(Math.abs(ball.y-cy)>=lh){ball.x=BR;if(ball.vx<0)bounce("vx");}
+    if(ball.x<0){if(ball.y<cy-lh+BR){ball.y=cy-lh+BR;if(ball.vy<0)ball.vy*=-.5;}if(ball.y>cy+lh-BR){ball.y=cy+lh-BR;if(ball.vy>0)ball.vy*=-.5;}if(ball.x<-GD+BR){ball.x=-GD+BR;ball.vx*=-.3;}}
+  }
+  if(ball.x>FW-BR){
+    if(Math.abs(ball.y-cy)>=rh){ball.x=FW-BR;if(ball.vx>0)bounce("vx");}
+    if(ball.x>FW){if(ball.y<cy-rh+BR){ball.y=cy-rh+BR;if(ball.vy<0)ball.vy*=-.5;}if(ball.y>cy+rh-BR){ball.y=cy+rh-BR;if(ball.vy>0)ball.vy*=-.5;}if(ball.x>FW+GD-BR){ball.x=FW+GD-BR;ball.vx*=-.3;}}
+  }
+  post(0,cy-lh);post(0,cy+lh);post(FW,cy-rh);post(FW,cy+rh);
+  if(ball.x>0&&ball.x<FW)bevel(ball,BR,true);
+  if(ball.x<-BR)goal("o");else if(ball.x>FW+BR)goal("b");
+  if(Math.hypot(ball.x-ballRef.x,ball.y-ballRef.y)>50){ballRef.x=ball.x;ballRef.y=ball.y;stuckT=0;}
+  else if(Math.min(ball.x,FW-ball.x,ball.y,FH-ball.y)<110&&ball.x>0&&ball.x<FW){stuckT+=dt;if(stuckT>4){ball.vx=(FW/2-ball.x)*0.9;ball.vy=(FH/2-ball.y)*0.9;stuckT=0;}}
+}
+function collidePlayers(){
+  for(let i=0;i<players.length;i++)for(let j=i+1;j<players.length;j++){
+    const a=players[i],b=players[j],dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy),m=a.r+b.r;
+    if(d<m&&d>0){const p=(m-d)/2,nx=dx/d,ny=dy/d;a.x-=nx*p;a.y-=ny*p;b.x+=nx*p;b.y+=ny*p;}
+  }
+}
+function goal(t){
+  if(state!=="play")return;
+  score[t]++;lastScorer=t;state="goal";stateT=2.4;updateBoard();sGoal();
+  const col=t==="o"?["#FF8A1F","#FFD23F","#ffffff"]:["#2F7BF0","#9CC3FF","#ffffff"];
+  const gx=t==="o"?0:FW;
+  for(let i=0;i<120;i++){const a=Math.random()*Math.PI*2,s=200+Math.random()*500;
+    confetti.push({x:gx,y:FH/2,vx:Math.abs(Math.cos(a))*s*(t==="o"?1:-1),vy:Math.sin(a)*s-200,c:col[i%3],r:Math.random()*6.28,life:2+Math.random()});}
+}
+
+/* ---------- 그리기 ---------- */
+function resize(){
+  const box=$("fieldbox").getBoundingClientRect(),cs=getComputedStyle($("fieldbox"));
+  const bw=box.width-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight),bh=box.height-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+  const w=Math.max(200,Math.min(bw,bh*VW/VH)),h=w*VH/VW;dpr=Math.min(devicePixelRatio||1,2);
+  cv.style.width=w+"px";cv.style.height=h+"px";cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);scale=w/VW;
+}
+addEventListener("resize",resize);
+function goalShape(x,h,dir){
+  const cy=FH/2,y0=cy-h/2;
+  ctx.fillStyle="rgba(255,255,255,.14)";ctx.fillRect(dir<0?x-GD:x,y0,GD,h);
+  ctx.strokeStyle="rgba(255,255,255,.35)";ctx.lineWidth=1.5;ctx.beginPath();
+  for(let gx=0;gx<=GD;gx+=11){const xx=dir<0?x-gx:x+gx;ctx.moveTo(xx,y0);ctx.lineTo(xx,y0+h);}
+  for(let gy=0;gy<=h;gy+=11){ctx.moveTo(x,y0+gy);ctx.lineTo(x+dir*GD,y0+gy);}
+  ctx.stroke();
+  ctx.strokeStyle="#fff";ctx.lineWidth=7;ctx.lineJoin="round";ctx.beginPath();
+  ctx.moveTo(x,y0);ctx.lineTo(x+dir*GD,y0);ctx.lineTo(x+dir*GD,y0+h);ctx.lineTo(x,y0+h);ctx.stroke();
+  ctx.fillStyle="#fff";[y0,y0+h].forEach(y=>{ctx.beginPath();ctx.arc(x,y,7,0,7);ctx.fill();});
+}
+function drawPlayer(p,now){
+  // 잡을 수 있다는 표시
+  if(p.pid===null&&(state==="ready"||state==="play")){
+    const pulse=(Math.sin(now/260+p.num)+1)/2;
+    ctx.strokeStyle=`rgba(255,255,255,${0.25+pulse*0.3})`;ctx.lineWidth=3;ctx.setLineDash([8,8]);
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r+14+pulse*6,0,7);ctx.stroke();ctx.setLineDash([]);
+  }
+  if(p.pid!==null){ctx.fillStyle="rgba(255,255,255,.22)";ctx.beginPath();ctx.arc(p.x,p.y,p.r+18,0,7);ctx.fill();}
+  ctx.fillStyle="rgba(0,0,0,.22)";ctx.beginPath();ctx.ellipse(p.x+4,p.y+9,p.r*1.02,p.r*.8,0,0,7);ctx.fill();
+  ctx.fillStyle=COL[p.team];ctx.strokeStyle="#fff";ctx.lineWidth=5;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fill();ctx.stroke();
+  const fx=Math.cos(p.face),fy=Math.sin(p.face),ex=-fy,ey=fx,o=p.r*.38,fw=p.r*.35;
+  [-1,1].forEach(s=>{const cx=p.x+fx*fw+ex*o*s,cy=p.y+fy*fw+ey*o*s;
+    ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(cx,cy,p.r*.22,0,7);ctx.fill();
+    ctx.fillStyle="#1a1a1a";ctx.beginPath();ctx.arc(cx+fx*p.r*.08,cy+fy*p.r*.08,p.r*.11,0,7);ctx.fill();});
+  // 등번호
+  ctx.font=`${p.r*.7}px Jua, sans-serif`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillStyle="rgba(255,255,255,.95)";
+  ctx.fillText(String(p.num),p.x-fx*p.r*.4,p.y-fy*p.r*.4+2);
+  ctx.font="26px Jua, sans-serif";ctx.textBaseline="bottom";
+  ctx.lineWidth=5;ctx.strokeStyle="rgba(0,0,0,.5)";ctx.strokeText(p.name,p.x,p.y-p.r-8);ctx.fillStyle="#fff";ctx.fillText(p.name,p.x,p.y-p.r-8);
+}
+function drawBall(){
+  ctx.fillStyle="rgba(0,0,0,.25)";ctx.beginPath();ctx.ellipse(ball.x+4,ball.y+6,BR,BR*.75,0,0,7);ctx.fill();
+  ctx.save();ctx.translate(ball.x,ball.y);ctx.rotate(ball.rot);
+  ctx.fillStyle="#fff";ctx.strokeStyle="#222";ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,BR,0,7);ctx.fill();ctx.stroke();
+  ctx.fillStyle="#222";
+  const pent=(cx,cy,r)=>{ctx.beginPath();for(let i=0;i<5;i++){const a=i*1.2566-1.57;ctx.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r);}ctx.closePath();ctx.fill();};
+  pent(0,0,BR*.38);ctx.save();ctx.beginPath();ctx.arc(0,0,BR,0,7);ctx.clip();for(let i=0;i<5;i++){const a=i*1.2566-1.57;pent(Math.cos(a)*BR*.95,Math.sin(a)*BR*.95,BR*.3);}ctx.restore();
+  ctx.restore();
+}
+function draw(now){
+  ctx.setTransform(scale*dpr,0,0,scale*dpr,-VX*scale*dpr,-VY*scale*dpr);
+  ctx.fillStyle="#2E8B47";ctx.fillRect(VX,VY,VW,VH);
+  for(let i=0;i<10;i++){ctx.fillStyle=i%2?"#3A9A54":"#34914D";ctx.fillRect(i*FW/10,0,FW/10,FH);}
+  ctx.fillStyle="rgba(47,123,240,.08)";ctx.fillRect(0,0,FW/2,FH);
+  ctx.fillStyle="rgba(255,138,31,.08)";ctx.fillRect(FW/2,0,FW/2,FH);
+  ctx.fillStyle="#2E8B47";[[0,0,1,1],[FW,0,-1,1],[0,FH,1,-1],[FW,FH,-1,-1]].forEach(([x,y,a,b])=>{ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+a*CUT,y);ctx.lineTo(x,y+b*CUT);ctx.closePath();ctx.fill();});
+  ctx.strokeStyle="rgba(255,255,255,.9)";ctx.lineWidth=5;
+  ctx.beginPath();ctx.moveTo(CUT,0);ctx.lineTo(FW-CUT,0);ctx.lineTo(FW,CUT);ctx.lineTo(FW,FH-CUT);ctx.lineTo(FW-CUT,FH);ctx.lineTo(CUT,FH);ctx.lineTo(0,FH-CUT);ctx.lineTo(0,CUT);ctx.closePath();ctx.stroke();
+  ctx.beginPath();ctx.moveTo(FW/2,0);ctx.lineTo(FW/2,FH);ctx.stroke();
+  ctx.beginPath();ctx.arc(FW/2,FH/2,80,0,7);ctx.stroke();
+  ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(FW/2,FH/2,6,0,7);ctx.fill();
+  const lh=leftGoalH(),rh=rightGoalH();
+  ctx.strokeRect(0,FH/2-lh/2-45,120,lh+90);ctx.strokeRect(FW-120,FH/2-rh/2-45,120,rh+90);
+  goalShape(0,lh,-1);goalShape(FW,rh,1);
+  ctx.font="22px Jua, sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillStyle="rgba(255,255,255,.55)";
+  ctx.save();ctx.translate(-GD-14,FH/2);ctx.rotate(-Math.PI/2);ctx.fillText("주황팀 골 넣는 곳",0,0);ctx.restore();
+  ctx.save();ctx.translate(FW+GD+14,FH/2);ctx.rotate(Math.PI/2);ctx.fillText("파랑팀 골 넣는 곳",0,0);ctx.restore();
+  drawBall();players.forEach(p=>drawPlayer(p,now));
+  confetti.forEach(c=>{ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.r);ctx.fillStyle=c.c;ctx.globalAlpha=Math.min(1,c.life);ctx.fillRect(-6,-3,12,6);ctx.restore();});
+  let big="",sub="";
+  if(state==="ready")big=stateT>0.45?"준비":"시작!";
+  if(state==="goal"){big="골~~~!";sub=`${TEAMN[lastScorer]} 골!`;}
+  if(big){
+    ctx.textAlign="center";ctx.textBaseline="middle";ctx.font=`${state==="goal"?150:110}px Jua, sans-serif`;
+    const t=state==="goal"?1+Math.sin(now/90)*0.04:1;
+    ctx.save();ctx.translate(FW/2,FH/2-20);ctx.scale(t,t);
+    ctx.lineWidth=14;ctx.strokeStyle="rgba(0,0,0,.45)";ctx.strokeText(big,0,0);
+    ctx.fillStyle=state==="goal"?(lastScorer==="o"?"#FFB347":"#9CC3FF"):"#fff";ctx.fillText(big,0,0);ctx.restore();
+    if(sub){ctx.font="54px Jua, sans-serif";ctx.lineWidth=10;ctx.strokeStyle="rgba(0,0,0,.45)";ctx.strokeText(sub,FW/2,FH/2+90);ctx.fillStyle="#fff";ctx.fillText(sub,FW/2,FH/2+90);}
+  }
+}
+
+/* ---------- 점수판 ---------- */
+const fmt=t=>{t=Math.max(0,Math.ceil(t));return `${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`;};
+function updateBoard(){$("oScore").textContent=score.o;$("bScore").textContent=score.b;$("clock").textContent=fmt(timeLeft);}
+function endGame(){
+  state="end";sWhistle();$("pauseBtn").hidden=true;grabs.clear();players.forEach(p=>p.pid=null);
+  $("fO").textContent=score.o;$("fB").textContent=score.b;
+  const names=t=>players.filter(p=>p.team===t).map(p=>p.name).join(", ");
+  $("endMsg").textContent=score.o>score.b?`주황팀 승리! (${names("o")})`:score.o<score.b?`파랑팀 승리! (${names("b")})`:"비겼어요! 모두 잘했어요!";
+  const w=score.o>score.b?"o":score.o<score.b?"b":null;
+  if(w)for(let i=0;i<160;i++)confetti.push({x:Math.random()*FW,y:-20,vx:(Math.random()-.5)*200,vy:Math.random()*200,c:[COL[w],"#FFD23F","#fff"][i%3],r:Math.random()*6,life:3+Math.random()*2});
+  setTimeout(()=>{if(state==="end"){$("end").hidden=false;}},900);
+}
+function setPause(on){
+  if(on){prevState=state;state="paused";grabs.clear();players.forEach(p=>p.pid=null);$("pause").hidden=false;}
+  else{state=prevState;$("pause").hidden=true;}
+}
+
+/* ---------- 루프 ---------- */
+let last=performance.now();
+function frame(now){
+  const dt=Math.min(.033,(now-last)/1000);last=now;
+  if(state==="ready"){stateT-=dt;if(stateT<=0)state="play";}
+  if(state==="play"||state==="ready"||state==="goal"||state==="end"){
+    if(state==="play"){timeLeft-=dt;if(timeLeft<=0){timeLeft=0;updateBoard();endGame();}}
+    players.forEach(p=>movePlayer(p,dt));collidePlayers();
+    if(state==="play")players.forEach(hitBall);
+    if(state!=="ready")moveBall(dt);
+    if(state==="goal"){stateT-=dt;if(stateT<=0)kickoff();}
+  }
+  if(state!=="paused"){confetti.forEach(c=>{c.vy+=500*dt;c.x+=c.vx*dt;c.y+=c.vy*dt;c.vx*=.99;c.r+=dt*8;c.life-=dt;});confetti=confetti.filter(c=>c.life>0);}
+  if(state==="play")$("clock").textContent=fmt(timeLeft);
+  draw(now);requestAnimationFrame(frame);
+}
+
+/* ---------- 메뉴 ---------- */
+function renderRows(){
+  const R=$("rows");R.innerHTML="";
+  roster.forEach((r,i)=>{
+    const d=document.createElement("div");d.className="prow"+(r.team==="b"?" b":"");
+    d.innerHTML=`<span class="num">${i+1}</span><input id="nm${i}" maxlength="6" aria-label="${i+1}번 선수 이름"><div class="tg"><button type="button" class="o${r.team==="o"?" on":""}">주황</button><button type="button" class="b${r.team==="b"?" on":""}">파랑</button></div>`;
+    d.querySelector("input").value=r.name;
+    d.querySelector("input").addEventListener("input",e=>{r.name=e.target.value;});
+    d.querySelectorAll(".tg button").forEach(b=>b.addEventListener("click",()=>{r.team=b.classList.contains("o")?"o":"b";save();renderRows();}));
+    R.appendChild(d);
+  });
+  const no=roster.filter(r=>r.team==="o").length;
+  const bad=no===0||no===3;
+  $("warn").textContent=bad?"두 팀에 한 명 이상씩 있어야 해요.":`주황팀 ${no}명 · 파랑팀 ${3-no}명`;
+  $("startBtn").disabled=bad;
+  makePlayers();kickoffPreview();
+}
+function kickoffPreview(){players.forEach(p=>{p.x=p.hx;p.y=p.hy;});ball.x=FW/2;ball.y=FH/2;}
+function seg(id,key){const el=$(id);el.querySelectorAll("button").forEach(b=>{b.classList.toggle("on",+b.dataset.v===opt[key]);
+  b.addEventListener("click",()=>{opt[key]=+b.dataset.v;el.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));save();});});}
+seg("optTime","time");seg("optHelp","help");
+{const el=$("optTeam");const sync=()=>{el.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===opt.helpTeam));$("helpBox").hidden=opt.helpTeam==="none";};
+  el.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{opt.helpTeam=b.dataset.v;save();sync();makePlayers();kickoffPreview();}));sync();}
+$("startBtn").addEventListener("click",startGame);
+$("againBtn").addEventListener("click",()=>{$("end").hidden=true;makePlayers();score={o:0,b:0};timeLeft=opt.time;confetti=[];$("pauseBtn").hidden=false;sWhistle();kickoff();updateBoard();});
+$("menuBtn").addEventListener("click",()=>{state="menu";$("end").hidden=true;$("menu").hidden=false;renderRows();});
+$("quitBtn").addEventListener("click",()=>{state="menu";$("pause").hidden=true;$("pauseBtn").hidden=true;$("menu").hidden=false;renderRows();});
+$("resumeBtn").addEventListener("click",()=>setPause(false));
+$("pauseBtn").addEventListener("click",()=>{if(state==="play"||state==="ready"||state==="goal")setPause(true);});
+document.addEventListener("visibilitychange",()=>{if(document.hidden&&(state==="play"||state==="ready"))setPause(true);});
+addEventListener("keydown",e=>{if(e.key==="Escape"){if(state==="paused")setPause(false);else if(state==="play"||state==="ready")setPause(true);}});
+
+resize();renderRows();timeLeft=opt.time;updateBoard();requestAnimationFrame(frame);
+window.__s3={get state(){return state},players:()=>players,ball,score:()=>score,toScreen:(x,y)=>{const r=cv.getBoundingClientRect();return {x:r.left+(x-VX)/VW*r.width,y:r.top+(y-VY)/VH*r.height};}};
+})();
+</script>
