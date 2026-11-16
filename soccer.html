@@ -31,7 +31,7 @@ canvas{display:block;border-radius:14px;touch-action:none;max-width:100%}
 .card{width:min(640px,100%);background:var(--panel);border:2px solid rgba(255,255,255,.12);border-radius:22px;padding:22px;display:flex;flex-direction:column;gap:16px;margin:auto}
 .card h1{font-family:var(--f-display);font-weight:400;font-size:clamp(44px,9vw,72px);line-height:1;margin:0;text-wrap:balance}
 .card h1 span{color:var(--gold)}
-.who{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.who{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
 @media (max-width:520px){.who{grid-template-columns:1fr}}
 .side{border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px;border:3px solid}
 .side.kid{border-color:var(--kid);background:rgba(255,138,31,.1)}
@@ -39,7 +39,7 @@ canvas{display:block;border-radius:14px;touch-action:none;max-width:100%}
 .side input{font:inherit;font-family:var(--f-display);font-size:24px;background:rgba(255,255,255,.1);border:0;border-radius:10px;color:#fff;padding:6px 10px;width:100%;box-sizing:border-box}
 .keys{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,44px);gap:5px;justify-content:center}
 .keys kbd{display:flex;align-items:center;justify-content:center;background:#fff;color:#123;border-radius:9px;font-family:var(--f-display);font-size:22px;box-shadow:0 4px 0 rgba(0,0,0,.35)}
-.keys kbd:first-child{grid-column:2}
+.keys kbd:nth-child(1){grid-area:1/2}.keys kbd:nth-child(2){grid-area:2/1}.keys kbd:nth-child(3){grid-area:2/2}.keys kbd:nth-child(4){grid-area:2/3}
 .hint{font-size:14px;color:var(--muted);margin:0;text-align:center}
 .opt{display:flex;flex-direction:column;gap:6px}
 .opt .lb{font-size:14px;color:var(--muted)}
@@ -71,13 +71,15 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:2
 <div class="overlay" id="menu">
   <div class="card">
     <h1>꼬마 <span>축구</span></h1>
+    <div class="opt"><span class="lb">누구랑 할까요?</span>
+      <div class="seg" id="optMode"><button type="button" data-v="solo" class="on">혼자 하기 (로봇이랑)</button><button type="button" data-v="duo">아빠랑 하기</button></div></div>
     <div class="who">
       <div class="side kid">
         <input id="inKid" value="아이" maxlength="6" aria-label="아이 이름">
         <div class="keys"><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></div>
         <p class="hint">방향키로 움직여요.<br>공에 닿으면 저절로 뻥!<br>태블릿은 손가락으로 누른 곳으로 가요.</p>
       </div>
-      <div class="side dad">
+      <div class="side dad" id="dadSide">
         <input id="inDad" value="아빠" maxlength="6" aria-label="아빠 이름">
         <div class="keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></div>
         <p class="hint">W A S D로 움직여요.<br>왼쪽 골대를 지켜요.</p>
@@ -85,7 +87,7 @@ button:focus-visible,input:focus-visible{outline:3px solid #fff;outline-offset:2
     </div>
     <div class="opt"><span class="lb">경기 시간</span>
       <div class="seg" id="optTime"><button type="button" data-v="60">1분</button><button type="button" data-v="120" class="on">2분</button><button type="button" data-v="180">3분</button></div></div>
-    <div class="opt"><span class="lb">아이 도움 (높을수록 아빠 골대가 커지고 아빠가 느려져요)</span>
+    <div class="opt"><span class="lb" id="helpLb">아이 도움 (높을수록 아빠 골대가 커지고 아빠가 느려져요)</span>
       <div class="seg" id="optHelp"><button type="button" data-v="0">없음</button><button type="button" data-v="1">조금</button><button type="button" data-v="2" class="on">많이</button></div></div>
     <button class="go" id="startBtn" type="button">경기 시작!</button>
   </div>
@@ -117,7 +119,8 @@ const HELP=[
   {dadSpd:1,   dadGoal:1,   kidGoal:1,   kidR:1,   kidKick:1},
   {dadSpd:.82, dadGoal:1.25,kidGoal:.8,  kidR:1.15,kidKick:1.2},
   {dadSpd:.68, dadGoal:1.5, kidGoal:.62, kidR:1.3, kidKick:1.4}];
-let opt={time:120,help:2};
+let opt={time:120,help:2,mode:"solo"};
+const solo=()=>opt.mode==="solo";
 const cv=$("cv"),ctx=cv.getContext("2d");
 let scale=1,dpr=1;
 
@@ -143,11 +146,11 @@ const rightGoalH=()=>GOAL*H().kidGoal;  // 아이가 지키는 오른쪽 골대
 function kickoff(){
   kid.x=kid.homeX;kid.y=FH/2;dad.x=dad.homeX;dad.y=FH/2;
   kid.vx=kid.vy=dad.vx=dad.vy=0;kid.face=Math.PI;dad.face=0;
-  ball.x=FW/2;ball.y=FH/2;ball.vx=ball.vy=0;stuckT=0;
+  ball.x=FW/2;ball.y=FH/2;ball.vx=ball.vy=0;stuckT=0;ai.idle=0.6;ai.t=0;
   state="ready";stateT=1.3;
 }
 function startGame(){
-  kid.name=($("inKid").value||"아이").trim()||"아이";dad.name=($("inDad").value||"아빠").trim()||"아빠";
+  kid.name=($("inKid").value||"아이").trim()||"아이";dad.name=solo()?"로봇":(($("inDad").value||"아빠").trim()||"아빠");
   $("kidName").textContent=kid.name;$("dadName").textContent=dad.name;
   kid.r=28*H().kidR;
   score={kid:0,dad:0};timeLeft=opt.time;confetti=[];
@@ -170,6 +173,7 @@ function dirOf(p){
   let x=0,y=0;
   if(p===kid){x=(k("ArrowRight","k:ArrowRight")?1:0)-(k("ArrowLeft","k:ArrowLeft")?1:0);y=(k("ArrowDown","k:ArrowDown")?1:0)-(k("ArrowUp","k:ArrowUp")?1:0);
     if(!x&&!y&&pointer){const dx=pointer.x-kid.x,dy=pointer.y-kid.y,d=Math.hypot(dx,dy);if(d>8){x=dx/d;y=dy/d;if(d<40){x*=d/40;y*=d/40;}}}}
+  else if(solo()){if(ai.idle>0)return [0,0];const dx=ai.tx-dad.x,dy=ai.ty-dad.y,d=Math.hypot(dx,dy);if(d<10)return [0,0];return [dx/d,dy/d];}
   else{x=(k("KeyD")?1:0)-(k("KeyA")?1:0);y=(k("KeyS")?1:0)-(k("KeyW")?1:0);}
   const l=Math.hypot(x,y);return l>1?[x/l,y/l]:[x,y];
 }
@@ -178,10 +182,28 @@ cv.addEventListener("pointerdown",e=>{pointer=toWorld(e);cv.setPointerCapture?.(
 cv.addEventListener("pointermove",e=>{if(pointer)pointer=toWorld(e);});
 ["pointerup","pointercancel","pointerleave"].forEach(t=>cv.addEventListener(t,()=>{pointer=null;}));
 
+/* ---------- 로봇 (혼자 하기) ---------- */
+const ai={tx:260,ty:300,t:0,idle:0};
+function aiThink(dt){
+  if(ai.idle>0){ai.idle-=dt;return;}
+  ai.t-=dt;if(ai.t>0)return;ai.t=0.25; // 반응이 조금 느림
+  if(Math.random()<0.07){ai.idle=0.5+Math.random()*0.7;return;} // 가끔 멈칫
+  const bx=ball.x,by=ball.y;
+  // 공에서 아이 골대 쪽 방향
+  let ux=FW+20-bx,uy=FH/2-by;const ul=Math.hypot(ux,uy)||1;ux/=ul;uy/=ul;
+  const rx=bx-dad.x,ry=by-dad.y,rl=Math.hypot(rx,ry)||1;
+  const behind=(rx*ux+ry*uy)/rl>0.75;
+  if(behind){ai.tx=bx+ux*30;ai.ty=by+uy*30+(Math.random()-.5)*24;}            // 공 뒤에 있으면 골대 쪽으로 밀기
+  else{const m=dad.r+BR+22;let tx=bx-ux*m,ty=by-uy*m;                          // 아니면 공 뒤로 돌아가기(공을 피해서)
+    const side=(rx*-uy+ry*ux)>0?1:-1;if(rl<m+20){tx+=-uy*side*40;ty+=ux*side*40;}
+    ai.tx=tx;ai.ty=ty;}
+  ai.tx=Math.max(dad.r,Math.min(FW-dad.r,ai.tx));ai.ty=Math.max(dad.r,Math.min(FH-dad.r,ai.ty));
+}
+
 /* ---------- 물리 ---------- */
 function movePlayer(p,dt){
   const [dx,dy]=state==="play"?dirOf(p):[0,0];
-  const spd=p===dad?300*H().dadSpd:300;
+  const spd=p===dad?300*H().dadSpd*(solo()?0.6:1):300;
   const a=Math.min(1,dt*9);
   p.vx+=(dx*spd-p.vx)*a;p.vy+=(dy*spd-p.vy)*a;
   p.x+=p.vx*dt;p.y+=p.vy*dt;
@@ -195,7 +217,7 @@ function hitBall(p){
   const rel=(ball.vx-p.vx)*nx+(ball.vy-p.vy)*ny;
   if(rel<0){ball.vx-=1.5*rel*nx;ball.vy-=1.5*rel*ny;}
   const ps=Math.hypot(p.vx,p.vy);
-  const power=(110+ps*0.75)*(p===kid?H().kidKick:1);
+  const power=(110+ps*0.75)*(p===kid?H().kidKick:(solo()?0.7:1));
   ball.vx+=nx*power*0.5;ball.vy+=ny*power*0.5;
   const bs=Math.hypot(ball.vx,ball.vy);if(bs>950){ball.vx*=950/bs;ball.vy*=950/bs;}
   if(ps>60||bs>200)sKick();
@@ -236,7 +258,7 @@ function moveBall(dt){
   if(ball.x<-BR)goal("kid");else if(ball.x>FW+BR)goal("dad");
   // 구석에 박혀서 안 움직이면 살짝 밀어줌
   const corner=(ball.x<60||ball.x>FW-60)&&(ball.y<60||ball.y>FH-60);
-  if(corner&&Math.hypot(ball.vx,ball.vy)<40){stuckT+=dt;if(stuckT>2.5){ball.vx=(FW/2-ball.x)*0.6;ball.vy=(FH/2-ball.y)*0.6;stuckT=0;}}else stuckT=0;
+  if(corner&&Math.hypot(ball.vx,ball.vy)<220){stuckT+=dt;if(stuckT>2.5){ball.vx=(FW/2-ball.x)*0.6;ball.vy=(FH/2-ball.y)*0.6;stuckT=0;}}else stuckT=0;
 }
 function collidePlayers(){
   const dx=dad.x-kid.x,dy=dad.y-kid.y,d=Math.hypot(dx,dy),m=kid.r+dad.r;
@@ -272,6 +294,8 @@ function goalShape(x,h,dir){
 }
 function drawPlayer(p){
   ctx.fillStyle="rgba(0,0,0,.22)";ctx.beginPath();ctx.ellipse(p.x+4,p.y+8,p.r*1.02,p.r*.8,0,0,7);ctx.fill();
+  if(p===dad&&solo()){ctx.strokeStyle="#fff";ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(p.x,p.y-p.r);ctx.lineTo(p.x,p.y-p.r-14);ctx.stroke();
+    ctx.fillStyle="#FFD23F";ctx.beginPath();ctx.arc(p.x,p.y-p.r-16,6,0,7);ctx.fill();}
   ctx.fillStyle=p.color;ctx.strokeStyle="#fff";ctx.lineWidth=5;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fill();ctx.stroke();
   // 얼굴
   const fx=Math.cos(p.face),fy=Math.sin(p.face),ex=-fy,ey=fx,o=p.r*.38,fw=p.r*.35;
@@ -279,7 +303,7 @@ function drawPlayer(p){
     ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(cx,cy,p.r*.24,0,7);ctx.fill();
     ctx.fillStyle="#1a1a1a";ctx.beginPath();ctx.arc(cx+fx*p.r*.09,cy+fy*p.r*.09,p.r*.12,0,7);ctx.fill();});
   ctx.font=`26px Jua, sans-serif`;ctx.textAlign="center";ctx.textBaseline="bottom";
-  ctx.lineWidth=5;ctx.strokeStyle="rgba(0,0,0,.45)";ctx.strokeText(p.name,p.x,p.y-p.r-6);ctx.fillStyle="#fff";ctx.fillText(p.name,p.x,p.y-p.r-6);
+  ctx.lineWidth=5;ctx.strokeStyle="rgba(0,0,0,.45)";const ly=p.y-p.r-(p===dad&&solo()?24:6);ctx.strokeText(p.name,p.x,ly);ctx.fillStyle="#fff";ctx.fillText(p.name,p.x,ly);
 }
 function drawBall(){
   ctx.fillStyle="rgba(0,0,0,.25)";ctx.beginPath();ctx.ellipse(ball.x+4,ball.y+6,BR,BR*.75,0,0,7);ctx.fill();
@@ -350,6 +374,7 @@ function frame(now){
   if(state==="ready"){stateT-=dt;if(stateT<=0){state="play";}}
   if(state==="play"||state==="ready"||state==="goal"||state==="end"){
     if(state==="play"){timeLeft-=dt;if(timeLeft<=0){timeLeft=0;updateBoard();endGame();}}
+    if(state==="play"&&solo())aiThink(dt);
     movePlayer(kid,dt);movePlayer(dad,dt);collidePlayers();
     if(state==="play"){hitBall(kid);hitBall(dad);}
     if(state!=="ready")moveBall(dt);
@@ -368,6 +393,15 @@ function seg(id,key){$(id).querySelectorAll("button").forEach(b=>b.addEventListe
 function kickoffPreview(){kid.r=28*H().kidR;kid.x=kid.homeX;kid.y=FH/2;dad.x=dad.homeX;dad.y=FH/2;ball.x=FW/2;ball.y=FH/2;}
 try{const o=JSON.parse(localStorage.getItem("soccer.opt")||"null");if(o){opt={...opt,...o};
   ["optTime","optHelp"].forEach((id,i)=>$(id).querySelectorAll("button").forEach(b=>b.classList.toggle("on",+b.dataset.v===(i?opt.help:opt.time))));}}catch(e){}
+function applyMode(){
+  $("optMode").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===opt.mode));
+  $("dadSide").hidden=solo();
+  $("helpLb").textContent=solo()?"쉬운 정도 (높을수록 로봇이 느리고 로봇 골대가 커져요)":"아이 도움 (높을수록 아빠 골대가 커지고 아빠가 느려져요)";
+  dad.name=solo()?"로봇":(($("inDad").value||"아빠").trim()||"아빠");
+  $("dadName").textContent=dad.name;
+}
+$("optMode").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{opt.mode=b.dataset.v;try{localStorage.setItem("soccer.opt",JSON.stringify(opt));}catch(e){}applyMode();}));
+applyMode();
 seg("optTime","time");seg("optHelp","help");
 $("startBtn").addEventListener("click",startGame);
 $("againBtn").addEventListener("click",startGame);
