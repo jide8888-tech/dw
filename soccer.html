@@ -146,7 +146,7 @@ const rightGoalH=()=>GOAL*H().kidGoal;  // 아이가 지키는 오른쪽 골대
 function kickoff(){
   kid.x=kid.homeX;kid.y=FH/2;dad.x=dad.homeX;dad.y=FH/2;
   kid.vx=kid.vy=dad.vx=dad.vy=0;kid.face=Math.PI;dad.face=0;
-  ball.x=FW/2;ball.y=FH/2;ball.vx=ball.vy=0;stuckT=0;ai.idle=0.6;ai.t=0;
+  ball.x=FW/2;ball.y=FH/2;ball.vx=ball.vy=0;stuckT=0;ballRef.x=ball.x;ballRef.y=ball.y;ai.idle=0.6;ai.t=0;ai.escape=0;ai.stuck=0;
   state="ready";stateT=1.3;
 }
 function startGame(){
@@ -183,14 +183,24 @@ cv.addEventListener("pointermove",e=>{if(pointer)pointer=toWorld(e);});
 ["pointerup","pointercancel","pointerleave"].forEach(t=>cv.addEventListener(t,()=>{pointer=null;}));
 
 /* ---------- 로봇 (혼자 하기) ---------- */
-const ai={tx:260,ty:300,t:0,idle:0};
+const ballRef={x:FW/2,y:FH/2};
+const ai={tx:260,ty:300,t:0,idle:0,escape:0,stuck:0,lx:0,ly:0};
 function aiThink(dt){
+  if(ai.escape>0){ai.escape-=dt;return;}            // 빠져나오는 중
   if(ai.idle>0){ai.idle-=dt;return;}
   ai.t-=dt;if(ai.t>0)return;ai.t=0.25; // 반응이 조금 느림
+  // 제자리에 끼어 있으면 가운데 쪽으로 빠져나오기
+  const moved=Math.hypot(dad.x-ai.lx,dad.y-ai.ly);ai.lx=dad.x;ai.ly=dad.y;
+  if(moved<6)ai.stuck+=0.25;else ai.stuck=0;
+  if(ai.stuck>=1){ai.stuck=0;ai.escape=0.9;ai.tx=FW/2+(Math.random()-.5)*200;ai.ty=FH/2+(Math.random()-.5)*200;return;}
   if(Math.random()<0.07){ai.idle=0.5+Math.random()*0.7;return;} // 가끔 멈칫
   const bx=ball.x,by=ball.y;
-  // 공에서 아이 골대 쪽 방향
-  let ux=FW+20-bx,uy=FH/2-by;const ul=Math.hypot(ux,uy)||1;ux/=ul;uy/=ul;
+  // 공에서 아이 골대 쪽 방향. 공이 벽에 붙어 있으면 먼저 가운데 쪽으로 빼냄
+  let ux=FW+20-bx,uy=FH/2-by;
+  const ex=Math.min(bx,FW-bx),ey=Math.min(by,FH-by),near=dad.r+BR+20;
+  if(ey<near&&ey<=ex){ux=1;uy=(by<FH/2?1:-1)*0.35;}                                   // 위/아래 벽: 벽 따라 오른쪽으로
+  else if(ex<near&&!(bx>FW/2&&Math.abs(by-FH/2)<rightGoalH()/2)){ux=(bx<FW/2?1:-1)*0.35;uy=by<FH/2?1:-1;} // 옆 벽: 가운데 쪽으로
+  const ul=Math.hypot(ux,uy)||1;ux/=ul;uy/=ul;
   const rx=bx-dad.x,ry=by-dad.y,rl=Math.hypot(rx,ry)||1;
   const behind=(rx*ux+ry*uy)/rl>0.75;
   if(behind){ai.tx=bx+ux*30;ai.ty=by+uy*30+(Math.random()-.5)*24;}            // 공 뒤에 있으면 골대 쪽으로 밀기
@@ -207,8 +217,16 @@ function movePlayer(p,dt){
   const a=Math.min(1,dt*9);
   p.vx+=(dx*spd-p.vx)*a;p.vy+=(dy*spd-p.vy)*a;
   p.x+=p.vx*dt;p.y+=p.vy*dt;
-  p.x=Math.max(p.r,Math.min(FW-p.r,p.x));p.y=Math.max(p.r,Math.min(FH-p.r,p.y));
+  p.x=Math.max(p.r,Math.min(FW-p.r,p.x));p.y=Math.max(p.r,Math.min(FH-p.r,p.y));bevel(p,p.r,false);
   if(Math.hypot(p.vx,p.vy)>30)p.face=Math.atan2(p.vy,p.vx);
+}
+const CUT=100; // 경기장 네 구석을 대각선으로 깎아서 공과 선수가 끼지 않게 함
+function bevel(o,r,vel){
+  for(const [cx,cy,nx,ny] of [[0,0,1,1],[FW,0,-1,1],[0,FH,1,-1],[FW,FH,-1,-1]]){
+    const d=((o.x-cx)*nx+(o.y-cy)*ny)/Math.SQRT2,need=CUT/Math.SQRT2+r;
+    if(d<need){const ux=nx/Math.SQRT2,uy=ny/Math.SQRT2,pen=need-d;o.x+=ux*pen;o.y+=uy*pen;
+      if(vel){const v=o.vx*ux+o.vy*uy;if(v<0){o.vx-=1.8*v*ux;o.vy-=1.8*v*uy;}}}
+  }
 }
 function hitBall(p){
   const dx=ball.x-p.x,dy=ball.y-p.y,d=Math.hypot(dx,dy),m=p.r+BR;
@@ -255,10 +273,13 @@ function moveBall(dt){
     }
   }
   post(0,cy-lh);post(0,cy+lh);post(FW,cy-rh);post(FW,cy+rh);
+  if(ball.x>0&&ball.x<FW)bevel(ball,BR,true);
   if(ball.x<-BR)goal("kid");else if(ball.x>FW+BR)goal("dad");
   // 구석에 박혀서 안 움직이면 살짝 밀어줌
-  const corner=(ball.x<60||ball.x>FW-60)&&(ball.y<60||ball.y>FH-60);
-  if(corner&&Math.hypot(ball.vx,ball.vy)<220){stuckT+=dt;if(stuckT>2.5){ball.vx=(FW/2-ball.x)*0.6;ball.vy=(FH/2-ball.y)*0.6;stuckT=0;}}else stuckT=0;
+  // 공이 벽이나 구석에서 4초 넘게 거의 제자리면 가운데 쪽으로 굴려줌
+  if(Math.hypot(ball.x-ballRef.x,ball.y-ballRef.y)>50){ballRef.x=ball.x;ballRef.y=ball.y;stuckT=0;}
+  else if(Math.min(ball.x,FW-ball.x,ball.y,FH-ball.y)<110&&ball.x>0&&ball.x<FW){stuckT+=dt;
+    if(stuckT>4){ball.vx=(FW/2-ball.x)*0.9;ball.vy=(FH/2-ball.y)*0.9;stuckT=0;}}
 }
 function collidePlayers(){
   const dx=dad.x-kid.x,dy=dad.y-kid.y,d=Math.hypot(dx,dy),m=kid.r+dad.r;
@@ -319,7 +340,8 @@ function draw(){
   ctx.fillStyle="#2E8B47";ctx.fillRect(VX,VY,VW,VH);
   for(let i=0;i<10;i++){ctx.fillStyle=i%2?"#3A9A54":"#34914D";ctx.fillRect(i*FW/10,0,FW/10,FH);}
   ctx.strokeStyle="rgba(255,255,255,.9)";ctx.lineWidth=5;
-  ctx.strokeRect(0,0,FW,FH);
+  ctx.fillStyle="#2E8B47";[[0,0,1,1],[FW,0,-1,1],[0,FH,1,-1],[FW,FH,-1,-1]].forEach(([x,y,a,b])=>{ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+a*CUT,y);ctx.lineTo(x,y+b*CUT);ctx.closePath();ctx.fill();});
+  ctx.beginPath();ctx.moveTo(CUT,0);ctx.lineTo(FW-CUT,0);ctx.lineTo(FW,CUT);ctx.lineTo(FW,FH-CUT);ctx.lineTo(FW-CUT,FH);ctx.lineTo(CUT,FH);ctx.lineTo(0,FH-CUT);ctx.lineTo(0,CUT);ctx.closePath();ctx.stroke();
   ctx.beginPath();ctx.moveTo(FW/2,0);ctx.lineTo(FW/2,FH);ctx.stroke();
   ctx.beginPath();ctx.arc(FW/2,FH/2,80,0,7);ctx.stroke();
   ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(FW/2,FH/2,6,0,7);ctx.fill();
