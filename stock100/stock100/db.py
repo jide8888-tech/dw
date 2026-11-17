@@ -93,4 +93,7 @@ def connect(path: Path) -> sqlite3.Connection:
     con = sqlite3.connect(str(path))
     con.row_factory = sqlite3.Row
     con.executescript(SCHEMA)
+    for table, col in (("watch_ticks2", "d_ret REAL"), ("watch_signals2", "d_ret REAL")):   # 이전 DB 이어 쓰기
+        if col.split()[0] not in {r[1] for r in con.execute(f"PRAGMA table_info({table})")}:
+            con.execute(f"ALTER TABLE {table} ADD COLUMN {col}")
     return con

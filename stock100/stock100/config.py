@@ -24,8 +24,9 @@ DEFAULTS = {
     "watch": {"interval_min": 5, "start": "09:00", "end": "15:30",
               "groups": {
                   # ① 5분마다 그 시각의 전체 시장 거래대금 상위 100
+                  # 매수 = 5분 동안 거래대금 순위 상승 + 5분 전 가격 대비 +1.5% 상승 (ETF 포함 100개 전부)
                   "live": {"enabled": True, "label": "①거래대금상위", "top_n": 100, "fetch_n": 200,
-                           "exclude_etf": True},
+                           "exclude_etf": False, "pct_mode": "ret", "pct_delta": 1.5, "value_delta_eok": 0},
                   # (사용 안 함) 장 시작 직전 예상체결 등락률 상위 — enabled: true 로 다시 켤 수 있음
                   "expected": {"enabled": False, "label": "③예상체결", "top_n": 100,
                                "pick_times": ["08:55", "08:59"], "min_qty": 1000, "min_price": 1000,

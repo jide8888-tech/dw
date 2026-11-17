@@ -402,7 +402,8 @@ def test_watch_live_top100(tmp_path, monkeypatch):
     ETF 제외, 산 종목은 순위 밖으로 밀려도 시세를 따로 받아 성과 기록"""
     import pandas as pd
     from stock100 import watch
-    cfg, con = _watch_env(tmp_path, monkeypatch, {"watch": {"groups": {"live": {"top_n": 3, "fetch_n": 6}}}})
+    cfg, con = _watch_env(tmp_path, monkeypatch, {"watch": {"groups": {"live": {"top_n": 3, "fetch_n": 6,
+                                                                                   "exclude_etf": True}}}})
 
     def board(rows):      # (code, name, price, pct, value억) — 리스트 순서 = 거래대금 순위
         return pd.DataFrame([{"code": c, "name": n, "price": p, "pct": r, "value": v * 1e8, "rank": i + 1}
@@ -448,3 +449,49 @@ def test_watch_live_top100(tmp_path, monkeypatch):
     row = con.execute("SELECT price FROM watch_ticks2 WHERE grp='live' AND code='D' AND time='09:40'").fetchone()
     assert row and row[0] == 4300                                                # 밀려나도 시세 기록
     assert con.execute("SELECT COUNT(*) FROM watch_universe WHERE grp='live'").fetchone()[0] == 2
+
+
+def test_watch_live_rule_rank_up_and_5min_return(tmp_path, monkeypatch):
+    """① 기본 규칙: ETF 포함 100개 전부, 매수 = 5분 동안 거래대금 순위 상승 + 5분 전 가격 대비 +1.5% 이상
+    (5억 조건 없음, 전일대비 등락률 변화가 아니라 5분 상승률)"""
+    import pandas as pd
+    from stock100 import watch
+    cfg, con = _watch_env(tmp_path, monkeypatch, {"watch": {"groups": {"live": {"top_n": 4, "fetch_n": 6}}}})
+
+    def board(rows):
+        return pd.DataFrame([{"code": c, "name": n, "price": p, "pct": r, "value": v * 1e8, "rank": i + 1}
+                             for i, (c, n, p, r, v) in enumerate(rows)])
+
+    boards = [
+        board([("E", "KODEX 레버리지", 10000, 1.0, 900), ("A", "에이", 10000, 20.0, 500),
+               ("B", "비", 10000, 1.0, 300), ("C", "씨", 10000, 1.0, 200), ("D", "디", 10000, 1.0, 100)]),
+        board([("E", "KODEX 레버리지", 10200, 3.0, 905),   # ETF: 순위 그대로 → 주목만
+               ("B", "비", 10160, 2.6, 302),                 # +1.6%, 3위→2위, 대금 +2억(5억 안 돼도) → 매수
+               ("A", "에이", 10140, 21.7, 501),             # 등락률 +1.7%p 지만 5분 상승률 +1.4% → 신호 없음
+               ("D", "디", 10100, 2.0, 280),                 # 5위→4위, +1.0% → 상승률 미달
+               ("C", "씨", 10300, 4.0, 210)]),               # +3%, 4위→5위(100위 밖) → 신호 없음
+    ]
+
+    class Feed:
+        def live_top(self, n):
+            return boards.pop(0)
+
+        def quotes(self, codes):
+            return pd.DataFrame(columns=["code", "name", "price", "pct", "value", "strength"])
+
+        def market_rank(self, n=300):
+            return {}
+
+    tf = watch.TickFeed(Feed(), live_n=6)
+    w = watch.Watcher(cfg, con, tf, pd.DataFrame(columns=watch.UNI_COLS), dt.date(2026, 11, 17), "live")
+    t0 = dt.datetime(2026, 11, 17, 10, 0)
+    tf.begin([])
+    r0 = w.tick(t0)
+    assert "E" in set(r0["rows"]["code"]) and r0["n_watch"] == 4                   # ETF 포함
+    tf.begin([])
+    r1 = w.tick(t0 + dt.timedelta(minutes=5))
+    kinds = {(s["code"], s["kind"]) for s in r1["signals"]}
+    assert kinds == {("E", "주목"), ("B", "주목"), ("B", "매수")}
+    b = next(s for s in r1["signals"] if s["kind"] == "매수")
+    assert b["d_ret"] == 1.6 and (b["rank_prev"], b["rank_now"]) == (3, 2)
+    assert con.execute("SELECT d_ret FROM watch_ticks2 WHERE code='A' AND time='10:05'").fetchone()[0] == 1.4
