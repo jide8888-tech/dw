@@ -9,11 +9,15 @@
  *  5) [실행 로그]에 나오는 시트 주소를 열고 '기사별 링크' 탭의 링크를 카톡으로 전달
  *
  * 차량이 늘거나 줄면: VEHICLES 수정 → updateVehicles 실행
+ * 다른 관리자와 같이 보려면: EDITORS 에 구글 계정 적기 → share 실행
+ * (기사님은 구글 계정 없이 링크만으로 입력 가능)
  */
 
 // ===== 여기만 수정하세요 =====
 const VEHICLES = ['12가3456', '34나5678', '56다7890'];
 const TITLE = '화물차 운행일지';
+// 시트·폼을 같이 관리할 사람의 구글 계정 (예: ['manager@gmail.com'])
+const EDITORS = [];
 // ============================
 
 const RESP_SHEET = '응답원본';
@@ -73,6 +77,7 @@ function setup() {
   props.setProperties({ formId: form.getId(), ssId: ss.getId(), vehicleItemId: String(vehicleItem.getId()) });
 
   buildVehicleTabs_(ss, form);
+  shareWithEditors_(ss, form);
 
   // 기본으로 생기는 빈 시트 삭제
   const blank = ss.getSheetByName('Sheet1') || ss.getSheetByName('시트1');
@@ -90,6 +95,22 @@ function updateVehicles() {
   form.getItemById(Number(props.getProperty('vehicleItemId'))).asListItem().setChoiceValues(VEHICLES);
   buildVehicleTabs_(ss, form);
   Logger.log('업데이트 완료: ' + ss.getUrl());
+}
+
+/** EDITORS 수정 후 실행하면 그 계정들에 시트·폼 편집 권한을 줍니다 */
+function share() {
+  const props = PropertiesService.getScriptProperties();
+  const ss = SpreadsheetApp.openById(props.getProperty('ssId'));
+  const form = FormApp.openById(props.getProperty('formId'));
+  shareWithEditors_(ss, form);
+}
+
+function shareWithEditors_(ss, form) {
+  const emails = EDITORS.map(e => e.trim()).filter(Boolean);
+  if (!emails.length) return;
+  ss.addEditors(emails);
+  form.addEditors(emails);
+  Logger.log('공유 완료: ' + emails.join(', '));
 }
 
 /** 차량별 탭(일자/출발km/도착km/총 주행km/주유량/주유금액) + 기사별 링크 탭 */
