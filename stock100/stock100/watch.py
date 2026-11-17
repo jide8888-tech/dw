@@ -1,9 +1,11 @@
 """장중 5분 감시 — 기존 HTS 실시간 연동 엑셀(5분 매크로)을 키움 REST API 로 옮긴 것.
 
 감시 종목을 고르는 두 방식을 같은 날 동시에 돌려 비교한다.
-  ① 예상체결  : 08:55 1차 → 08:59 확정, 장전 예상체결 등락률 상위 100
-                (우선주·스팩·ETF·ETN 제외, 예상체결량 1만 주↑, 1천 원↑)
+  ① 거래대금상위: 5분마다 그 시각의 전체 시장 거래대금 상위 100 을 조회 (ETF·ETN 제외).
+                 101~200위도 함께 받아 두어, 100위 안으로 새로 들어온 종목도 5분 변화를 잴 수 있다.
+                 순위는 전체 시장 거래대금 순위 (예: 34위 → 30위)
   ② 거래대금이력: 최근 10거래일 안에 거래대금 100위 이내 + 등락률 15% 이상이었던 종목 (+ extra_codes)
+  (예전 ① 예상체결 방식은 groups.expected.enabled: true 로 다시 켤 수 있다)
 5분마다 그룹마다:
   🔴 주목 : 5분 거래대금 증가 ≥ 5억 AND 5분 등락률 변화 ≥ +1.5%p
   ▲ 순위 : 그룹 안 거래대금 순위가 위로 (예: 34위 → 30위)
@@ -23,7 +25,7 @@ import pandas as pd
 
 from .util import iso, to_date
 
-GROUPS = ["expected", "history"]
+GROUPS = ["live", "expected", "history"]
 UNI_COLS = ["code", "name", "rank", "reason"]
 
 
@@ -168,18 +170,29 @@ def pick_expected(cfg, con, feed, today, tag: str, quiet=False) -> pd.DataFrame:
 class TickFeed:
     """두 그룹이 같은 시세를 쓰도록 회차마다 합집합을 한 번만 조회한다."""
 
-    def __init__(self, feed):
+    def __init__(self, feed, live_n: int = 0):
         self.feed = feed
+        self.live_n = live_n
         self._q = pd.DataFrame()
+        self._live = pd.DataFrame()
         self._mk: dict = {}
 
     def begin(self, codes):
-        self._q = self.feed.quotes(sorted(set(codes)))
+        codes = sorted(set(codes))
+        self._q = self.feed.quotes(codes) if codes else pd.DataFrame()
+        self._live = pd.DataFrame()
         try:
-            self._mk = self.feed.market_rank(300)
+            if self.live_n:     # ① 거래대금상위: 시장 순위 목록 자체가 시세 (한 번의 조회로 순위도 같이 얻음)
+                self._live = self.feed.live_top(self.live_n)
+                self._mk = dict(zip(self._live["code"], self._live["rank"]))
+            else:
+                self._mk = self.feed.market_rank(300)
         except Exception as e:
             print(f"[warn] 시장 거래대금 순위 조회 실패: {e}")
             self._mk = {}
+
+    def live(self):
+        return self._live.copy()
 
     def quotes(self, codes):
         if self._q.empty:
@@ -198,6 +211,7 @@ class Watcher:
         self.date = iso(date)
         self.codes = list(uni["code"])
         self.names = dict(zip(uni["code"], uni["name"]))
+        self.live = grp == "live"
         self.prev: pd.DataFrame | None = None
         last = con.execute("SELECT cash_left FROM watch_signals2 WHERE date=? AND grp=? AND kind='매수' "
                            "ORDER BY time DESC LIMIT 1", (self.date, grp)).fetchone()
@@ -216,19 +230,24 @@ class Watcher:
     def tick(self, now: dt.datetime, final=False) -> dict:
         w = self.w
         hm = now.strftime("%H:%M")
-        q = self.feed.quotes(self.codes)
+        top_n = gcfg(self.cfg, "live").get("top_n", 100) if self.live else None
+        if self.live:
+            q = self._live_quotes()
+        else:
+            q = self.feed.quotes(self.codes)
         if q.empty:
             return {"grp": self.grp, "time": hm, "rows": q, "signals": []}
         q = q.drop_duplicates("code").set_index("code")
         q["name"] = [n or self.names.get(c, c) for c, n in zip(q.index, q["name"])]
-        blank = self.uni["name"].fillna("") == ""
-        if blank.any():
-            self.uni.loc[blank, "name"] = self.uni.loc[blank, "code"].map(q["name"]).fillna("")
-            self.names.update({c: n for c, n in zip(self.uni["code"], self.uni["name"]) if n})
+        if not self.live:
+            blank = self.uni["name"].fillna("") == ""
+            if blank.any():
+                self.uni.loc[blank, "name"] = self.uni.loc[blank, "code"].map(q["name"]).fillna("")
+                self.names.update({c: n for c, n in zip(self.uni["code"], self.uni["name"]) if n})
         q["wl_rank"] = q["value"].rank(ascending=False, method="first").astype(int)
         mk = self.feed.market_rank(300)
         q["mk_rank"] = [mk.get(c) for c in q.index]
-        basis = "mk_rank" if w["rank_basis"] == "market" else "wl_rank"
+        basis = "mk_rank" if (self.live or w["rank_basis"] == "market") else "wl_rank"
 
         for col in ("d_value", "d_pct", "d_strength", "per_won", "rank_prev", "rank_up"):
             q[col] = np.nan
@@ -247,8 +266,12 @@ class Watcher:
             q["rank_up"] = q["rank_prev"] - q[basis]
             red = (q["d_value"] >= w["value_delta_eok"] * 1e8) & (q["d_pct"] >= w["pct_delta"])
             rank_ok = q["rank_up"] >= w["rank_up_min"]
+            buy = (red & rank_ok) if w["buy_rule"] == "both" else rank_ok
+            if self.live:       # 신호는 지금 100위 안에 있는 종목만 (101~200위는 다음 회차 비교용)
+                inside = q["mk_rank"].fillna(10 ** 6) <= top_n
+                red, buy = red & inside, buy & inside
             q["red"] = red.fillna(False).astype(bool)
-            q["buy"] = ((red & rank_ok) if w["buy_rule"] == "both" else rank_ok).fillna(False).astype(bool)
+            q["buy"] = buy.fillna(False).astype(bool)
 
         signals = []
         for c, r in q.iterrows():
@@ -277,9 +300,36 @@ class Watcher:
                               int(r.wl_rank), _int(r.mk_rank), _f(r.d_value), _f(r.d_pct), _f(r.d_strength),
                               _f(r.per_won), _int(r.rank_prev), _int(r.rank_up), int(r.red), int(r.buy)))
         self._outcomes(now, q["price"], final)
+        if self.live:           # 엑셀 '감시대상'에 이 시각의 100위 목록을 남김
+            cur = q[q["mk_rank"].fillna(10 ** 6) <= top_n].sort_values("mk_rank")
+            self.uni = pd.DataFrame({"code": list(cur.index), "name": list(cur["name"]),
+                                     "rank": [int(x) for x in cur["mk_rank"]],
+                                     "reason": [f"{hm} 거래대금 {int(r)}위, {p:+.2f}%" for r, p in
+                                                zip(cur["mk_rank"], cur["pct"])]})
+            save_universe(self.con, self.date, "live", self.uni, hm)
         self.con.commit()
         self.prev = q[["price", "pct", "value", "strength", "wl_rank", "mk_rank"]].copy()
-        return {"grp": self.grp, "time": hm, "rows": q.reset_index(), "signals": signals, "basis": basis}
+        n_watch = int((q["mk_rank"].fillna(10 ** 6) <= top_n).sum()) if self.live else len(q)
+        return {"grp": self.grp, "time": hm, "rows": q.reset_index(), "signals": signals, "basis": basis,
+                "n_watch": n_watch}
+
+    def _live_quotes(self) -> pd.DataFrame:
+        live = self.feed.live()
+        if live.empty:
+            return live
+        if gcfg(self.cfg, "live").get("exclude_etf", True):
+            live = live[~live["name"].map(is_etf)]
+        live = live.assign(strength=np.nan)[["code", "name", "price", "pct", "value", "strength"]]
+        # 산 종목이 200위 밖으로 밀려도 성과(30분·1시간·규칙 청산)를 계속 잴 수 있게 시세를 따로 붙임
+        missing = [c for c in self.bought if c not in set(live["code"])]
+        if missing:
+            extra = self.feed.quotes(missing)
+            if not extra.empty:
+                live = pd.concat([live, extra[live.columns]], ignore_index=True)
+        return live
+
+    def bought_codes(self):
+        return list(self.bought)
 
     def _outcomes(self, now, prices: pd.Series, final: bool):
         """매수 신호 이후 30분·1시간·종가 수익률, 최고 수익률 갱신"""
@@ -324,7 +374,7 @@ def print_tick(cfg, res):
     w = cfg["watch"]
     rows = res["rows"]
     n_red = int(rows["red"].sum()) if len(rows) else 0
-    print(f"[{res['time']}] {label(cfg, res['grp'])} {len(rows)}종목 · 🔴 주목 {n_red} · 매수 "
+    print(f"[{res['time']}] {label(cfg, res['grp'])} {res.get('n_watch', len(rows))}종목 · 🔴 주목 {n_red} · 매수 "
           f"{sum(s['kind'] == '매수' for s in res['signals'])}")
     for s in res["signals"]:
         if s["kind"] == "주목":
@@ -406,6 +456,8 @@ def write_excel(cfg, con, date, unis: dict, path):
 
     # 성과비교
     ex = w.get("exit", {})
+    used = {r[0] for r in con.execute("SELECT DISTINCT grp FROM watch_signals2")}
+    shown = [g for g in GROUPS if g in unis or g in used]      # 꺼 둔 그룹은 기록이 없으면 숨김
     ws = _sheet(wb, "성과비교", ["그룹", "기간", "감시 종목 수", "주목 신호", "매수 신호", "30분 평균(%)",
                              "1시간 평균(%)", "종가 평균(%)", "종가 적중률(%)", "평균 최고수익(%)", "모의 손익(원)",
                              "규칙 평균(%)", "규칙 승률(%)", "익절/손절/정리", "일수"],
@@ -413,7 +465,7 @@ def write_excel(cfg, con, date, unis: dict, path):
     for period, dd in (("오늘", date), ("누적", None)):
         out, sig = compare_rows(con, dd)
         sim = simulate_exit(con, cfg, dd)
-        for g in GROUPS:
+        for g in shown:
             o = out.get(g, {})
             nc = o.get("nc") or 0
             rs = [v for k, v in sim.items() if k[1] == g]
@@ -504,7 +556,11 @@ def write_excel(cfg, con, date, unis: dict, path):
     # 기준
     e, h = gcfg(cfg, "expected"), gcfg(cfg, "history")
     ws = _sheet(wb, "기준", ["항목", "값"], [26, 80])
-    for row in ((label(cfg, "expected"), f"{'/'.join(e['pick_times'])} 예상체결 등락률 상위 {e['top_n']} "
+    lv = gcfg(cfg, "live")
+    for row in ((label(cfg, "live"), f"{w['interval_min']}분마다 전체 시장 거래대금 상위 {lv.get('top_n', 100)}위 조회"
+                 f"{' (ETF·ETN 제외)' if lv.get('exclude_etf', True) else ''}, 순위 = 전체 시장 거래대금 순위"),
+                (label(cfg, "expected") + ("" if e.get("enabled") else " (사용 안 함)"),
+                 f"{'/'.join(e['pick_times'])} 예상체결 등락률 상위 {e['top_n']} "
                  f"(우선주·스팩·ETF·ETN 제외, 예상체결량 {e['min_qty']:,}주↑, {e['min_price']:,}원↑)"),
                 (label(cfg, "history"), f"최근 {h['lookback_days']}거래일 거래대금 {h['top_n']}위 이내 + "
                  f"등락률 {h['min_pct']}%↑" + (" + extra_codes" if w.get("extra_codes") else "")),
@@ -577,6 +633,26 @@ def run(app, once=False, demo=False, list_only=False, clock=None, sleep=_time.sl
         unis["history"] = history_universe(cfg, con, src, today)
         _show(cfg, "history", unis["history"])
 
+    if "live" in groups:
+        lv = gcfg(cfg, "live")
+        unis["live"] = load_universe(con, today, "live")
+        print(f"[감시] {label(cfg, 'live')}: 5분마다 전체 시장 거래대금 상위 {lv.get('top_n', 100)}위를 조회합니다"
+              f"{' (ETF·ETN 제외)' if lv.get('exclude_etf', True) else ''}.")
+        if list_only:
+            try:
+                tf0 = TickFeed(feed, live_n=lv.get("fetch_n", 200))
+                tf0.begin([])
+                cur = tf0.live()
+                if lv.get("exclude_etf", True):
+                    cur = cur[~cur["name"].map(is_etf)]
+                cur = cur[cur["rank"] <= lv.get("top_n", 100)]
+                unis["live"] = pd.DataFrame({"code": cur["code"], "name": cur["name"], "rank": cur["rank"],
+                                             "reason": [f"지금 거래대금 {int(r)}위, {p:+.2f}%"
+                                                        for r, p in zip(cur["rank"], cur["pct"])]})
+                _show(cfg, "live", unis["live"])
+            except Exception as ex:
+                print(f"[warn] 거래대금 상위 조회 실패: {ex}")
+
     if "expected" in groups:
         e = gcfg(cfg, "expected")
         times = [_at(today, t) for t in e["pick_times"]]
@@ -609,19 +685,20 @@ def run(app, once=False, demo=False, list_only=False, clock=None, sleep=_time.sl
 
     if list_only:
         return unis
-    unis = {g: u for g, u in unis.items() if not u.empty}
+    unis = {g: u for g, u in unis.items() if g == "live" or not u.empty}
     if not unis:
         print("감시할 종목이 없습니다. ①은 08:55~08:59 에 켜 두어야 하고, ②는 KRX 로그인 또는 며칠간의 evening 기록이 "
               "필요합니다. 급하면 config 의 watch.extra_codes 에 종목코드를 넣으세요.")
         return unis
-    tf = TickFeed(feed)
+    tf = TickFeed(feed, live_n=gcfg(cfg, "live").get("fetch_n", 200) if "live" in unis else 0)
     watchers = {g: Watcher(cfg, con, tf, u, today, g, now=clock()) for g, u in unis.items()}
-    union = sorted({c for u in unis.values() for c in u["code"]})
+    fixed = sorted({c for g, u in unis.items() if g != "live" for c in u["code"]})
     path = cfg.sub("watch") / f"{iso(today)}_실시간감시.xlsx"
     step = dt.timedelta(minutes=w["interval_min"])
 
     def one(t, final=False):
-        tf.begin(union)
+        extra = watchers["live"].bought_codes() if "live" in watchers else []
+        tf.begin(fixed + extra)
         results = [wt.tick(t, final=final) for wt in watchers.values()]
         return results
 
@@ -632,7 +709,7 @@ def run(app, once=False, demo=False, list_only=False, clock=None, sleep=_time.sl
                 if res["signals"]:
                     print_tick(cfg, res)
             t += step
-        print(f"  → {write_excel(cfg, con, today, unis, path)}")
+        print(f"  → {write_excel(cfg, con, today, {g: wt.uni for g, wt in watchers.items()}, path)}")
         return unis
 
     first = True
@@ -660,7 +737,7 @@ def run(app, once=False, demo=False, list_only=False, clock=None, sleep=_time.sl
                 print_tick(cfg, res)
             if w.get("beep") and any(s["kind"] == "매수" for res in results for s in res["signals"]):
                 beep()
-            write_excel(cfg, con, today, unis, path)
+            write_excel(cfg, con, today, {g: wt.uni for g, wt in watchers.items()}, path)
         except Exception as ex:
             print(f"[warn] {now:%H:%M} 감시 실패: {ex.__class__.__name__}: {str(ex)[:200]}")
         if once:
@@ -714,6 +791,14 @@ class DemoFeed:
     def market_rank(self, n=300):
         order = sorted(self.state, key=lambda c: -self.state[c]["value"])
         return {c: i + 1 for i, c in enumerate(order[:n])}
+
+    def live_top(self, n=200):
+        for c, nm in self.pool:
+            self._st(c, nm)
+        df = self.quotes([c for c, _ in self.pool]).sort_values("value", ascending=False).head(n)
+        df = df.reset_index(drop=True)
+        df["rank"] = range(1, len(df) + 1)
+        return df
 
 
 def _demo_history(cfg, con, src, today):

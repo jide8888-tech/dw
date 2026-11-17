@@ -269,7 +269,8 @@ def test_watch_premarket_timing(tmp_path, monkeypatch):
     from stock100 import watch
     from stock100.__main__ import App
     monkeypatch.chdir(tmp_path)
-    cfg = Config.load(None, {"data_dir": str(tmp_path), "sources": {"prices": "demo"}})
+    cfg = Config.load(None, {"data_dir": str(tmp_path), "sources": {"prices": "demo"},
+                             "watch": {"groups": {"expected": {"enabled": True}}}})   # 예상체결 방식도 켜서 시험
     app = App(cfg)
     feed = watch.DemoFeed()
     monkeypatch.setattr(watch, "_feed", lambda a, demo: feed)
@@ -289,7 +290,7 @@ def test_watch_premarket_timing(tmp_path, monkeypatch):
     times = [r[0] for r in app.con.execute("SELECT DISTINCT time FROM watch_ticks2 ORDER BY time")]
     assert times[0] == "09:00" and times[-1] == "15:30" and len(times) == 79
     grps = {r[0] for r in app.con.execute("SELECT DISTINCT grp FROM watch_ticks2")}
-    assert grps == {"expected", "history"}
+    assert grps == {"live", "expected", "history"}
 
 
 def test_watch_midday_start_aligns_to_grid(tmp_path, monkeypatch):
@@ -394,3 +395,56 @@ def test_watch_day2_fixes(tmp_path, monkeypatch):
     con.execute("UPDATE watch_outcomes SET rclose=-1.0")
     assert watch.fill_close(con, Src(), dt.date(2026, 11, 12)) == 1
     assert con.execute("SELECT rclose FROM watch_outcomes").fetchone()[0] == 10.0   # 5400→5940 실제 종가로 덮어씀
+
+
+def test_watch_live_top100(tmp_path, monkeypatch):
+    """① 거래대금상위: 5분마다 시장 거래대금 순위 조회, 101~200위에서 올라온 종목도 비교, 신호는 100위 안만,
+    ETF 제외, 산 종목은 순위 밖으로 밀려도 시세를 따로 받아 성과 기록"""
+    import pandas as pd
+    from stock100 import watch
+    cfg, con = _watch_env(tmp_path, monkeypatch, {"watch": {"groups": {"live": {"top_n": 3, "fetch_n": 6}}}})
+
+    def board(rows):      # (code, name, price, pct, value억) — 리스트 순서 = 거래대금 순위
+        return pd.DataFrame([{"code": c, "name": n, "price": p, "pct": r, "value": v * 1e8, "rank": i + 1}
+                             for i, (c, n, p, r, v) in enumerate(rows)])
+
+    boards = [
+        board([("E", "KODEX 레버리지", 1, 0, 900), ("A", "에이", 1000, 1.0, 500), ("B", "비", 2000, 2.0, 300),
+               ("C", "씨", 3000, 1.0, 200), ("D", "디", 4000, 0.5, 100)]),
+        # D: 5위 → 3위 (+150억, +3.0%p) → 지금 3위 안 + 순위 상승 → 매수 / C: 4위(밖) → 신호 없음
+        board([("E", "KODEX 레버리지", 1, 0, 950), ("A", "에이", 1010, 2.0, 520), ("D", "디", 4120, 3.5, 250),
+               ("B", "비", 2000, 2.0, 310), ("C", "씨", 3100, 4.0, 240)]),
+        # D 가 순위에서 사라짐 → 따로 받은 시세로 성과 기록
+        board([("E", "KODEX 레버리지", 1, 0, 990), ("A", "에이", 1020, 2.5, 540), ("B", "비", 2000, 2.0, 320)]),
+    ]
+
+    class Feed:
+        def live_top(self, n):
+            return boards.pop(0)
+
+        def quotes(self, codes):
+            return pd.DataFrame([{"code": c, "name": "디", "price": 4300, "pct": 8.0, "value": 300e8, "strength": 100}
+                                 for c in codes if c == "D"], columns=["code", "name", "price", "pct", "value", "strength"])
+
+        def market_rank(self, n=300):
+            return {}
+
+    tf = watch.TickFeed(Feed(), live_n=6)
+    uni = pd.DataFrame(columns=watch.UNI_COLS)
+    w = watch.Watcher(cfg, con, tf, uni, dt.date(2026, 11, 17), "live")
+    t0 = dt.datetime(2026, 11, 17, 9, 30)
+    tf.begin([])
+    r0 = w.tick(t0)
+    assert "E" not in set(r0["rows"]["code"])                                   # ETF 제외
+    assert list(w.uni["code"]) == ["A", "B"]                                     # 시장 순위 3위 안 (ETF 1위)
+    tf.begin(w.bought_codes())
+    r1 = w.tick(t0 + dt.timedelta(minutes=5))
+    kinds = {(s["code"], s["kind"]) for s in r1["signals"]}
+    assert ("D", "매수") in kinds and not any(c == "C" for c, _ in kinds)
+    buy = next(s for s in r1["signals"] if s["kind"] == "매수")
+    assert (buy["rank_prev"], buy["rank_now"]) == (5, 3)
+    tf.begin(w.bought_codes())
+    w.tick(t0 + dt.timedelta(minutes=10))
+    row = con.execute("SELECT price FROM watch_ticks2 WHERE grp='live' AND code='D' AND time='09:40'").fetchone()
+    assert row and row[0] == 4300                                                # 밀려나도 시세 기록
+    assert con.execute("SELECT COUNT(*) FROM watch_universe WHERE grp='live'").fetchone()[0] == 2
