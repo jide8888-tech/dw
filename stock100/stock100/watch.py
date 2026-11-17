@@ -249,7 +249,11 @@ class Watcher:
         q["mk_rank"] = [mk.get(c) for c in q.index]
         basis = "mk_rank" if (self.live or w["rank_basis"] == "market") else "wl_rank"
 
-        for col in ("d_value", "d_pct", "d_strength", "per_won", "rank_prev", "rank_up"):
+        gc = gcfg(self.cfg, self.grp)
+        vd = float(gc.get("value_delta_eok", w["value_delta_eok"]))      # 그룹별로 기준을 다르게 쓸 수 있음
+        pdel = float(gc.get("pct_delta", w["pct_delta"]))
+        mode = gc.get("pct_mode", "pp")     # pp = 전일대비 등락률의 5분 변화(%p) / ret = 5분 전 가격 대비 상승률(%)
+        for col in ("d_value", "d_pct", "d_ret", "d_strength", "per_won", "rank_prev", "rank_up"):
             q[col] = np.nan
         q["red"] = False
         q["buy"] = False
@@ -259,12 +263,14 @@ class Watcher:
             p = p.where(p["value"].fillna(0) > 0)
             q["d_value"] = q["value"] - p["value"]
             q["d_pct"] = (q["pct"] - p["pct"]).round(2)
+            q["d_ret"] = ((q["price"] / p["price"].where(p["price"] > 0) - 1) * 100).round(2)
             q["d_strength"] = (q["strength"] - p["strength"]).round(2)
             dprice = q["price"] - p["price"]
             q["per_won"] = np.where(dprice.abs() > 0, q["d_value"] / dprice.where(dprice != 0), np.nan)
             q["rank_prev"] = p[basis]
             q["rank_up"] = q["rank_prev"] - q[basis]
-            red = (q["d_value"] >= w["value_delta_eok"] * 1e8) & (q["d_pct"] >= w["pct_delta"])
+            move = q["d_ret"] if mode == "ret" else q["d_pct"]
+            red = (q["d_value"] >= vd * 1e8) & (move >= pdel)
             rank_ok = q["rank_up"] >= w["rank_up_min"]
             buy = (red & rank_ok) if w["buy_rule"] == "both" else rank_ok
             if self.live:       # 신호는 지금 100위 안에 있는 종목만 (101~200위는 다음 회차 비교용)
@@ -287,18 +293,23 @@ class Watcher:
                     self.con.execute("INSERT OR REPLACE INTO watch_outcomes VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                                      (self.date, self.grp, hm, c, r["name"], r.price, qty, None, None, None, 0.0))
                 sig = {"grp": self.grp, "time": hm, "code": c, "name": r["name"], "kind": k, "price": r.price,
-                       "pct": r.pct, "d_value": r.d_value, "d_pct": r.d_pct, "rank_prev": _int(r.rank_prev),
+                       "pct": r.pct, "d_value": r.d_value, "d_pct": r.d_pct, "d_ret": r.d_ret,
+                       "mode": mode, "rank_prev": _int(r.rank_prev),
                        "rank_now": _int(r[basis]), "qty": qty, "amount": amount, "cash_left": self.cash}
                 signals.append(sig)
-                self.con.execute("INSERT OR REPLACE INTO watch_signals2 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                self.con.execute("INSERT OR REPLACE INTO watch_signals2 (date, time, grp, code, name, kind, price, pct, "
+                                 "d_value, d_pct, rank_prev, rank_now, qty, amount, cash_left, d_ret) "
+                                 "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                                  (self.date, hm, self.grp, c, sig["name"], k, r.price, r.pct, _f(r.d_value),
                                   _f(r.d_pct), sig["rank_prev"], sig["rank_now"], qty, amount,
-                                  self.cash if k == "매수" else None))
+                                  self.cash if k == "매수" else None, _f(r.d_ret)))
         for c, r in q.iterrows():
-            self.con.execute("INSERT OR REPLACE INTO watch_ticks2 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            self.con.execute("INSERT OR REPLACE INTO watch_ticks2 (date, time, grp, code, name, price, pct, value, "
+                             "strength, wl_rank, mk_rank, d_value, d_pct, d_strength, per_won, rank_prev, rank_up, "
+                             "red, buy, d_ret) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                              (self.date, hm, self.grp, c, r["name"], r.price, r.pct, r.value, _f(r.strength),
                               int(r.wl_rank), _int(r.mk_rank), _f(r.d_value), _f(r.d_pct), _f(r.d_strength),
-                              _f(r.per_won), _int(r.rank_prev), _int(r.rank_up), int(r.red), int(r.buy)))
+                              _f(r.per_won), _int(r.rank_prev), _int(r.rank_up), int(r.red), int(r.buy), _f(r.d_ret)))
         self._outcomes(now, q["price"], final)
         if self.live:           # 엑셀 '감시대상'에 이 시각의 100위 목록을 남김
             cur = q[q["mk_rank"].fillna(10 ** 6) <= top_n].sort_values("mk_rank")
@@ -381,7 +392,9 @@ def print_tick(cfg, res):
             continue
         rk = f"{s['rank_prev']}→{s['rank_now']}위" if s["rank_prev"] else f"{s['rank_now']}위"
         msg = (f"   ▶ {s['kind']} {s['name']}({s['code']}) {s['price']:,.0f}원 {s['pct']:+.2f}% · "
-               f"5분 대금 {(_f(s['d_value']) or 0) / 1e8:+.1f}억 · 등락 {(_f(s['d_pct']) or 0):+.2f}%p · {rk}")
+               f"5분 대금 {(_f(s['d_value']) or 0) / 1e8:+.1f}억 · "
+               + (f"5분 상승 {(_f(s.get('d_ret')) or 0):+.2f}%" if s.get("mode") == "ret"
+                  else f"등락 {(_f(s['d_pct']) or 0):+.2f}%p") + f" · {rk}")
         if s["kind"] == "매수":
             msg += (f"\n     → 보유금 {w['buy_ratio'] * 100:.0f}% 매수 제안: {s['qty']:,}주 ({s['amount']:,.0f}원)")
         print(msg)
@@ -489,8 +502,9 @@ def write_excel(cfg, con, date, unis: dict, path):
             continue
         ws = _sheet(wb, f"실시간_{label(cfg, g)}",
                     ["순위", "이전순위", "순위변동", "시장순위", "종목명", "코드", "현재가", "등락률", "거래대금(억)",
-                     "5분 대금증가(억)", "5분 등락률변화(%p)", "가격1원당 유입(만원)", "체결강도", "체결강도변화", "신호"],
-                    [6, 8, 8, 8, 16, 9, 11, 9, 11, 13, 14, 14, 9, 11, 8])
+                     "5분 대금증가(억)", "5분 등락률변화(%p)", "5분 상승률(%)", "가격1원당 유입(만원)", "체결강도",
+                     "체결강도변화", "신호"],
+                    [6, 8, 8, 8, 16, 9, 11, 9, 11, 13, 14, 11, 14, 9, 11, 8])
         t = con.execute("SELECT MAX(time) FROM watch_ticks2 WHERE date=? AND grp=?", (d, g)).fetchone()[0]
         if not t:
             continue
@@ -499,7 +513,7 @@ def write_excel(cfg, con, date, unis: dict, path):
             up = r["rank_up"]
             ws.append([r[basis], r["rank_prev"], (f"▲{up}" if up and up > 0 else (f"▼{-up}" if up else "")),
                        r["mk_rank"], r["name"], r["code"], r["price"], r["pct"], round((r["value"] or 0) / 1e8, 1),
-                       None if r["d_value"] is None else round(r["d_value"] / 1e8, 2), r["d_pct"],
+                       None if r["d_value"] is None else round(r["d_value"] / 1e8, 2), r["d_pct"], r["d_ret"],
                        None if r["per_won"] is None else round(r["per_won"] / 1e4, 1), r["strength"],
                        r["d_strength"], "매수" if r["buy"] else ("주목" if r["red"] else "")])
             if r["red"] or r["buy"]:
@@ -507,7 +521,7 @@ def write_excel(cfg, con, date, unis: dict, path):
                     c.fill = BUY if r["buy"] else RED
                 if r["buy"]:
                     ws.cell(ws.max_row, 5).font = Font(bold=True)
-        ws.cell(1, 16, f"기준 시각 {d} {t}")
+        ws.cell(1, 17, f"기준 시각 {d} {t}")
 
     # 신호 성과
     sim = simulate_exit(con, cfg, date)
@@ -521,12 +535,13 @@ def write_excel(cfg, con, date, unis: dict, path):
 
     # 신호기록
     ws = _sheet(wb, "신호기록", ["그룹", "시각", "구분", "종목명", "코드", "현재가", "등락률", "5분 대금증가(억)",
-                             "5분 등락률변화(%p)", "이전순위", "현재순위", "제안수량", "제안금액", "그룹 남은 보유금"],
-                [16, 7, 7, 16, 9, 11, 9, 13, 14, 8, 8, 10, 13, 14])
+                             "5분 등락률변화(%p)", "5분 상승률(%)", "이전순위", "현재순위", "제안수량", "제안금액",
+                             "그룹 남은 보유금"],
+                [16, 7, 7, 16, 9, 11, 9, 13, 14, 11, 8, 8, 10, 13, 14])
     for r in con.execute("SELECT * FROM watch_signals2 WHERE date=? ORDER BY time, grp, kind", (d,)):
         ws.append([label(cfg, r["grp"]), r["time"], r["kind"], r["name"], r["code"], r["price"], r["pct"],
-                   None if r["d_value"] is None else round(r["d_value"] / 1e8, 2), r["d_pct"], r["rank_prev"],
-                   r["rank_now"], r["qty"] or None, r["amount"] or None, r["cash_left"]])
+                   None if r["d_value"] is None else round(r["d_value"] / 1e8, 2), r["d_pct"], r["d_ret"],
+                   r["rank_prev"], r["rank_now"], r["qty"] or None, r["amount"] or None, r["cash_left"]])
         fill = BUY if r["kind"] == "매수" else (RED if r["kind"] == "주목" else None)
         if fill:
             for c in ws[ws.max_row]:
@@ -564,10 +579,7 @@ def write_excel(cfg, con, date, unis: dict, path):
                  f"(우선주·스팩·ETF·ETN 제외, 예상체결량 {e['min_qty']:,}주↑, {e['min_price']:,}원↑)"),
                 (label(cfg, "history"), f"최근 {h['lookback_days']}거래일 거래대금 {h['top_n']}위 이내 + "
                  f"등락률 {h['min_pct']}%↑" + (" + extra_codes" if w.get("extra_codes") else "")),
-                ("주목(빨간 음영)", f"{w['interval_min']}분 거래대금 증가 ≥ {w['value_delta_eok']}억 AND "
-                                 f"등락률 변화 ≥ +{w['pct_delta']}%p"),
-                ("순위 기준", "그룹 안 거래대금 순위" if basis == "wl_rank" else "전체 시장 거래대금 순위"),
-                ("매수 신호", ("주목 + " if w["buy_rule"] == "both" else "") + f"순위 {w['rank_up_min']}계단↑ 상승"),
+                *[(f"{label(cfg, g)} 주목·매수", _rule_text(cfg, g, basis)) for g in GROUPS if g in unis],
                 ("매수 제안", f"그룹별 보유금 {w['cash']:,}원에서 남은 금액의 {w['buy_ratio'] * 100:.0f}%. "
                            f"같은 종목은 하루 1번 '매수', 이후 '재신호'"),
                 ("주의", "실제 주문은 하지 않습니다. 수량·손익은 모의 계산입니다.")):
@@ -588,6 +600,18 @@ def write_excel(cfg, con, date, unis: dict, path):
             return None
         print(f"[info] {path.name} 이 열려 있어 {alt.name} 로 저장했습니다.")
         return alt
+
+
+def _rule_text(cfg, g, basis) -> str:
+    w, gc = cfg["watch"], gcfg(cfg, g)
+    vd = float(gc.get("value_delta_eok", w["value_delta_eok"]))
+    pdel = float(gc.get("pct_delta", w["pct_delta"]))
+    move = (f"{w['interval_min']}분 전 가격 대비 +{pdel}% 이상 상승" if gc.get("pct_mode", "pp") == "ret"
+            else f"{w['interval_min']}분 등락률 변화 +{pdel}%p 이상")
+    cond = (f"{w['interval_min']}분 거래대금 +{vd}억 이상 AND " if vd > 0 else "") + move
+    rank = "전체 시장 거래대금 순위" if (g == "live" or basis == "mk_rank") else "그룹 안 거래대금 순위"
+    return (f"주목 = {cond} / 매수 = " + ("주목 + " if w["buy_rule"] == "both" else "")
+            + f"{rank} {w['rank_up_min']}계단↑ 상승")
 
 
 def _r(x, n=2):

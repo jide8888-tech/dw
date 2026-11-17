@@ -59,7 +59,11 @@ watch:                    # 장중 5분 감시 (python -m stock100 watch, 키움
       enabled: true
       top_n: 100          # 신호는 지금 100위 안 종목만
       fetch_n: 200        # 101~200위도 받아 두어 100위 안으로 새로 들어온 종목도 5분 변화를 잼
-      exclude_etf: true   # ETF·ETN·레버리지·인버스 제외
+      exclude_etf: false  # false = ETF 포함 100개 전부
+      # ① 매수 = 5분 동안 거래대금 순위 상승 + 5분 전 가격 대비 +1.5% 이상 상승
+      pct_mode: ret       # ret = 5분 전 가격 대비 상승률 / pp = 전일대비 등락률의 5분 변화
+      pct_delta: 1.5
+      value_delta_eok: 0  # 0 = 5분 거래대금 증가 조건 없음
     expected:             # (사용 안 함) 장전 예상체결 등락률 상위 — 다시 쓰려면 true
       enabled: false
       top_n: 100
