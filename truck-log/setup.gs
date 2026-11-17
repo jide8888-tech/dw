@@ -23,8 +23,9 @@ const HEADERS = ['일자', '출발km', '도착km', '총 주행km', '주유량(L)
 
 function setup() {
   const props = PropertiesService.getScriptProperties();
-  if (props.getProperty('formId')) {
-    throw new Error('이미 만들어져 있습니다. 실행 로그 또는 구글 드라이브에서 확인하세요.');
+  const oldId = props.getProperty('formId');
+  if (oldId && !isTrashed_(oldId)) {
+    throw new Error('이미 만들어져 있습니다. 새로 만들려면 기존 폼과 시트를 휴지통에 버리고 다시 실행하세요.');
   }
 
   const ss = SpreadsheetApp.create(TITLE);
@@ -83,16 +84,17 @@ function setup() {
 function buildLogSheet_(ss) {
   const R = "'" + RESP_SHEET + "'!";
   // 응답원본 열: A 타임스탬프, B 시점, C 출발km, D 도착km, E 주유량, F 주유금액
+  // ※ 폼은 응답마다 행을 끼워 넣어서 A2:A 같은 범위가 밀림 → 반드시 열 전체(A:A) 참조
   // 같은 날 여러 번 보냈으면 마지막 값 사용
   const pick = col =>
     '=MAP(A2:A, LAMBDA(d, IF(d="", "", IFERROR(CHOOSEROWS(FILTER(' +
-    R + col + '2:' + col + ', INT(' + R + 'A2:A)=d, ' +
-    R + col + '2:' + col + '<>""), -1), ""))))';
+    R + col + ':' + col + ', IFERROR(INT(' + R + 'A:A), 0)=d, ' +
+    R + col + ':' + col + '<>""), -1), ""))))';
 
   const sh = ss.insertSheet(LOG_SHEET, 0);
   sh.getRange(1, 1, 1, 6).setValues([HEADERS]).setFontWeight('bold').setBackground('#e8eef7');
   sh.getRange('A2').setFormula(
-    '=IFERROR(SORT(UNIQUE(FILTER(INT(' + R + 'A2:A), ' + R + 'A2:A<>""))), "")');
+    '=IFERROR(SORT(UNIQUE(FILTER(INT(' + R + 'A:A), ISNUMBER(' + R + 'A:A)))), "")');
   sh.getRange('B2').setFormula(pick('C'));
   sh.getRange('C2').setFormula(pick('D'));
   sh.getRange('D2').setFormula(
@@ -120,6 +122,10 @@ function shareWithEditors_(ss, form) {
   ss.addEditors(emails);
   form.addEditors(emails);
   Logger.log('공유 완료: ' + emails.join(', '));
+}
+
+function isTrashed_(id) {
+  try { return DriveApp.getFileById(id).isTrashed(); } catch (e) { return true; }
 }
 
 function numberRule_() {
