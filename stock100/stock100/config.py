@@ -23,8 +23,11 @@ DEFAULTS = {
     "kiwoom": {"mock": False},
     "watch": {"interval_min": 5, "start": "09:00", "end": "15:30",
               "groups": {
-                  # ① 장 시작 직전 예상체결 등락률 상위
-                  "expected": {"enabled": True, "label": "①예상체결", "top_n": 100,
+                  # ① 5분마다 그 시각의 전체 시장 거래대금 상위 100
+                  "live": {"enabled": True, "label": "①거래대금상위", "top_n": 100, "fetch_n": 200,
+                           "exclude_etf": True},
+                  # (사용 안 함) 장 시작 직전 예상체결 등락률 상위 — enabled: true 로 다시 켤 수 있음
+                  "expected": {"enabled": False, "label": "③예상체결", "top_n": 100,
                                "pick_times": ["08:55", "08:59"], "min_qty": 1000, "min_price": 1000,
                                "exclude_pref_spac": True},
                   # ② 최근 N거래일 거래대금 상위 + 급등 이력

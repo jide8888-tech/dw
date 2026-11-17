@@ -230,6 +230,12 @@ class KiwoomSource(BaseSource):
                         "value": self._value(r), "rank": int(_num(r.get("now_rank")) or i)})
         return pd.DataFrame(out, columns=["code", "name", "market", "close", "change_pct", "value", "rank"])
 
+    def live_top(self, n: int = 200) -> pd.DataFrame:
+        """지금 이 순간의 전체 시장 거래대금 상위 n (ka10032). 5분 감시 ① 그룹용"""
+        df = self.value_top(dt.date.today(), n)
+        return df.rename(columns={"close": "price", "change_pct": "pct"})[["code", "name", "price", "pct", "value",
+                                                                           "rank"]]
+
     # ---------------- 5분 감시용 현재가 (관심종목정보 ka10095, 여러 종목 한 번에)
     def quotes(self, codes: list[str], chunk: int = 30) -> pd.DataFrame:
         out = []
