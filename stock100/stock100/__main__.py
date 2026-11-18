@@ -77,6 +77,11 @@ class App:
         except Exception as e:
             if not quiet:
                 print(f"[info] 종가 갱신 생략 ({e.__class__.__name__})")
+        try:   # 1분봉으로 신호 후 움직임·매도 방법 비교를 다시 계산하고 감시 엑셀 갱신
+            watch.report(self.cfg, self.con, self.src, date, quiet=quiet)
+        except Exception as e:
+            if not quiet:
+                print(f"[info] 감시 보고서 갱신 생략 ({e.__class__.__name__}: {str(e)[:100]})")
         return path
 
     def theme_excel(self, rv, quiet=False):
@@ -147,6 +152,8 @@ def main(argv=None):
     p.add_argument("--once", action="store_true", help="한 번만 조회하고 종료")
     p.add_argument("--list", action="store_true", help="오늘 감시 대상만 출력")
     p.add_argument("--demo", action="store_true", help="가짜 데이터로 하루치 감시 재생")
+    p.add_argument("--report", action="store_true", help="장 마감 후: 1분봉 받아 신호 후 움직임·매도 방법 비교 엑셀 갱신")
+    p.add_argument("--date", help="--report 날짜 YYYYMMDD (기본: 오늘)")
     p = sp.add_parser("update", help="GitHub 최신 코드로 업데이트 (config.yaml·data 유지)")
     p.add_argument("--check", action="store_true", help="새 버전이 있는지만 확인")
     p.add_argument("--no-pip", action="store_true")
@@ -203,6 +210,8 @@ def _dispatch(app, a):
         app.backfill(a.days, to_date(a.end) if a.end else dt.date.today())
     elif a.cmd == "theme":
         app.theme_only(to_date(a.date) if a.date else dt.date.today())
+    elif a.cmd == "watch" and a.report:
+        watch.report(app.cfg, app.con, app.src, to_date(a.date) if a.date else dt.date.today())
     elif a.cmd == "watch":
         watch.run(app, once=a.once, list_only=a.list)
     elif a.cmd == "kiwoom":

@@ -262,6 +262,27 @@ class KiwoomSource(BaseSource):
                         "qty": _num(r.get("exp_cntr_qty")) or 0, "rank": i})
         return pd.DataFrame(out, columns=["code", "name", "price", "pct", "qty", "rank"])
 
+    def minute_bars(self, code: str, date) -> pd.DataFrame:
+        """그날 1분봉 (ka10080). time = 'HH:MM'"""
+        d = ymd(date)
+        rows = self.c.call("/api/dostk/chart", "ka10080", {"stk_cd": code, "tic_scope": "1", "upd_stkpc_tp": "1"},
+                           max_pages=10, stop=lambda pg: str(pg[-1].get("cntr_tm", "99999999"))[:8] < d)
+        out = []
+        for r in rows:
+            tm = str(r.get("cntr_tm") or "")
+            if len(tm) >= 12:
+                if tm[:8] != d:
+                    continue
+                hhmm = f"{tm[8:10]}:{tm[10:12]}"
+            elif len(tm) >= 4:
+                hhmm = f"{tm[:2]}:{tm[2:4]}"
+            else:
+                continue
+            out.append({"time": hhmm, "open": abs(_num(r.get("open_pric")) or 0),
+                        "high": abs(_num(r.get("high_pric")) or 0), "low": abs(_num(r.get("low_pric")) or 0),
+                        "close": abs(_num(r.get("cur_prc")) or 0), "volume": int(_num(r.get("trde_qty")) or 0)})
+        return pd.DataFrame(out, columns=["time", "open", "high", "low", "close", "volume"]).drop_duplicates("time")
+
     def stock_themes(self, code: str) -> list[str]:
         """종목이 속한 키움 테마 이름들 (ka90001, 종목검색)"""
         rows = self.c.call("/api/dostk/thme", "ka90001",
