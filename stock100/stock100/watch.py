@@ -16,9 +16,11 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 import math
 import re
 import time as _time
+from collections import Counter
 
 import numpy as np
 import pandas as pd
@@ -107,7 +109,8 @@ def ensure_history(cfg, con, src, today, quiet=False):
 
 
 _ETF = re.compile(r"^(KODEX|TIGER|KBSTAR|RISE|ACE|SOL|HANARO|ARIRANG|KOSEF|PLUS|TIMEFOLIO|KOACT|WOORI|BNK|FOCUS|"
-                  r"TREX|UNICORN|VITA|KIWOOM|1Q|WON|TRUSTON|ITF|HK|에셋플러스|마이티|히어로즈|파워)\b|ETN|레버리지|인버스")
+                  r"TREX|UNICORN|VITA|KIWOOM|1Q|WON|TRUSTON|ITF|HK|에셋플러스|마이티|히어로즈|파워)\b|ETN|ETF|레버리지|인버스",
+                  re.IGNORECASE)
 
 
 def is_etf(name: str) -> bool:
@@ -166,13 +169,58 @@ def pick_expected(cfg, con, feed, today, tag: str, quiet=False) -> pd.DataFrame:
     return df[UNI_COLS]
 
 
+# ------------------------------------------------------------------ 종목별 테마
+class ThemeBook:
+    """종목이 속한 테마. 키움 '종목별 테마 조회'(ka90001) 결과를 DB 에 7일 캐시하고,
+    조회가 안 되면 종목명 키워드(테마 사전)와 최근 테마 분석(theme_daily) 기록으로 대신한다."""
+
+    def __init__(self, con, feed, cfg=None):
+        self.con, self.feed, self.cfg = con, feed, cfg
+        self.mem: dict[str, list[str]] = {}
+
+    def _fallback(self, code, name) -> list[str]:
+        from .theme import DEFAULT_THEMES
+        d = dict(DEFAULT_THEMES)
+        if self.cfg is not None:
+            d.update(self.cfg.get("themes") or {})
+        out = [t for t, kws in d.items() if any(k and k in str(name) for k in kws)]
+        out += [r[0] for r in self.con.execute(
+            "SELECT DISTINCT theme FROM theme_daily WHERE code=? AND theme NOT LIKE '#%' AND theme<>'개별 이슈'",
+            (code,))]
+        if "로봇" in str(name) and "로봇" not in out:
+            out.append("로봇")
+        return list(dict.fromkeys(out))
+
+    def get(self, code, name="") -> list[str]:
+        if code in self.mem:
+            return self.mem[code]
+        row = self.con.execute("SELECT themes, updated FROM stock_themes WHERE code=?", (code,)).fetchone()
+        fresh = row and row["updated"] >= (dt.date.today() - dt.timedelta(days=7)).isoformat()
+        if fresh:
+            th = json.loads(row["themes"])
+        else:
+            th = None
+            if hasattr(self.feed, "stock_themes"):
+                try:
+                    th = self.feed.stock_themes(code)
+                    self.con.execute("INSERT OR REPLACE INTO stock_themes VALUES (?,?,?)",
+                                     (code, json.dumps(th, ensure_ascii=False), dt.date.today().isoformat()))
+                except Exception as e:
+                    print(f"[warn] 테마 조회 실패 {name}({code}): {e.__class__.__name__}")
+            if not th:
+                th = self._fallback(code, name)
+        self.mem[code] = th
+        return th
+
+
 # ------------------------------------------------------------------ 한 회차에 한 번만 조회
 class TickFeed:
     """두 그룹이 같은 시세를 쓰도록 회차마다 합집합을 한 번만 조회한다."""
 
-    def __init__(self, feed, live_n: int = 0):
+    def __init__(self, feed, live_n: int = 0, con=None, cfg=None):
         self.feed = feed
         self.live_n = live_n
+        self.book = ThemeBook(con, feed, cfg) if con is not None else None
         self._q = pd.DataFrame()
         self._live = pd.DataFrame()
         self._mk: dict = {}
@@ -193,6 +241,9 @@ class TickFeed:
 
     def live(self):
         return self._live.copy()
+
+    def themes(self, code, name=""):
+        return self.book.get(code, name) if self.book else []
 
     def quotes(self, codes):
         if self._q.empty:
@@ -275,13 +326,17 @@ class Watcher:
             buy = (red & rank_ok) if w["buy_rule"] == "both" else rank_ok
             if self.live:       # 신호는 지금 100위 안에 있는 종목만 (101~200위는 다음 회차 비교용)
                 inside = q["mk_rank"].fillna(10 ** 6) <= top_n
+                if gc.get("exclude_etf_signals", True):     # ETF·ETN 은 순위 계산에만 쓰고 신호는 내지 않음
+                    inside &= ~q["name"].map(is_etf)
                 red, buy = red & inside, buy & inside
             q["red"] = red.fillna(False).astype(bool)
             q["buy"] = buy.fillna(False).astype(bool)
 
         signals = []
+        tags = self._tags(now, q)
         for c, r in q.iterrows():
             kinds = (["주목"] if r.red else []) + ([("매수" if c not in self.bought else "재신호")] if r.buy else [])
+            tg = ",".join(tags.get(c, []))
             for k in kinds:
                 qty = amount = 0
                 if k == "매수" and r.price > 0:
@@ -290,19 +345,21 @@ class Watcher:
                     amount = qty * r.price
                     self.cash -= amount
                     self.bought.add(c)
-                    self.con.execute("INSERT OR REPLACE INTO watch_outcomes VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                                     (self.date, self.grp, hm, c, r["name"], r.price, qty, None, None, None, 0.0))
+                    self.con.execute("INSERT OR REPLACE INTO watch_outcomes (date, grp, time, code, name, entry, qty, "
+                                     "r30, r60, rclose, rmax, tags) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                                     (self.date, self.grp, hm, c, r["name"], r.price, qty, None, None, None, 0.0, tg))
                 sig = {"grp": self.grp, "time": hm, "code": c, "name": r["name"], "kind": k, "price": r.price,
                        "pct": r.pct, "d_value": r.d_value, "d_pct": r.d_pct, "d_ret": r.d_ret,
                        "mode": mode, "rank_prev": _int(r.rank_prev),
-                       "rank_now": _int(r[basis]), "qty": qty, "amount": amount, "cash_left": self.cash}
+                       "rank_now": _int(r[basis]), "qty": qty, "amount": amount, "cash_left": self.cash,
+                       "tags": tg}
                 signals.append(sig)
                 self.con.execute("INSERT OR REPLACE INTO watch_signals2 (date, time, grp, code, name, kind, price, pct, "
-                                 "d_value, d_pct, rank_prev, rank_now, qty, amount, cash_left, d_ret) "
-                                 "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                                 "d_value, d_pct, rank_prev, rank_now, qty, amount, cash_left, d_ret, tags) "
+                                 "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                                  (self.date, hm, self.grp, c, sig["name"], k, r.price, r.pct, _f(r.d_value),
                                   _f(r.d_pct), sig["rank_prev"], sig["rank_now"], qty, amount,
-                                  self.cash if k == "매수" else None, _f(r.d_ret)))
+                                  self.cash if k == "매수" else None, _f(r.d_ret), tg))
         for c, r in q.iterrows():
             self.con.execute("INSERT OR REPLACE INTO watch_ticks2 (date, time, grp, code, name, price, pct, value, "
                              "strength, wl_rank, mk_rank, d_value, d_pct, d_strength, per_won, rank_prev, rank_up, "
@@ -323,6 +380,38 @@ class Watcher:
         n_watch = int((q["mk_rank"].fillna(10 ** 6) <= top_n).sum()) if self.live else len(q)
         return {"grp": self.grp, "time": hm, "rows": q.reset_index(), "signals": signals, "basis": basis,
                 "n_watch": n_watch}
+
+    def _tags(self, now, q) -> dict[str, list[str]]:
+        """신호 종목 표시: 테마동반(같은 테마 종목이 최근 15분 안에 함께 신호) / 급락반등(전일 대비 -10% 이하)"""
+        tg = self.w.get("tags", {})
+        crash = float(tg.get("crash_pct", -10.0))
+        need = int(tg.get("theme_min_stocks", 2))
+        since = (now - dt.timedelta(minutes=int(tg.get("theme_window_min", 15)))).strftime("%H:%M")
+        sig = [c for c in q.index if q.at[c, "red"] or q.at[c, "buy"]]
+        out: dict[str, list[str]] = {}
+        if not sig:
+            return out
+        recent = {r["code"]: r["name"] for r in self.con.execute(
+            "SELECT DISTINCT code, name FROM watch_signals2 WHERE date=? AND time>=? AND time<?",
+            (self.date, since, now.strftime("%H:%M")))}
+        recent.update({c: q.at[c, "name"] for c in sig})
+        recent = {c: n for c, n in recent.items() if not is_etf(n)}
+        themes_of = (lambda c, n: self.feed.themes(c, n)) if hasattr(self.feed, "themes") else (lambda c, n: [])
+        th = {c: set(themes_of(c, n)) for c, n in recent.items()}
+        for c in sig:
+            t: list[str] = []
+            mine = th.get(c, set())
+            cnt = Counter(x for o in recent if o != c for x in (mine & th.get(o, set())))
+            if mine and cnt:
+                best, n = cnt.most_common(1)[0]
+                if n + 1 >= need:
+                    mates = [recent[o] for o in recent if o != c and best in th.get(o, set())][:3]
+                    t.append(f"테마동반({best}: {'·'.join(mates)})")
+            if (_f(q.at[c, "pct"]) or 0) <= crash:
+                t.append("급락반등")
+            if t:
+                out[c] = t
+        return out
 
     def _live_quotes(self) -> pd.DataFrame:
         live = self.feed.live()
@@ -395,6 +484,8 @@ def print_tick(cfg, res):
                f"5분 대금 {(_f(s['d_value']) or 0) / 1e8:+.1f}억 · "
                + (f"5분 상승 {(_f(s.get('d_ret')) or 0):+.2f}%" if s.get("mode") == "ret"
                   else f"등락 {(_f(s['d_pct']) or 0):+.2f}%p") + f" · {rk}")
+        if s.get("tags"):
+            msg += "  [" + "] [".join(s["tags"].split(",")) + "]"
         if s["kind"] == "매수":
             msg += (f"\n     → 보유금 {w['buy_ratio'] * 100:.0f}% 매수 제안: {s['qty']:,}주 ({s['amount']:,.0f}원)")
         print(msg)
@@ -526,22 +617,46 @@ def write_excel(cfg, con, date, unis: dict, path):
     # 신호 성과
     sim = simulate_exit(con, cfg, date)
     ws = _sheet(wb, "신호성과", ["그룹", "신호시각", "종목명", "코드", "신호가격", "제안수량", "30분(%)", "1시간(%)",
-                             "종가(%)", "최고(%)", "규칙 청산(%)", "청산 사유", "청산 시각"],
-                [16, 8, 16, 9, 11, 9, 9, 9, 9, 9, 11, 10, 9])
+                             "종가(%)", "최고(%)", "규칙 청산(%)", "청산 사유", "청산 시각", "태그"],
+                [16, 8, 16, 9, 11, 9, 9, 9, 9, 9, 11, 10, 9, 40])
     for r in con.execute("SELECT * FROM watch_outcomes WHERE date=? ORDER BY time", (d,)):
         x = sim.get((r["date"], r["grp"], r["time"], r["code"]), (None, None, None))
         ws.append([label(cfg, r["grp"]), r["time"], r["name"], r["code"], r["entry"], r["qty"], r["r30"], r["r60"],
-                   r["rclose"], r["rmax"], *x])
+                   r["rclose"], r["rmax"], *x, r["tags"]])
+
+    # 태그별 성과
+    ws = _sheet(wb, "태그별성과", ["그룹", "기간", "구분", "매수 신호", "종가 평균(%)", "종가 오른 비율(%)", "규칙 평균(%)",
+                              "익절/손절/정리", "평균 최고수익(%)"], [16, 8, 12, 9, 11, 13, 11, 13, 13])
+    for period, dd in (("오늘", date), ("누적", None)):
+        simp = simulate_exit(con, cfg, dd)
+        cond, args = ("WHERE date=?", (iso(dd),)) if dd else ("", ())
+        outs = con.execute(f"SELECT * FROM watch_outcomes {cond}", args).fetchall()
+        for g in shown:
+            og = [o for o in outs if o["grp"] == g]
+            for lbl, pick in (("테마동반", lambda t: "테마동반" in t), ("급락반등", lambda t: "급락반등" in t),
+                              ("태그 없음", lambda t: not t)):
+                rs = [o for o in og if pick(o["tags"] or "")]
+                rc = [o["rclose"] for o in rs if o["rclose"] is not None]
+                sm = [simp[k] for k in ((o["date"], o["grp"], o["time"], o["code"]) for o in rs) if k in simp]
+                ws.append([label(cfg, g), period, lbl, len(rs), _r(sum(rc) / len(rc)) if rc else None,
+                           _r(sum(x > 0 for x in rc) / len(rc) * 100) if rc else None,
+                           _r(sum(x[0] for x in sm) / len(sm)) if sm else None,
+                           "/".join(str(sum(x[1].startswith(k) for x in sm)) for k in ("익절", "손절", ex.get("end_time", "15:20")))
+                           if sm else None, _r(sum(o["rmax"] or 0 for o in rs) / len(rs)) if rs else None])
+    ws.append([])
+    ws.append([f"테마동반 = 최근 {w.get('tags', {}).get('theme_window_min', 15)}분 안에 같은 테마(키움 테마 기준) 종목이 함께 "
+               f"주목/매수 신호 · 급락반등 = 신호 때 전일 대비 {w.get('tags', {}).get('crash_pct', -10.0)}% 이하. "
+               "한 신호가 두 태그를 모두 가질 수 있음."])
 
     # 신호기록
     ws = _sheet(wb, "신호기록", ["그룹", "시각", "구분", "종목명", "코드", "현재가", "등락률", "5분 대금증가(억)",
                              "5분 등락률변화(%p)", "5분 상승률(%)", "이전순위", "현재순위", "제안수량", "제안금액",
-                             "그룹 남은 보유금"],
-                [16, 7, 7, 16, 9, 11, 9, 13, 14, 11, 8, 8, 10, 13, 14])
+                             "그룹 남은 보유금", "태그"],
+                [16, 7, 7, 16, 9, 11, 9, 13, 14, 11, 8, 8, 10, 13, 14, 40])
     for r in con.execute("SELECT * FROM watch_signals2 WHERE date=? ORDER BY time, grp, kind", (d,)):
         ws.append([label(cfg, r["grp"]), r["time"], r["kind"], r["name"], r["code"], r["price"], r["pct"],
                    None if r["d_value"] is None else round(r["d_value"] / 1e8, 2), r["d_pct"], r["d_ret"],
-                   r["rank_prev"], r["rank_now"], r["qty"] or None, r["amount"] or None, r["cash_left"]])
+                   r["rank_prev"], r["rank_now"], r["qty"] or None, r["amount"] or None, r["cash_left"], r["tags"]])
         fill = BUY if r["kind"] == "매수" else (RED if r["kind"] == "주목" else None)
         if fill:
             for c in ws[ws.max_row]:
@@ -714,7 +829,7 @@ def run(app, once=False, demo=False, list_only=False, clock=None, sleep=_time.sl
         print("감시할 종목이 없습니다. ①은 08:55~08:59 에 켜 두어야 하고, ②는 KRX 로그인 또는 며칠간의 evening 기록이 "
               "필요합니다. 급하면 config 의 watch.extra_codes 에 종목코드를 넣으세요.")
         return unis
-    tf = TickFeed(feed, live_n=gcfg(cfg, "live").get("fetch_n", 200) if "live" in unis else 0)
+    tf = TickFeed(feed, live_n=gcfg(cfg, "live").get("fetch_n", 200) if "live" in unis else 0, con=con, cfg=cfg)
     watchers = {g: Watcher(cfg, con, tf, u, today, g, now=clock()) for g, u in unis.items()}
     fixed = sorted({c for g, u in unis.items() if g != "live" for c in u["code"]})
     path = cfg.sub("watch") / f"{iso(today)}_실시간감시.xlsx"

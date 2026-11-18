@@ -59,7 +59,8 @@ watch:                    # 장중 5분 감시 (python -m stock100 watch, 키움
       enabled: true
       top_n: 100          # 신호는 지금 100위 안 종목만
       fetch_n: 200        # 101~200위도 받아 두어 100위 안으로 새로 들어온 종목도 5분 변화를 잼
-      exclude_etf: false  # false = ETF 포함 100개 전부
+      exclude_etf: false  # false = ETF 포함 100개 전부 (순위 계산)
+      exclude_etf_signals: true   # ETF·ETN·레버리지·인버스는 매수/주목 신호에서 제외
       # ① 매수 = 5분 동안 거래대금 순위 상승 + 5분 전 가격 대비 +1.5% 이상 상승
       pct_mode: ret       # ret = 5분 전 가격 대비 상승률 / pp = 전일대비 등락률의 5분 변화
       pct_delta: 1.5
@@ -92,6 +93,10 @@ watch:                    # 장중 5분 감시 (python -m stock100 watch, 키움
     stop_loss_pct: 3.0    # -3% 손절
     end_time: "15:20"     # 그때까지 안 팔렸으면 정리
   beep: true              # 매수 신호 때 알림음
+  tags:                   # 신호에 붙는 표시 (엑셀 '태그별성과' 시트로 성과 비교)
+    theme_window_min: 15  # 테마동반: 최근 15분 안에
+    theme_min_stocks: 2   #          같은 테마(키움 테마) 종목 2개 이상이 신호
+    crash_pct: -10.0      # 급락반등: 신호 때 전일 대비 -10% 이하
 
 morning:                  # Day 41~: 새벽 예습
   queries: [특징주, 상한가, 공급계약, 수주, 합작, 세계 최초, 인수, 정부 지원]
