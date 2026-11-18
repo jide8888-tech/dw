@@ -491,7 +491,63 @@ def test_watch_live_rule_rank_up_and_5min_return(tmp_path, monkeypatch):
     tf.begin([])
     r1 = w.tick(t0 + dt.timedelta(minutes=5))
     kinds = {(s["code"], s["kind"]) for s in r1["signals"]}
-    assert kinds == {("E", "주목"), ("B", "주목"), ("B", "매수")}
+    assert kinds == {("B", "주목"), ("B", "매수")}        # ETF(E)는 +2% 올라도 신호 제외 (순위에는 포함)
     b = next(s for s in r1["signals"] if s["kind"] == "매수")
     assert b["d_ret"] == 1.6 and (b["rank_prev"], b["rank_now"]) == (3, 2)
     assert con.execute("SELECT d_ret FROM watch_ticks2 WHERE code='A' AND time='10:05'").fetchone()[0] == 1.4
+
+
+def test_watch_tags_and_etf_signal_exclusion(tmp_path, monkeypatch):
+    """11-18 분석 반영: ETF·ETN 은 순위엔 포함·신호 제외, 테마동반(같은 테마 2종목 이상 15분 내 신호), 급락반등(-10% 이하)"""
+    import pandas as pd
+    from stock100 import watch
+    cfg, con = _watch_env(tmp_path, monkeypatch, {"watch": {"groups": {"live": {"top_n": 6, "fetch_n": 8}}}})
+
+    def board(rows):
+        return pd.DataFrame([{"code": c, "name": n, "price": p, "pct": r, "value": v * 1e8, "rank": i + 1}
+                             for i, (c, n, p, r, v) in enumerate(rows)])
+
+    base = [("E", "KODEX 200선물인버스2X", 10000, -6.0, 900), ("L", "에이엘로봇", 10000, -17.5, 800),
+            ("R", "레인보우로보틱스", 10000, 11.0, 300), ("T", "로보티즈", 10000, 7.0, 290),
+            ("S", "삼현", 10000, 4.0, 280), ("X", "기타", 10000, 1.0, 270)]
+    nxt = [("E", "KODEX 200선물인버스2X", 10200, -4.0, 1000), ("L", "에이엘로봇", 10300, -15.0, 950),
+           ("T", "로보티즈", 10200, 9.0, 340), ("R", "레인보우로보틱스", 10200, 13.0, 330),
+           ("S", "삼현", 10200, 6.0, 300), ("X", "기타", 10000, 1.0, 271)]
+    boards = [board(base), board(nxt)]
+
+    class Feed:
+        def live_top(self, n):
+            return boards.pop(0)
+
+        def quotes(self, codes):
+            return pd.DataFrame(columns=["code", "name", "price", "pct", "value", "strength"])
+
+        def market_rank(self, n=300):
+            return {}
+
+        def stock_themes(self, code):
+            return {"R": ["로봇", "휴머노이드"], "T": ["로봇"], "S": ["로봇", "원전"], "L": ["로봇"],
+                    "X": ["건설"]}.get(code, [])
+
+    tf = watch.TickFeed(Feed(), live_n=8, con=con, cfg=cfg)
+    w = watch.Watcher(cfg, con, tf, pd.DataFrame(columns=watch.UNI_COLS), dt.date(2026, 11, 18), "live")
+    t0 = dt.datetime(2026, 11, 18, 9, 15)
+    tf.begin([])
+    w.tick(t0)
+    tf.begin([])
+    r = w.tick(t0 + dt.timedelta(minutes=5))
+    by = {}
+    for s in r["signals"]:
+        by.setdefault(s["code"], s)
+    assert "E" not in by                                            # ETF 는 신호 제외
+    assert int(r["rows"].set_index("code").at["E", "mk_rank"]) == 1   # 순위에는 포함
+    assert "급락반등" in by["L"]["tags"] and "테마동반(로봇" in by["L"]["tags"]
+    assert "테마동반(로봇" in by["R"]["tags"] and "급락반등" not in by["R"]["tags"]
+    assert "X" not in by
+    o = dict(con.execute("SELECT tags FROM watch_outcomes WHERE code='T'").fetchone())
+    assert "테마동반" in o["tags"]
+    assert con.execute("SELECT COUNT(*) FROM stock_themes").fetchone()[0] >= 4    # 테마 캐시
+    p = watch.write_excel(cfg, con, dt.date(2026, 11, 18), {"live": w.uni}, tmp_path / "w.xlsx")
+    import openpyxl
+    rows = list(openpyxl.load_workbook(p)["태그별성과"].iter_rows(min_row=2, max_row=4, values_only=True))
+    assert [x[2] for x in rows] == ["테마동반", "급락반등", "태그 없음"] and rows[0][3] == 1   # 매수는 로보티즈 1건

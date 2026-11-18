@@ -80,6 +80,9 @@ CREATE TABLE IF NOT EXISTS watch_outcomes (     -- 매수 신호 이후 성과 (
     r30 REAL, r60 REAL, rclose REAL, rmax REAL,
     PRIMARY KEY (date, grp, time, code)
 );
+CREATE TABLE IF NOT EXISTS stock_themes (       -- 종목이 속한 테마 (키움 종목별 테마 조회, 7일 캐시)
+    code TEXT PRIMARY KEY, themes TEXT, updated TEXT
+);
 CREATE TABLE IF NOT EXISTS paper_trades (       -- Day 71~ 소액 매매 (모의)
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     date TEXT, code TEXT, stage TEXT, qty INTEGER, entry REAL, exit REAL,
@@ -93,7 +96,8 @@ def connect(path: Path) -> sqlite3.Connection:
     con = sqlite3.connect(str(path))
     con.row_factory = sqlite3.Row
     con.executescript(SCHEMA)
-    for table, col in (("watch_ticks2", "d_ret REAL"), ("watch_signals2", "d_ret REAL")):   # 이전 DB 이어 쓰기
+    for table, col in (("watch_ticks2", "d_ret REAL"), ("watch_signals2", "d_ret REAL"),   # 이전 DB 이어 쓰기
+                       ("watch_signals2", "tags TEXT"), ("watch_outcomes", "tags TEXT")):
         if col.split()[0] not in {r[1] for r in con.execute(f"PRAGMA table_info({table})")}:
             con.execute(f"ALTER TABLE {table} ADD COLUMN {col}")
     return con

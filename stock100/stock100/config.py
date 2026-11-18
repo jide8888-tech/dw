@@ -26,7 +26,8 @@ DEFAULTS = {
                   # ① 5분마다 그 시각의 전체 시장 거래대금 상위 100
                   # 매수 = 5분 동안 거래대금 순위 상승 + 5분 전 가격 대비 +1.5% 상승 (ETF 포함 100개 전부)
                   "live": {"enabled": True, "label": "①거래대금상위", "top_n": 100, "fetch_n": 200,
-                           "exclude_etf": False, "pct_mode": "ret", "pct_delta": 1.5, "value_delta_eok": 0},
+                           "exclude_etf": False, "exclude_etf_signals": True,
+                           "pct_mode": "ret", "pct_delta": 1.5, "value_delta_eok": 0},
                   # (사용 안 함) 장 시작 직전 예상체결 등락률 상위 — enabled: true 로 다시 켤 수 있음
                   "expected": {"enabled": False, "label": "③예상체결", "top_n": 100,
                                "pick_times": ["08:55", "08:59"], "min_qty": 1000, "min_price": 1000,
@@ -39,7 +40,9 @@ DEFAULTS = {
               "value_delta_eok": 5.0, "pct_delta": 1.5,
               "rank_basis": "watchlist", "rank_up_min": 1, "buy_rule": "both",
               "cash": 10_000_000, "buy_ratio": 0.2, "sizing": "fixed", "beep": True,
-              "exit": {"take_profit_pct": 3.0, "stop_loss_pct": 3.0, "end_time": "15:20"}},
+              "exit": {"take_profit_pct": 3.0, "stop_loss_pct": 3.0, "end_time": "15:20"},
+              # 신호 표시: 테마동반 = 15분 안에 같은 테마 2종목 이상 신호 / 급락반등 = 전일 대비 -10% 이하에서 신호
+              "tags": {"theme_window_min": 15, "theme_min_stocks": 2, "crash_pct": -10.0}},
     "morning": {"queries": ["특징주", "상한가", "공급계약", "수주"], "min_score": 2},
     "track": {"horizons": [1, 3, 5], "hit_pct": 3.0},
     "paper": {"enabled": True, "take_profit_pct": 3.0, "stop_loss_pct": 3.0, "max_per_day": 1},

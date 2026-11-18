@@ -262,6 +262,13 @@ class KiwoomSource(BaseSource):
                         "qty": _num(r.get("exp_cntr_qty")) or 0, "rank": i})
         return pd.DataFrame(out, columns=["code", "name", "price", "pct", "qty", "rank"])
 
+    def stock_themes(self, code: str) -> list[str]:
+        """종목이 속한 키움 테마 이름들 (ka90001, 종목검색)"""
+        rows = self.c.call("/api/dostk/thme", "ka90001",
+                           {"qry_tp": "2", "stk_cd": code, "date_tp": "1", "thema_nm": "", "flu_pl_amt_tp": "3",
+                            "stex_tp": "1"}, max_pages=2)
+        return list(dict.fromkeys((r.get("thema_nm") or "").strip() for r in rows if r.get("thema_nm")))
+
     def market_rank(self, n: int = 300) -> dict[str, int]:
         rows = self.c.call("/api/dostk/rkinfo", "ka10032", {"mrkt_tp": "000", "mang_stk_incls": "1", "stex_tp": "1"},
                            max_pages=10, stop=_enough(n))
