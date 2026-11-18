@@ -92,6 +92,9 @@ watch:                    # 장중 5분 감시 (python -m stock100 watch, 키움
     take_profit_pct: 3.0  # +3% 익절
     stop_loss_pct: 3.0    # -3% 손절
     end_time: "15:20"     # 그때까지 안 팔렸으면 정리
+    trail_pcts: [3.0, 5.0]   # 고점 대비 -3%, -5% 빠지면 매도 (두 가지 비교)
+    half_take_pct: 3.0       # 절반 방식: +3% 에서 절반 매도
+    half_trail_pct: 5.0      #            나머지는 고점 대비 -5% 에서 매도
   beep: true              # 매수 신호 때 알림음
   tags:                   # 신호에 붙는 표시 (엑셀 '태그별성과' 시트로 성과 비교)
     theme_window_min: 15  # 테마동반: 최근 15분 안에

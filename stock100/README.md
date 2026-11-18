@@ -48,6 +48,7 @@ python -m stock100 evening              # 복습 + 추적 + 모의매매 → dat
 python -m stock100 theme                # 오늘 거래대금 상위 + 고등락률 종목 테마 분석 → 엑셀
 python -m stock100 theme --value 300 --pct 15 --date 20261030   # 기준과 날짜 지정
 python -m stock100 watch                # 장중 5분 감시 (키움 필요). --list 대상만, --once 1회, --demo 가짜 장
+python -m stock100 watch --report       # 장 마감 후: 신호 종목 1분봉으로 신호 후 최고·최저·매도 방법 비교 엑셀 갱신 (evening 에서도 자동)
 python -m stock100 status               # 단계, 누적 적중률, 모의 손익
 python -m stock100 update               # GitHub 최신 코드로 업데이트 (config.yaml·data 유지, scripts\update.bat 더블클릭도 가능)
 ```

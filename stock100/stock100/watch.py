@@ -500,32 +500,49 @@ def beep():
 
 
 def simulate_exit(con, cfg, date=None) -> dict:
-    """신호마다 '익절 +tp% / 손절 -sl% / end 시각 정리' 로 팔았다면의 수익률 (5분 시세 기준).
-    5분마다 본 가격으로 판정하므로 실제 체결과는 다를 수 있다. 반환: {(date, grp, time, code): (수익률, 사유, 시각)}"""
-    e = cfg["watch"].get("exit", {})
-    tp, sl, end = float(e.get("take_profit_pct", 3.0)), float(e.get("stop_loss_pct", 3.0)), e.get("end_time", "15:20")
-    cond, args = ("WHERE date=?", (iso(date),)) if date else ("", ())
-    out = {}
-    for o in con.execute(f"SELECT * FROM watch_outcomes {cond}", args).fetchall():
-        if not o["entry"]:
+    """고정 익절·손절(+tp/-sl/end 정리) 결과만 {(date, grp, time, code): (수익률, 사유, 시각)} 로 (이전 호환)"""
+    from .evaluate import evaluate
+    return {(r["date"], r["grp"], r["time"], r["code"]): r["strat"]["fixed"]
+            for r in evaluate(con, cfg, date) if r["strat"].get("fixed")}
+
+
+def fetch_minute_bars(con, src, date, quiet=False) -> int:
+    """그날 매수 신호가 난 종목의 1분봉을 받아 둔다 (장 마감 후). 키움이 없으면 0"""
+    k = getattr(src, "kiwoom", None) or (src if hasattr(src, "minute_bars") else None)
+    if k is None or not hasattr(k, "minute_bars"):
+        return 0
+    d = iso(date)
+    n = 0
+    for (code,) in con.execute("SELECT DISTINCT code FROM watch_outcomes WHERE date=?", (d,)).fetchall():
+        if con.execute("SELECT COUNT(*) FROM minute_bars WHERE date=? AND code=?", (d, code)).fetchone()[0] >= 300:
             continue
-        ticks = con.execute("SELECT time, price FROM watch_ticks2 WHERE date=? AND grp=? AND code=? AND time>? "
-                            "AND time<=? ORDER BY time", (o["date"], o["grp"], o["code"], o["time"], end)).fetchall()
-        res = None
-        for t in ticks:
-            ret = round((t["price"] / o["entry"] - 1) * 100, 2)
-            if ret >= tp:
-                res = (ret, "익절", t["time"])
-                break
-            if ret <= -sl:
-                res = (ret, "손절", t["time"])
-                break
-        if res is None and ticks:
-            last = ticks[-1]
-            res = (round((last["price"] / o["entry"] - 1) * 100, 2), f"{end} 정리", last["time"])
-        if res:
-            out[(o["date"], o["grp"], o["time"], o["code"])] = res
-    return out
+        try:
+            df = k.minute_bars(code, date)
+        except Exception as e:
+            if not quiet:
+                print(f"[warn] 1분봉 실패 {code}: {e.__class__.__name__}")
+            continue
+        for r in df.itertuples():
+            con.execute("INSERT OR REPLACE INTO minute_bars VALUES (?,?,?,?,?,?,?,?)",
+                        (d, code, r.time, r.open, r.high, r.low, r.close, int(r.volume)))
+        n += 1 if len(df) else 0
+    con.commit()
+    return n
+
+
+def report(cfg, con, src, date, quiet=False):
+    """장 마감 후: 1분봉 받기 → 신호 후 움직임·매도 방법 재계산 → 그날 감시 엑셀 다시 만들기"""
+    n = fetch_minute_bars(con, src, date, quiet=quiet)
+    unis = {g: load_universe(con, date, g) for g in GROUPS
+            if con.execute("SELECT 1 FROM watch_ticks2 WHERE date=? AND grp=? LIMIT 1", (iso(date), g)).fetchone()}
+    if not unis:
+        if not quiet:
+            print(f"[감시] {iso(date)} 감시 기록이 없습니다.")
+        return None
+    path = write_excel(cfg, con, date, unis, cfg.sub("watch") / f"{iso(date)}_실시간감시.xlsx")
+    if not quiet:
+        print(f"[감시] 1분봉 {n}종목 반영, 신호 후 움직임·매도 방법 비교 갱신 → {path}")
+    return path
 
 
 def compare_rows(con, date=None):
@@ -559,33 +576,31 @@ def write_excel(cfg, con, date, unis: dict, path):
     wb.remove(wb.active)
 
     # 성과비교
+    from .evaluate import evaluate, strategies, summarize
     ex = w.get("exit", {})
+    strats = strategies(cfg)
     used = {r[0] for r in con.execute("SELECT DISTINCT grp FROM watch_signals2")}
     shown = [g for g in GROUPS if g in unis or g in used]      # 꺼 둔 그룹은 기록이 없으면 숨김
-    ws = _sheet(wb, "성과비교", ["그룹", "기간", "감시 종목 수", "주목 신호", "매수 신호", "30분 평균(%)",
-                             "1시간 평균(%)", "종가 평균(%)", "종가 적중률(%)", "평균 최고수익(%)", "모의 손익(원)",
-                             "규칙 평균(%)", "규칙 승률(%)", "익절/손절/정리", "일수"],
-                [16, 8, 11, 9, 9, 11, 11, 11, 12, 13, 13, 11, 11, 13, 6])
+    evals = {"오늘": evaluate(con, cfg, date), "누적": evaluate(con, cfg, None)}
+    ws = _sheet(wb, "성과비교", ["그룹", "기간", "감시 종목 수", "주목 신호", "매수 신호", "평균 최고 상승(%)",
+                             "평균 최대 하락(%)", "상승 먼저(%)", "최고까지 평균(분)"] + [f"{n}(%)" for _, n in strats]
+                + ["가장 좋은 방법", "일수"],
+                [16, 8, 11, 9, 9, 13, 13, 11, 13] + [14] * len(strats) + [22, 6])
     for period, dd in (("오늘", date), ("누적", None)):
         out, sig = compare_rows(con, dd)
-        sim = simulate_exit(con, cfg, dd)
         for g in shown:
-            o = out.get(g, {})
-            nc = o.get("nc") or 0
-            rs = [v for k, v in sim.items() if k[1] == g]
+            sm = summarize([r for r in evals[period] if r["grp"] == g], cfg)
             ws.append([label(cfg, g), period, len(unis.get(g, [])) if period == "오늘" else None, sig.get(g, 0),
-                       o.get("n", 0), _r(o.get("a30")), _r(o.get("a60")), _r(o.get("ac")),
-                       _r((o.get("win") or 0) / nc * 100) if nc else None, _r(o.get("amax")),
-                       round(o["pnl"]) if o.get("pnl") is not None else None,
-                       _r(sum(v[0] for v in rs) / len(rs)) if rs else None,
-                       _r(sum(v[0] > 0 for v in rs) / len(rs) * 100) if rs else None,
-                       "/".join(str(sum(v[1].startswith(x) for v in rs)) for x in ("익절", "손절", ex.get("end_time", "15:20")))
-                       if rs else None, o.get("days")])
+                       sm["n"], sm["up"], sm["down"], sm["first_up"], sm["up_min"]] + [sm[k] for k, _ in strats]
+                      + [sm["best"], out.get(g, {}).get("days")])
     ws.append([])
-    ws.append(["적중 = 매수 신호가 난 가격보다 종가가 높음. 모의 손익 = 제안 수량 × (종가 − 신호 가격). "
-               "종가는 저녁 작업(evening)에서 실제 종가로 바뀝니다."])
-    ws.append([f"규칙 = 신호 가격에 사서 +{ex.get('take_profit_pct', 3.0)}% 익절 / -{ex.get('stop_loss_pct', 3.0)}% 손절 / "
-               f"{ex.get('end_time', '15:20')} 정리로 팔았다면 (5분 시세 기준, 실제 체결과 다를 수 있음)."])
+    for line in (
+            "평균 최고 상승 / 최대 하락 = 매수 신호 가격 대비, 신호 뒤 15:20 까지 가장 높았던 / 낮았던 가격 (1분봉이 있으면 1분봉 고가·저가).",
+            f"상승 먼저 = +{ex.get('take_profit_pct', 3.0)}% 와 -{ex.get('stop_loss_pct', 3.0)}% 중 +쪽에 먼저 닿은 비율.",
+            "매도 방법: 고정 = 익절/손절 / 고점-N% = 신호 뒤 최고가에서 N% 빠지면 매도(처음엔 신호가 -N%) / "
+            "절반 = 목표에서 절반 팔고 나머지는 고점 대비 추적 / 종가 = 끝까지 보유 (저녁에 실제 종가).",
+            "1분봉은 장 마감 후 evening(또는 watch --report)에서 받습니다. 그 전에는 5분 시세로 계산합니다."):
+        ws.append([line])
 
     # 그룹별 실시간
     for g in GROUPS:
@@ -614,39 +629,35 @@ def write_excel(cfg, con, date, unis: dict, path):
                     ws.cell(ws.max_row, 5).font = Font(bold=True)
         ws.cell(1, 17, f"기준 시각 {d} {t}")
 
-    # 신호 성과
-    sim = simulate_exit(con, cfg, date)
-    ws = _sheet(wb, "신호성과", ["그룹", "신호시각", "종목명", "코드", "신호가격", "제안수량", "30분(%)", "1시간(%)",
-                             "종가(%)", "최고(%)", "규칙 청산(%)", "청산 사유", "청산 시각", "태그"],
-                [16, 8, 16, 9, 11, 9, 9, 9, 9, 9, 11, 10, 9, 40])
-    for r in con.execute("SELECT * FROM watch_outcomes WHERE date=? ORDER BY time", (d,)):
-        x = sim.get((r["date"], r["grp"], r["time"], r["code"]), (None, None, None))
-        ws.append([label(cfg, r["grp"]), r["time"], r["name"], r["code"], r["entry"], r["qty"], r["r30"], r["r60"],
-                   r["rclose"], r["rmax"], *x, r["tags"]])
+    # 신호 성과 (신호 뒤 움직임)
+    ws = _sheet(wb, "신호성과", ["그룹", "신호시각", "종목명", "코드", "신호가격", "제안수량", "태그",
+                             "최고 상승(%)", "최고 시각", "최고까지(분)", "최대 하락(%)", "최저 시각", "먼저 온 것",
+                             "10분 최고", "10분 최저", "30분 최고", "30분 최저", "60분 최고", "60분 최저"]
+                + [f"{n}(%)" for _, n in strats] + ["데이터"],
+                [16, 8, 16, 9, 11, 9, 34, 11, 9, 11, 11, 9, 11, 9, 9, 9, 9, 9, 9] + [14] * len(strats) + [9])
+    for r in evals["오늘"]:
+        ws.append([label(cfg, r["grp"]), r["time"], r["name"], r["code"], r["entry"], r["qty"], r["tags"],
+                   r.get("up"), r.get("up_time"), r.get("up_min"), r.get("down"), r.get("down_time"), r.get("first"),
+                   r.get("up10"), r.get("dn10"), r.get("up30"), r.get("dn30"), r.get("up60"), r.get("dn60")]
+                  + [(r["strat"].get(k) or (None,))[0] for k, _ in strats] + [r["source"]])
 
-    # 태그별 성과
-    ws = _sheet(wb, "태그별성과", ["그룹", "기간", "구분", "매수 신호", "종가 평균(%)", "종가 오른 비율(%)", "규칙 평균(%)",
-                              "익절/손절/정리", "평균 최고수익(%)"], [16, 8, 12, 9, 11, 13, 11, 13, 13])
-    for period, dd in (("오늘", date), ("누적", None)):
-        simp = simulate_exit(con, cfg, dd)
-        cond, args = ("WHERE date=?", (iso(dd),)) if dd else ("", ())
-        outs = con.execute(f"SELECT * FROM watch_outcomes {cond}", args).fetchall()
+    # 태그별 · 매도 방법별 성과
+    ws = _sheet(wb, "태그별성과", ["그룹", "기간", "구분", "매수 신호", "평균 최고 상승(%)", "평균 최대 하락(%)",
+                              "상승 먼저(%)", "최고까지 평균(분)"] + [f"{n}(%)" for _, n in strats]
+                + [f"{n} 승률(%)" for _, n in strats] + ["가장 좋은 방법"],
+                [16, 8, 12, 9, 13, 13, 11, 13] + [14] * len(strats) + [14] * len(strats) + [22])
+    for period in ("오늘", "누적"):
         for g in shown:
-            og = [o for o in outs if o["grp"] == g]
+            og = [r for r in evals[period] if r["grp"] == g]
             for lbl, pick in (("테마동반", lambda t: "테마동반" in t), ("급락반등", lambda t: "급락반등" in t),
                               ("태그 없음", lambda t: not t)):
-                rs = [o for o in og if pick(o["tags"] or "")]
-                rc = [o["rclose"] for o in rs if o["rclose"] is not None]
-                sm = [simp[k] for k in ((o["date"], o["grp"], o["time"], o["code"]) for o in rs) if k in simp]
-                ws.append([label(cfg, g), period, lbl, len(rs), _r(sum(rc) / len(rc)) if rc else None,
-                           _r(sum(x > 0 for x in rc) / len(rc) * 100) if rc else None,
-                           _r(sum(x[0] for x in sm) / len(sm)) if sm else None,
-                           "/".join(str(sum(x[1].startswith(k) for x in sm)) for k in ("익절", "손절", ex.get("end_time", "15:20")))
-                           if sm else None, _r(sum(o["rmax"] or 0 for o in rs) / len(rs)) if rs else None])
+                sm = summarize([r for r in og if pick(r["tags"] or "")], cfg)
+                ws.append([label(cfg, g), period, lbl, sm["n"], sm["up"], sm["down"], sm["first_up"], sm["up_min"]]
+                          + [sm[k] for k, _ in strats] + [sm[k + "_win"] for k, _ in strats] + [sm["best"]])
     ws.append([])
     ws.append([f"테마동반 = 최근 {w.get('tags', {}).get('theme_window_min', 15)}분 안에 같은 테마(키움 테마 기준) 종목이 함께 "
                f"주목/매수 신호 · 급락반등 = 신호 때 전일 대비 {w.get('tags', {}).get('crash_pct', -10.0)}% 이하. "
-               "한 신호가 두 태그를 모두 가질 수 있음."])
+               "한 신호가 두 태그를 모두 가질 수 있음. 승률 = 그 방법으로 팔았을 때 플러스인 비율."])
 
     # 신호기록
     ws = _sheet(wb, "신호기록", ["그룹", "시각", "구분", "종목명", "코드", "현재가", "등락률", "5분 대금증가(억)",
@@ -770,6 +781,8 @@ def run(app, once=False, demo=False, list_only=False, clock=None, sleep=_time.sl
         else:
             ensure_history(cfg, con, src, today)
         unis["history"] = history_universe(cfg, con, src, today)
+        if not list_only and not unis["history"].empty:
+            save_universe(con, today, "history", unis["history"], now.strftime("%H:%M"))
         _show(cfg, "history", unis["history"])
 
     if "live" in groups:

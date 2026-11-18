@@ -80,6 +80,10 @@ CREATE TABLE IF NOT EXISTS watch_outcomes (     -- 매수 신호 이후 성과 (
     r30 REAL, r60 REAL, rclose REAL, rmax REAL,
     PRIMARY KEY (date, grp, time, code)
 );
+CREATE TABLE IF NOT EXISTS minute_bars (        -- 매수 신호 종목의 1분봉 (저녁에 받아 신호 후 움직임 계산)
+    date TEXT, code TEXT, time TEXT, open REAL, high REAL, low REAL, close REAL, volume INTEGER,
+    PRIMARY KEY (date, code, time)
+);
 CREATE TABLE IF NOT EXISTS stock_themes (       -- 종목이 속한 테마 (키움 종목별 테마 조회, 7일 캐시)
     code TEXT PRIMARY KEY, themes TEXT, updated TEXT
 );

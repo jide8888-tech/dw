@@ -551,3 +551,51 @@ def test_watch_tags_and_etf_signal_exclusion(tmp_path, monkeypatch):
     import openpyxl
     rows = list(openpyxl.load_workbook(p)["태그별성과"].iter_rows(min_row=2, max_row=4, values_only=True))
     assert [x[2] for x in rows] == ["테마동반", "급락반등", "태그 없음"] and rows[0][3] == 1   # 매수는 로보티즈 1건
+
+
+def test_evaluate_path_and_exit_methods(tmp_path, monkeypatch):
+    """신호 후 최고·최저·먼저 온 것·구간별 최고/최저, 매도 방법(고정/고점-3%/고점-5%/절반+추적/종가) — 1분봉 기준"""
+    import pandas as pd
+    from stock100 import evaluate, watch
+    cfg, con = _watch_env(tmp_path, monkeypatch)
+    con.execute("INSERT INTO watch_outcomes (date, grp, time, code, name, entry, qty, rmax, tags) "
+                "VALUES ('2026-11-19','live','09:15','A','에이',10000,10,0,'테마동반(로봇: 비)')")
+    con.execute("INSERT INTO watch_outcomes (date, grp, time, code, name, entry, qty, rmax, tags) "
+                "VALUES ('2026-11-19','live','09:30','B','비',5000,10,0,'')")
+    for t, h, l, c in (("09:15", 10000, 9000, 9900),                  # 신호가 난 분 → 제외
+                       ("09:16", 10100, 9950, 10050), ("09:17", 10400, 10050, 10350),
+                       ("09:18", 10900, 10350, 10800), ("09:19", 11000, 10600, 10650),
+                       ("09:20", 10700, 10300, 10350), ("09:21", 10400, 9500, 9600)):
+        con.execute("INSERT INTO minute_bars VALUES ('2026-11-19','A',?,?,?,?,?,0)", (t, c, h, l, c))
+    for t, p in (("09:35", 4900), ("09:40", 4800)):                 # B 는 1분봉 없음 → 5분 시세
+        con.execute("INSERT INTO watch_ticks2 (date, time, grp, code, name, price) VALUES ('2026-11-19',?,'live','B','비',?)",
+                    (t, p))
+    con.commit()
+    rs = {r["code"]: r for r in evaluate.evaluate(con, cfg, dt.date(2026, 11, 19))}
+    a = rs["A"]
+    assert (a["source"], a["up"], a["up_time"], a["up_min"]) == ("1분봉", 10.0, "09:19", 4)
+    assert (a["down"], a["down_time"], a["first"]) == (-5.0, "09:21", "상승 먼저")
+    assert a["up10"] == 10.0 and a["dn10"] == -5.0
+    st = a["strat"]
+    assert st["fixed"][:2] == (3.0, "익절")
+    assert st["trail3"][:2] == (6.7, "추적 매도")          # 고점 11,000 의 -3% = 10,670
+    assert st["trail5"][:2] == (4.5, "추적 매도")          # 고점 11,000 의 -5% = 10,450
+    assert st["half"][0] == 3.75                           # (+3% + 4.5%) / 2
+    assert rs["B"]["source"] == "5분 시세" and rs["B"]["down"] == -4.0 and rs["B"]["first"] == "하락 먼저"
+    sm = evaluate.summarize(list(rs.values()), cfg)
+    assert sm["n"] == 2 and sm["first_up"] == 50.0 and sm["best"]
+
+    class Src:
+        def minute_bars(self, code, date):
+            return pd.DataFrame([{"time": "09:31", "open": 5000, "high": 5300, "low": 4990, "close": 5250, "volume": 1}])
+
+    assert watch.fetch_minute_bars(con, Src(), dt.date(2026, 11, 19), quiet=True) == 2
+    rb = {r["code"]: r for r in evaluate.evaluate(con, cfg, dt.date(2026, 11, 19))}["B"]
+    assert rb["source"] == "1분봉" and rb["up"] == 6.0 and rb["strat"]["fixed"][:2] == (3.0, "익절")
+    con.execute("INSERT INTO watch_ticks2 (date, time, grp, code, name, price) VALUES ('2026-11-19','09:30','live','B','비',5000)")
+    p = watch.report(cfg, con, Src(), dt.date(2026, 11, 19), quiet=True)
+    import openpyxl
+    wb = openpyxl.load_workbook(p)
+    hdr = [c.value for c in wb["신호성과"][1]]
+    assert "최고 상승(%)" in hdr and "최대 하락(%)" in hdr and "먼저 온 것" in hdr and "고점-5%(%)" in hdr
+    assert [c.value for c in wb["태그별성과"][1]][:4] == ["그룹", "기간", "구분", "매수 신호"]

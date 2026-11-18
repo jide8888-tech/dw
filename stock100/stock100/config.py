@@ -40,7 +40,8 @@ DEFAULTS = {
               "value_delta_eok": 5.0, "pct_delta": 1.5,
               "rank_basis": "watchlist", "rank_up_min": 1, "buy_rule": "both",
               "cash": 10_000_000, "buy_ratio": 0.2, "sizing": "fixed", "beep": True,
-              "exit": {"take_profit_pct": 3.0, "stop_loss_pct": 3.0, "end_time": "15:20"},
+              "exit": {"take_profit_pct": 3.0, "stop_loss_pct": 3.0, "end_time": "15:20",
+                       "trail_pcts": [3.0, 5.0], "half_take_pct": 3.0, "half_trail_pct": 5.0},
               # 신호 표시: 테마동반 = 15분 안에 같은 테마 2종목 이상 신호 / 급락반등 = 전일 대비 -10% 이하에서 신호
               "tags": {"theme_window_min": 15, "theme_min_stocks": 2, "crash_pct": -10.0}},
     "morning": {"queries": ["특징주", "상한가", "공급계약", "수주"], "min_score": 2},
