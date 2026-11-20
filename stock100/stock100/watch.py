@@ -113,6 +113,16 @@ _ETF = re.compile(r"^(KODEX|TIGER|KBSTAR|RISE|ACE|SOL|HANARO|ARIRANG|KOSEF|PLUS|
                   re.IGNORECASE)
 
 
+def is_affiliate(a: str, b: str) -> bool:
+    """같은 그룹 계열사로 볼 이름: 앞 3글자 이상이 같음 (한국화장품·한국화장품제조, 한진칼·한진칼우, 에코프로·에코프로비엠).
+    '한국전력'·'한국가스공사', '삼성전자'·'삼성SDI' 처럼 앞 2글자만 같은 경우는 다른 회사로 본다."""
+    a, b = str(a or "").replace(" ", ""), str(b or "").replace(" ", "")
+    k = 0
+    while k < min(len(a), len(b)) and a[k] == b[k]:
+        k += 1
+    return k >= 3
+
+
 def is_etf(name: str) -> bool:
     return bool(_ETF.search(str(name or "")))
 
@@ -264,6 +274,8 @@ class Watcher:
         self.names = dict(zip(uni["code"], uni["name"]))
         self.live = grp == "live"
         self.prev: pd.DataFrame | None = None
+        self.prev_time: str | None = None
+        self.start_hm = _at(self.date, self.w.get("start", "09:00")).strftime("%H:%M")
         last = con.execute("SELECT cash_left FROM watch_signals2 WHERE date=? AND grp=? AND kind='매수' "
                            "ORDER BY time DESC LIMIT 1", (self.date, grp)).fetchone()
         self.cash = float(last["cash_left"]) if last else float(self.w["cash"])
@@ -277,6 +289,7 @@ class Watcher:
             rows = con.execute("SELECT code, price, pct, value, strength, wl_rank, mk_rank FROM watch_ticks2 "
                                "WHERE date=? AND grp=? AND time=?", (self.date, grp, t)).fetchall()
             self.prev = pd.DataFrame([dict(r) for r in rows]).set_index("code")
+            self.prev_time = t
 
     def tick(self, now: dt.datetime, final=False) -> dict:
         w = self.w
@@ -308,7 +321,10 @@ class Watcher:
             q[col] = np.nan
         q["red"] = False
         q["buy"] = False
-        if self.prev is not None:
+        # 장 시작 시각(09:00)에 찍은 값은 기준으로 쓰지 않는다: 그때 값은 전일 종가·장전 단일가라서
+        # 09:05 비교가 '5분 변화'가 아니라 시초가 갭 전체가 된다 (11-20 한국화장품 09:05 +9.91% = 전일 대비 그대로).
+        # 09:05 값을 기준으로 09:10 부터 비교한다.
+        if self.prev is not None and self.prev_time != self.start_hm:
             p = self.prev.reindex(q.index)
             # 09:00 기준값이 장 시작 전(거래대금 0)이면 비교하지 않는다 → 시초가 갭 전체가 '5분 변화'로 잡히는 것 방지
             p = p.where(p["value"].fillna(0) > 0)
@@ -377,6 +393,7 @@ class Watcher:
             save_universe(self.con, self.date, "live", self.uni, hm)
         self.con.commit()
         self.prev = q[["price", "pct", "value", "strength", "wl_rank", "mk_rank"]].copy()
+        self.prev_time = hm
         n_watch = int((q["mk_rank"].fillna(10 ** 6) <= top_n).sum()) if self.live else len(q)
         return {"grp": self.grp, "time": hm, "rows": q.reset_index(), "signals": signals, "basis": basis,
                 "n_watch": n_watch}
@@ -385,7 +402,7 @@ class Watcher:
         """신호 종목 표시: 테마동반(같은 테마 종목이 최근 15분 안에 함께 신호) / 급락반등(전일 대비 -10% 이하)"""
         tg = self.w.get("tags", {})
         crash = float(tg.get("crash_pct", -10.0))
-        need = int(tg.get("theme_min_stocks", 2))
+        need = int(tg.get("theme_min_stocks", 3))
         since = (now - dt.timedelta(minutes=int(tg.get("theme_window_min", 15)))).strftime("%H:%M")
         sig = [c for c in q.index if q.at[c, "red"] or q.at[c, "buy"]]
         out: dict[str, list[str]] = {}
@@ -401,12 +418,23 @@ class Watcher:
         for c in sig:
             t: list[str] = []
             mine = th.get(c, set())
-            cnt = Counter(x for o in recent if o != c for x in (mine & th.get(o, set())))
-            if mine and cnt:
+            cnt: Counter = Counter()
+            mates_by: dict[str, list[str]] = {}
+            for x in mine:
+                kept: list[str] = []          # 같은 테마 동료 — 나와 계열사이거나, 이미 센 동료와 계열사면 1개로 봄
+                for o, n in recent.items():
+                    if o == c or x not in th.get(o, set()) or is_affiliate(n, recent[c]):
+                        continue
+                    if any(is_affiliate(n, k) for k in kept):
+                        continue
+                    kept.append(n)
+                if kept:
+                    cnt[x] = len(kept)
+                    mates_by[x] = kept
+            if cnt:
                 best, n = cnt.most_common(1)[0]
                 if n + 1 >= need:
-                    mates = [recent[o] for o in recent if o != c and best in th.get(o, set())][:3]
-                    t.append(f"테마동반({best}: {'·'.join(mates)})")
+                    t.append(f"테마동반({best}: {'·'.join(mates_by[best][:3])})")
             if (_f(q.at[c, "pct"]) or 0) <= crash:
                 t.append("급락반등")
             if t:
