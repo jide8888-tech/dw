@@ -245,7 +245,7 @@ def test_watch_signals_and_outcomes(tmp_path, monkeypatch):
 
     tf = watch.TickFeed(Feed())
     w = watch.Watcher(cfg, con, tf, uni, dt.date(2026, 11, 10), "history")
-    t0 = dt.datetime(2026, 11, 10, 9, 0)
+    t0 = dt.datetime(2026, 11, 10, 9, 5)      # 09:00 값은 기준으로 안 쓰므로 09:05 부터
     res = []
     for k in range(18):
         tf.begin(["A", "B"])
@@ -255,7 +255,7 @@ def test_watch_signals_and_outcomes(tmp_path, monkeypatch):
     buy = next(s for s in res[2]["signals"] if s["kind"] == "매수")
     assert (buy["rank_prev"], buy["rank_now"]) == (2, 1) and buy["qty"] == int(2_000_000 // 5400)
     o = dict(con.execute("SELECT * FROM watch_outcomes").fetchone())
-    assert o["time"] == "09:10" and o["entry"] == 5400
+    assert o["time"] == "09:15" and o["entry"] == 5400
     assert o["r30"] == 6.0 and o["r60"] == 12.0 and o["rclose"] == 15.0 and o["rmax"] == 15.0
     out, sig = watch.compare_rows(con)
     assert out["history"]["n"] == 1 and out["history"]["win"] == 1 and sig["history"] == 2   # 09:05, 09:10 주목
@@ -599,3 +599,56 @@ def test_evaluate_path_and_exit_methods(tmp_path, monkeypatch):
     hdr = [c.value for c in wb["신호성과"][1]]
     assert "최고 상승(%)" in hdr and "최대 하락(%)" in hdr and "먼저 온 것" in hdr and "고점-5%(%)" in hdr
     assert [c.value for c in wb["태그별성과"][1]][:4] == ["그룹", "기간", "구분", "매수 신호"]
+
+
+def test_watch_skips_session_start_baseline_and_affiliates(tmp_path, monkeypatch):
+    """11-20 반영: ① 09:00 값(대금이 조금 있어도)은 기준으로 안 씀 → 09:05 시초가 갭 신호 없음, 09:10 부터 비교
+    ② 테마동반은 계열사(앞 3글자 같음)를 1개로 세고 기본 3종목 이상"""
+    import pandas as pd
+    from stock100 import watch
+    assert watch.is_affiliate("한국화장품", "한국화장품제조") and watch.is_affiliate("에코프로", "에코프로비엠")
+    assert not watch.is_affiliate("한국전력", "한국가스공사") and not watch.is_affiliate("삼성전자", "삼성SDI")
+    cfg, con = _watch_env(tmp_path, monkeypatch, {"watch": {"groups": {"live": {"top_n": 6, "fetch_n": 8}}}})
+
+    def board(rows):
+        return pd.DataFrame([{"code": c, "name": n, "price": p, "pct": r, "value": v * 1e8, "rank": i + 1}
+                             for i, (c, n, p, r, v) in enumerate(rows)])
+
+    boards = [
+        # 09:00: 전일 종가 그대로(등락 0) 인데 대금이 조금 잡혀 있음
+        board([("H", "한국화장품", 6460, 0.0, 3), ("M", "한국화장품제조", 12700, 0.0, 2),
+               ("A", "에이", 10000, 0.0, 1), ("B", "비", 10000, 0.0, 1)]),
+        # 09:05: 갭상승 — 비교하면 +9.9% 지만 신호가 나면 안 됨
+        board([("H", "한국화장품", 7100, 9.91, 96), ("M", "한국화장품제조", 13000, 2.36, 25),
+               ("A", "에이", 10000, 0.0, 20), ("B", "비", 10000, 0.0, 10)]),
+        # 09:10: H·M 둘 다 +2% 이상, 순위 상승 → 매수. 같은 '화장품' 테마지만 계열사라 테마동반 아님
+        board([("M", "한국화장품제조", 13320, 4.88, 80), ("H", "한국화장품", 7250, 12.2, 161),
+               ("A", "에이", 10000, 0.0, 21), ("B", "비", 10000, 0.0, 11)]),
+    ]
+
+    class Feed:
+        def live_top(self, n):
+            return boards.pop(0)
+
+        def quotes(self, codes):
+            return pd.DataFrame(columns=["code", "name", "price", "pct", "value", "strength"])
+
+        def market_rank(self, n=300):
+            return {}
+
+        def stock_themes(self, code):
+            return ["화장품"] if code in ("H", "M") else []
+
+    tf = watch.TickFeed(Feed(), live_n=8, con=con, cfg=cfg)
+    w = watch.Watcher(cfg, con, tf, pd.DataFrame(columns=watch.UNI_COLS), dt.date(2026, 11, 20), "live")
+    t0 = dt.datetime(2026, 11, 20, 9, 0)
+    res = []
+    for k in range(3):
+        tf.begin([])
+        res.append(w.tick(t0 + dt.timedelta(minutes=5 * k)))
+    assert res[1]["signals"] == []                                          # 09:05 갭 신호 없음
+    d05 = con.execute("SELECT d_ret FROM watch_ticks2 WHERE code='H' AND time='09:05'").fetchone()[0]
+    assert d05 is None                                                      # 09:00 과 비교하지 않음
+    kinds = {(s["code"], s["kind"]) for s in res[2]["signals"]}
+    assert ("M", "매수") in kinds
+    assert all("테마동반" not in (s["tags"] or "") for s in res[2]["signals"])   # 계열사끼리는 테마동반 아님

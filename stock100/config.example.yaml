@@ -98,7 +98,7 @@ watch:                    # 장중 5분 감시 (python -m stock100 watch, 키움
   beep: true              # 매수 신호 때 알림음
   tags:                   # 신호에 붙는 표시 (엑셀 '태그별성과' 시트로 성과 비교)
     theme_window_min: 15  # 테마동반: 최근 15분 안에
-    theme_min_stocks: 2   #          같은 테마(키움 테마) 종목 2개 이상이 신호
+    theme_min_stocks: 3   #          같은 테마(키움 테마) 종목 3개 이상이 신호 (이름 앞 3글자가 같은 계열사는 1개로)
     crash_pct: -10.0      # 급락반등: 신호 때 전일 대비 -10% 이하
 
 morning:                  # Day 41~: 새벽 예습
