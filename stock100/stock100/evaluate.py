@@ -33,14 +33,17 @@ def exit_cfg(cfg) -> dict:
     e = cfg["watch"].get("exit", {})
     return {"tp": float(e.get("take_profit_pct", 3.0)), "sl": float(e.get("stop_loss_pct", 3.0)),
             "end": e.get("end_time", "15:20"), "trails": [float(x) for x in e.get("trail_pcts", [3.0, 5.0])],
-            "half_tp": float(e.get("half_take_pct", 3.0)), "half_trail": float(e.get("half_trail_pct", 5.0))}
+            "half_tp": float(e.get("half_take_pct", 3.0)), "half_trail": float(e.get("half_trail_pct", 5.0)),
+            "cf_min": int(e.get("confirm_min", 10)), "cf_drop": float(e.get("confirm_drop_pct", 1.0)),
+            "cf_trail": float(e.get("confirm_trail_pct", 3.0))}
 
 
 def strategies(cfg) -> list[tuple[str, str]]:
     x = exit_cfg(cfg)
     out = [("fixed", f"고정 +{x['tp']:g}/-{x['sl']:g}")]
     out += [(f"trail{t:g}", f"고점-{t:g}%") for t in x["trails"]]
-    out += [("half", f"절반+{x['half_tp']:g}% 후 고점-{x['half_trail']:g}%"), ("close", "종가 보유")]
+    out += [("half", f"절반+{x['half_tp']:g}% 후 고점-{x['half_trail']:g}%"),
+            ("confirm", f"{x['cf_min']}분 -{x['cf_drop']:g}% 확인 후 고점-{x['cf_trail']:g}%"), ("close", "종가 보유")]
     return out
 
 
@@ -60,7 +63,7 @@ def _fill(level, close, exact):
     return level if exact else close
 
 
-def run_strategies(entry, pts, x, exact, rclose=None) -> dict:
+def run_strategies(entry, pts, x, exact, rclose=None, signal_time=None) -> dict:
     out = {}
     end_px = pts[-1][3] if pts else None
 
@@ -113,6 +116,21 @@ def run_strategies(entry, pts, x, exact, rclose=None) -> dict:
             else finish(end_px, f"{x['end']} 정리", pts[-1][0])
     out["half"] = (round(res[0], 2), res[1], res[2]) if res else None
 
+    # 10분 확인 손절: 신호 뒤 10분 안에 -1% 빠지면 바로 손절, 버티면 그 뒤는 고점 대비 -3% 추적
+    res, peak = None, entry
+    cut = entry * (1 - x["cf_drop"] / 100)
+    for t, hi, lo, cl in pts:
+        early = signal_time is not None and _mins(signal_time, t) <= x["cf_min"]
+        if early and lo <= cut:
+            res = finish(_fill(cut, cl, exact), f"{x['cf_min']}분 확인 손절", t)
+            break
+        stop = peak * (1 - x["cf_trail"] / 100)
+        if lo <= stop:
+            res = finish(_fill(stop, cl, exact), "추적 매도", t)
+            break
+        peak = max(peak, hi)
+    out["confirm"] = res or (finish(end_px, f"{x['end']} 정리", pts[-1][0]) if pts else None)
+
     out["close"] = (rclose, "종가", "15:30") if rclose is not None else \
         (finish(end_px, f"{x['end']} 가격", pts[-1][0]) if pts else None)
     return out
@@ -151,7 +169,7 @@ def evaluate(con, cfg, date=None) -> list[dict]:
                 win = [p for p in pts if _mins(o["time"], p[0]) <= w]
                 r[f"up{w}"] = _pct(max(p[1] for p in win), e) if win else None
                 r[f"dn{w}"] = _pct(min(p[2] for p in win), e) if win else None
-        r["strat"] = run_strategies(e, pts, x, exact=(src == "1분봉"), rclose=o["rclose"])
+        r["strat"] = run_strategies(e, pts, x, exact=(src == "1분봉"), rclose=o["rclose"], signal_time=o["time"])
         rows.append(r)
     return rows
 
