@@ -549,8 +549,8 @@ def test_watch_tags_and_etf_signal_exclusion(tmp_path, monkeypatch):
     assert con.execute("SELECT COUNT(*) FROM stock_themes").fetchone()[0] >= 4    # 테마 캐시
     p = watch.write_excel(cfg, con, dt.date(2026, 11, 18), {"live": w.uni}, tmp_path / "w.xlsx")
     import openpyxl
-    rows = list(openpyxl.load_workbook(p)["태그별성과"].iter_rows(min_row=2, max_row=4, values_only=True))
-    assert [x[2] for x in rows] == ["테마동반", "급락반등", "태그 없음"] and rows[0][3] == 1   # 매수는 로보티즈 1건
+    rows = list(openpyxl.load_workbook(p)["태그별성과"].iter_rows(min_row=2, max_row=5, values_only=True))
+    assert [x[2] for x in rows] == ["테마동반", "급락반등", "상대강도", "태그 없음"] and rows[0][3] == 1   # 매수는 로보티즈 1건
 
 
 def test_evaluate_path_and_exit_methods(tmp_path, monkeypatch):
@@ -652,3 +652,56 @@ def test_watch_skips_session_start_baseline_and_affiliates(tmp_path, monkeypatch
     kinds = {(s["code"], s["kind"]) for s in res[2]["signals"]}
     assert ("M", "매수") in kinds
     assert all("테마동반" not in (s["tags"] or "") for s in res[2]["signals"])   # 계열사끼리는 테마동반 아님
+
+
+def test_watch_relative_strength_new_listing_and_confirm_exit(tmp_path, monkeypatch):
+    """11-20 분석 반영: 상대강도 표시(신호 때 +4~15%), 상장 첫날 종목 신호 제외, '10분 -1% 확인 후 고점-3%' 매도 방법"""
+    import pandas as pd
+    from stock100 import evaluate, watch
+    cfg, con = _watch_env(tmp_path, monkeypatch, {"watch": {"groups": {"live": {"top_n": 6, "fetch_n": 8}}}})
+
+    def board(rows):
+        return pd.DataFrame([{"code": c, "name": n, "price": p, "pct": r, "value": v * 1e8, "rank": i + 1}
+                             for i, (c, n, p, r, v) in enumerate(rows)])
+
+    boards = [board([("F1", "가", 10000, 0.0, 950), ("N", "하나에어로다이내믹스", 9500, 66.7, 900),
+                     ("F2", "나", 10000, 0.0, 800), ("P", "새상장", 10000, 10.0, 500),
+                     ("F3", "다", 10000, 0.0, 400), ("R", "한진칼", 10000, 6.0, 300)]),
+              # N 2→1위 +5.6%, P 4→3위 +3%, R 6→5위 +2% — 모두 순위 상승 + 5분 +1.5% 이상
+              board([("N", "하나에어로다이내믹스", 10030, 75.96, 1100), ("F1", "가", 10000, 0.0, 960),
+                     ("P", "새상장", 10300, 13.3, 820), ("F2", "나", 10000, 0.0, 810),
+                     ("R", "한진칼", 10200, 8.1, 600), ("F3", "다", 10000, 0.0, 410)])]
+
+    class Feed:
+        def live_top(self, n):
+            return boards.pop(0)
+
+        def quotes(self, codes):
+            return pd.DataFrame(columns=["code", "name", "price", "pct", "value", "strength"])
+
+        def market_rank(self, n=300):
+            return {}
+
+        def new_listings(self, date):
+            return {"P"}                       # 상장일이 오늘 (±30% 안이어도 제외)
+
+    tf = watch.TickFeed(Feed(), live_n=8, con=con, cfg=cfg)
+    w = watch.Watcher(cfg, con, tf, pd.DataFrame(columns=watch.UNI_COLS), dt.date(2026, 11, 20), "live")
+    t0 = dt.datetime(2026, 11, 20, 10, 30)
+    for k in range(2):
+        tf.begin([])
+        r = w.tick(t0 + dt.timedelta(minutes=5 * k))
+    codes = {s["code"] for s in r["signals"]}
+    assert "N" not in codes and "P" not in codes                 # 상장 첫날 제외 (±30% 초과 / 상장일 오늘)
+    by = {s["code"]: s for s in r["signals"] if s["kind"] == "매수"}
+    assert "상대강도" in by["R"]["tags"]                         # +8.1% → 상대강도
+
+    x = evaluate.exit_cfg(cfg)
+    drop = [("10:36", 10010, 9880, 9900), ("10:37", 10500, 9900, 10400)]      # 6분 뒤 -1.2% → -1% 손절
+    assert evaluate.run_strategies(10000, drop, x, True, signal_time="10:35")["confirm"][:2] == (-1.0, "10분 확인 손절")
+    hold = [("10:36", 10100, 9950, 10050), ("10:44", 10600, 10000, 10550),     # 10분 안엔 -0.5% 까지만
+            ("10:50", 11000, 10500, 10900), ("10:55", 10900, 10600, 10650)]   # 고점 11,000 -3% = 10,670
+    assert evaluate.run_strategies(10000, hold, x, True, signal_time="10:35")["confirm"][:2] == (6.7, "추적 매도")
+    late = [("10:36", 10100, 10000, 10050), ("10:50", 10100, 9880, 9900)]     # 15분 뒤 -1.2% → 확인 구간 지남
+    assert evaluate.run_strategies(10000, late, x, True, signal_time="10:35")["confirm"][1] != "10분 확인 손절"
+    assert ("confirm", "10분 -1% 확인 후 고점-3%") in evaluate.strategies(cfg)

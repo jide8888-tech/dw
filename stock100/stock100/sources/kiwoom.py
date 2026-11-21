@@ -149,15 +149,23 @@ class KiwoomSource(BaseSource):
             return self._shares
         p = self.cfg.data_dir / f"kiwoom_list_{dt.date.today():%Y%m%d}.json"
         if p.exists():
-            self._shares = json.loads(p.read_text(encoding="utf-8"))
-            return self._shares
+            cached = json.loads(p.read_text(encoding="utf-8"))
+            if all(len(v) >= 4 for v in cached.values()):      # 예전 형식(상장일 없음)이면 다시 받음
+                self._shares = cached
+                return self._shares
         out = {}
         for m in self.markets:
             for r in self.c.call("/api/dostk/stkinfo", "ka10099", {"mrkt_tp": MARKETS[m][1]}, max_pages=20):
-                out[_code(r.get("code", ""))] = [r.get("name", ""), _num(r.get("listCount")) or 0, m]
+                out[_code(r.get("code", ""))] = [r.get("name", ""), _num(r.get("listCount")) or 0, m,
+                                                 re.sub(r"\D", "", str(r.get("regDay") or ""))[:8]]
         p.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
         self._shares = out
         return out
+
+    def new_listings(self, date) -> set[str]:
+        """그날 상장한 종목코드 (ka10099 상장일 regDay 기준)"""
+        d = ymd(date)
+        return {c for c, v in self.shares().items() if len(v) >= 4 and v[3] == d}
 
     # ---------------- 오늘 상한가 / 천만주 / 거래대금 상위
     def movers(self, date, f):

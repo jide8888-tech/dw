@@ -252,6 +252,17 @@ class TickFeed:
     def live(self):
         return self._live.copy()
 
+    def new_listings(self, date) -> set:
+        d = iso(date)
+        if getattr(self, "_new_day", None) != d:
+            self._new_day, self._new = d, set()
+            if hasattr(self.feed, "new_listings"):
+                try:
+                    self._new = set(self.feed.new_listings(date))
+                except Exception as e:
+                    print(f"[warn] 신규상장 목록 조회 실패: {e.__class__.__name__}")
+        return self._new
+
     def themes(self, code, name=""):
         return self.book.get(code, name) if self.book else []
 
@@ -340,6 +351,11 @@ class Watcher:
             red = (q["d_value"] >= vd * 1e8) & (move >= pdel)
             rank_ok = q["rank_up"] >= w["rank_up_min"]
             buy = (red & rank_ok) if w["buy_rule"] == "both" else rank_ok
+            if w.get("exclude_new_listing", True):
+                # 상장 첫날 종목은 신호 제외: 상장일이 오늘이거나, 등락률이 ±30% 를 넘음(첫날만 가격제한폭이 다름)
+                new = set(self.feed.new_listings(self.date)) if hasattr(self.feed, "new_listings") else set()
+                first_day = q.index.isin(list(new)) | (q["pct"].abs() > 30)
+                red, buy = red & ~first_day, buy & ~first_day
             if self.live:       # 신호는 지금 100위 안에 있는 종목만 (101~200위는 다음 회차 비교용)
                 inside = q["mk_rank"].fillna(10 ** 6) <= top_n
                 if gc.get("exclude_etf_signals", True):     # ETF·ETN 은 순위 계산에만 쓰고 신호는 내지 않음
@@ -399,7 +415,8 @@ class Watcher:
                 "n_watch": n_watch}
 
     def _tags(self, now, q) -> dict[str, list[str]]:
-        """신호 종목 표시: 테마동반(같은 테마 종목이 최근 15분 안에 함께 신호) / 급락반등(전일 대비 -10% 이하)"""
+        """신호 종목 표시: 테마동반(같은 테마 종목이 최근 15분 안에 함께 신호) / 급락반등(전일 대비 -10% 이하) /
+        상대강도(신호 때 전일 대비 +4~+15%: 시장과 상관없이 이미 강한 종목)"""
         tg = self.w.get("tags", {})
         crash = float(tg.get("crash_pct", -10.0))
         need = int(tg.get("theme_min_stocks", 3))
@@ -435,8 +452,11 @@ class Watcher:
                 best, n = cnt.most_common(1)[0]
                 if n + 1 >= need:
                     t.append(f"테마동반({best}: {'·'.join(mates_by[best][:3])})")
-            if (_f(q.at[c, "pct"]) or 0) <= crash:
+            pct = _f(q.at[c, "pct"]) or 0
+            if pct <= crash:
                 t.append("급락반등")
+            if float(tg.get("rs_min_pct", 4.0)) <= pct <= float(tg.get("rs_max_pct", 15.0)):
+                t.append("상대강도")
             if t:
                 out[c] = t
         return out
@@ -678,13 +698,15 @@ def write_excel(cfg, con, date, unis: dict, path):
         for g in shown:
             og = [r for r in evals[period] if r["grp"] == g]
             for lbl, pick in (("테마동반", lambda t: "테마동반" in t), ("급락반등", lambda t: "급락반등" in t),
+                              ("상대강도", lambda t: "상대강도" in t),
                               ("태그 없음", lambda t: not t)):
                 sm = summarize([r for r in og if pick(r["tags"] or "")], cfg)
                 ws.append([label(cfg, g), period, lbl, sm["n"], sm["up"], sm["down"], sm["first_up"], sm["up_min"]]
                           + [sm[k] for k, _ in strats] + [sm[k + "_win"] for k, _ in strats] + [sm["best"]])
     ws.append([])
     ws.append([f"테마동반 = 최근 {w.get('tags', {}).get('theme_window_min', 15)}분 안에 같은 테마(키움 테마 기준) 종목이 함께 "
-               f"주목/매수 신호 · 급락반등 = 신호 때 전일 대비 {w.get('tags', {}).get('crash_pct', -10.0)}% 이하. "
+               f"주목/매수 신호 · 급락반등 = 신호 때 전일 대비 {w.get('tags', {}).get('crash_pct', -10.0)}% 이하 · "
+               f"상대강도 = 신호 때 전일 대비 +{w.get('tags', {}).get('rs_min_pct', 4.0)}~+{w.get('tags', {}).get('rs_max_pct', 15.0)}%. "
                "한 신호가 두 태그를 모두 가질 수 있음. 승률 = 그 방법으로 팔았을 때 플러스인 비율."])
 
     # 신호기록
