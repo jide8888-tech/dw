@@ -46,7 +46,8 @@ DEFAULTS = {
               "exclude_new_listing": True,     # 상장 첫날 종목은 신호 제외
               # 신호 표시: 테마동반 = 15분 안에 같은 테마 3종목 이상(계열사는 1개로) 신호 / 급락반등 = 전일 대비 -10% 이하
               "tags": {"theme_window_min": 15, "theme_min_stocks": 3, "crash_pct": -10.0,
-                       "rs_min_pct": 4.0, "rs_max_pct": 15.0}},     # 상대강도 = 신호 때 전일 대비 +4~+15%
+                       "rs_min_pct": 4.0, "rs_max_pct": 15.0,      # 상대강도 = 신호 때 전일 대비 +4~+15%
+                       "weak_min_pct": 0.0, "weak_max_pct": 4.0}},  # 약한상승 = 신호 때 0~+4% 미만
     "morning": {"queries": ["특징주", "상한가", "공급계약", "수주"], "min_score": 2},
     "track": {"horizons": [1, 3, 5], "hit_pct": 3.0},
     "paper": {"enabled": True, "take_profit_pct": 3.0, "stop_loss_pct": 3.0, "max_per_day": 1},
