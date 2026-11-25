@@ -416,7 +416,9 @@ class Watcher:
 
     def _tags(self, now, q) -> dict[str, list[str]]:
         """신호 종목 표시: 테마동반(같은 테마 종목이 최근 15분 안에 함께 신호) / 급락반등(전일 대비 -10% 이하) /
-        상대강도(신호 때 전일 대비 +4~+15%: 시장과 상관없이 이미 강한 종목)"""
+        상대강도(신호 때 전일 대비 +4~+15%: 시장과 상관없이 이미 강한 종목) /
+        약한상승(신호 때 0~+4%) / 주도주눌림(최근 급등 이력 종목이 신호 때 전일 대비 하락 중)"""
+        leaders = set(getattr(self.feed, "leaders", set()) or set())
         tg = self.w.get("tags", {})
         crash = float(tg.get("crash_pct", -10.0))
         need = int(tg.get("theme_min_stocks", 3))
@@ -457,6 +459,10 @@ class Watcher:
                 t.append("급락반등")
             if float(tg.get("rs_min_pct", 4.0)) <= pct <= float(tg.get("rs_max_pct", 15.0)):
                 t.append("상대강도")
+            if float(tg.get("weak_min_pct", 0.0)) <= pct < float(tg.get("weak_max_pct", 4.0)):
+                t.append("약한상승")            # 지수 따라 조금 오르던 종목 — 6일치에서 매일 약했던 구간
+            if pct < 0 and c in leaders:
+                t.append("주도주눌림")          # 최근 급등 이력(②) 종목이 오늘 밀려 있다가 다시 거래대금이 붙음
             if t:
                 out[c] = t
         return out
@@ -698,7 +704,8 @@ def write_excel(cfg, con, date, unis: dict, path):
         for g in shown:
             og = [r for r in evals[period] if r["grp"] == g]
             for lbl, pick in (("테마동반", lambda t: "테마동반" in t), ("급락반등", lambda t: "급락반등" in t),
-                              ("상대강도", lambda t: "상대강도" in t),
+                              ("상대강도", lambda t: "상대강도" in t), ("약한상승", lambda t: "약한상승" in t),
+                              ("주도주눌림", lambda t: "주도주눌림" in t),
                               ("태그 없음", lambda t: not t)):
                 sm = summarize([r for r in og if pick(r["tags"] or "")], cfg)
                 ws.append([label(cfg, g), period, lbl, sm["n"], sm["up"], sm["down"], sm["first_up"], sm["up_min"]]
@@ -706,7 +713,9 @@ def write_excel(cfg, con, date, unis: dict, path):
     ws.append([])
     ws.append([f"테마동반 = 최근 {w.get('tags', {}).get('theme_window_min', 15)}분 안에 같은 테마(키움 테마 기준) 종목이 함께 "
                f"주목/매수 신호 · 급락반등 = 신호 때 전일 대비 {w.get('tags', {}).get('crash_pct', -10.0)}% 이하 · "
-               f"상대강도 = 신호 때 전일 대비 +{w.get('tags', {}).get('rs_min_pct', 4.0)}~+{w.get('tags', {}).get('rs_max_pct', 15.0)}%. "
+               f"상대강도 = 신호 때 전일 대비 +{w.get('tags', {}).get('rs_min_pct', 4.0)}~+{w.get('tags', {}).get('rs_max_pct', 15.0)}% · "
+               f"약한상승 = 신호 때 +{w.get('tags', {}).get('weak_min_pct', 0.0)}~+{w.get('tags', {}).get('weak_max_pct', 4.0)}% 미만 · "
+               "주도주눌림 = 최근 급등 이력(② 거래대금이력) 종목이 신호 때 전일 대비 하락 중. "
                "한 신호가 두 태그를 모두 가질 수 있음. 승률 = 그 방법으로 팔았을 때 플러스인 비율."])
 
     # 신호기록
@@ -893,6 +902,9 @@ def run(app, once=False, demo=False, list_only=False, clock=None, sleep=_time.sl
               "필요합니다. 급하면 config 의 watch.extra_codes 에 종목코드를 넣으세요.")
         return unis
     tf = TickFeed(feed, live_n=gcfg(cfg, "live").get("fetch_n", 200) if "live" in unis else 0, con=con, cfg=cfg)
+    # '주도주눌림' 표시용: 최근 급등 이력 종목 (직접 추가한 종목은 제외)
+    hu = unis.get("history")
+    tf.leaders = set(hu.loc[hu["reason"] != "직접 추가(extra_codes)", "code"]) if hu is not None and len(hu) else set()
     watchers = {g: Watcher(cfg, con, tf, u, today, g, now=clock()) for g, u in unis.items()}
     fixed = sorted({c for g, u in unis.items() if g != "live" for c in u["code"]})
     path = cfg.sub("watch") / f"{iso(today)}_실시간감시.xlsx"

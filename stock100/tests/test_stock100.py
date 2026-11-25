@@ -549,8 +549,9 @@ def test_watch_tags_and_etf_signal_exclusion(tmp_path, monkeypatch):
     assert con.execute("SELECT COUNT(*) FROM stock_themes").fetchone()[0] >= 4    # 테마 캐시
     p = watch.write_excel(cfg, con, dt.date(2026, 11, 18), {"live": w.uni}, tmp_path / "w.xlsx")
     import openpyxl
-    rows = list(openpyxl.load_workbook(p)["태그별성과"].iter_rows(min_row=2, max_row=5, values_only=True))
-    assert [x[2] for x in rows] == ["테마동반", "급락반등", "상대강도", "태그 없음"] and rows[0][3] == 1   # 매수는 로보티즈 1건
+    rows = list(openpyxl.load_workbook(p)["태그별성과"].iter_rows(min_row=2, max_row=7, values_only=True))
+    assert [x[2] for x in rows] == ["테마동반", "급락반등", "상대강도", "약한상승", "주도주눌림", "태그 없음"]
+    assert rows[0][3] == 1   # 매수는 로보티즈 1건
 
 
 def test_evaluate_path_and_exit_methods(tmp_path, monkeypatch):
@@ -705,3 +706,42 @@ def test_watch_relative_strength_new_listing_and_confirm_exit(tmp_path, monkeypa
     late = [("10:36", 10100, 10000, 10050), ("10:50", 10100, 9880, 9900)]     # 15분 뒤 -1.2% → 확인 구간 지남
     assert evaluate.run_strategies(10000, late, x, True, signal_time="10:35")["confirm"][1] != "10분 확인 손절"
     assert ("confirm", "10분 -1% 확인 후 고점-3%") in evaluate.strategies(cfg)
+
+
+def test_watch_weak_rise_and_leader_pullback_tags(tmp_path, monkeypatch):
+    """6일치 분석 반영: 약한상승(신호 때 0~4%) / 주도주눌림(최근 급등 이력 종목이 신호 때 전일 대비 하락 중)"""
+    import pandas as pd
+    from stock100 import watch
+    cfg, con = _watch_env(tmp_path, monkeypatch, {"watch": {"groups": {"live": {"top_n": 6, "fetch_n": 8}}}})
+
+    def board(rows):
+        return pd.DataFrame([{"code": c, "name": n, "price": p, "pct": r, "value": v * 1e8, "rank": i + 1}
+                             for i, (c, n, p, r, v) in enumerate(rows)])
+
+    boards = [board([("F1", "가", 10000, 0.0, 900), ("W", "약한종목", 10000, 0.5, 800), ("F2", "나", 10000, 0.0, 700),
+                     ("L", "한진칼우", 10000, -5.0, 600), ("F3", "다", 10000, 0.0, 500), ("D", "하락대형주", 10000, -4.0, 400)]),
+              board([("W", "약한종목", 10200, 2.5, 950), ("F1", "가", 10000, 0.0, 910), ("L", "한진칼우", 10200, -3.1, 760),
+                     ("F2", "나", 10000, 0.0, 710), ("D", "하락대형주", 10200, -2.1, 520), ("F3", "다", 10000, 0.0, 510)])]
+
+    class Feed:
+        def live_top(self, n):
+            return boards.pop(0)
+
+        def quotes(self, codes):
+            return pd.DataFrame(columns=["code", "name", "price", "pct", "value", "strength"])
+
+        def market_rank(self, n=300):
+            return {}
+
+    tf = watch.TickFeed(Feed(), live_n=8, con=con, cfg=cfg)
+    tf.leaders = {"L"}                                  # 최근 급등 이력(②) 종목
+    w = watch.Watcher(cfg, con, tf, pd.DataFrame(columns=watch.UNI_COLS), dt.date(2026, 11, 25), "live")
+    t0 = dt.datetime(2026, 11, 25, 9, 30)
+    for k in range(2):
+        tf.begin([])
+        r = w.tick(t0 + dt.timedelta(minutes=5 * k))
+    by = {s["code"]: s for s in r["signals"] if s["kind"] == "매수"}
+    assert "약한상승" in by["W"]["tags"]                  # +2.5%
+    assert "주도주눌림" in by["L"]["tags"]                # 최근 급등 이력 + -3.1%
+    assert "주도주눌림" not in (by["D"]["tags"] or "")     # 하락 중이지만 급등 이력 없음
+    assert "약한상승" not in (by["L"]["tags"] or "")
