@@ -33,7 +33,7 @@ copy config.example.yaml config.yaml      # (mac/linux: cp)
 | `DART_API_KEY` | OpenDART — 최대주주 지분, 최근 공시, 재무 추이 | 노트에서 해당 항목 생략 |
 | `NAVER_CLIENT_ID` / `SECRET` | 네이버 검색 API 뉴스 | 구글 뉴스 RSS만 사용 |
 
-- 키움 REST API: https://openapi.kiwoom.com (키움 계좌 필요 → API 사용 신청 → 앱키/시크릿키, 접속 IP 등록). 연결 점검: `python -m stock100 kiwoom`
+- 키움 REST API: https://openapi.kiwoom.com (키움 계좌 필요 → API 사용 신청 → 앱키/시크릿키, 접속 IP 등록). 연결 점검: `python -m stock100 kiwoom`. 테마동반용 키움 전체 테마 구성 종목은 watch 시작 때 주 1회 자동으로 받고(1~2분), 지금 새로 받고 종목 테마를 확인하려면 `python -m stock100 kiwoom --themes 356860 042510`
 - KRX 회원가입: https://data.krx.co.kr
 - OpenDART 키 발급: https://opendart.fss.or.kr
 - 네이버 API: https://developers.naver.com (검색 API)

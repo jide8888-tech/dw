@@ -147,7 +147,9 @@ def main(argv=None):
     p.add_argument("--date", help="YYYYMMDD (기본: 오늘)")
     p.add_argument("--value", type=float, help="거래대금 기준 (억 원)")
     p.add_argument("--pct", type=float, help="등락률 기준 (%%)")
-    sp.add_parser("kiwoom", help="키움 REST API 연결 점검")
+    p = sp.add_parser("kiwoom", help="키움 REST API 연결 점검")
+    p.add_argument("--themes", nargs="*", metavar="CODE",
+                   help="키움 전체 테마 구성 종목을 새로 받고, 적은 종목코드의 테마를 보여 줌")
     p = sp.add_parser("watch", help="장중 5분 감시 (거래대금·등락률·순위 상승 → 매수 제안)")
     p.add_argument("--once", action="store_true", help="한 번만 조회하고 종료")
     p.add_argument("--list", action="store_true", help="오늘 감시 대상만 출력")
@@ -214,6 +216,15 @@ def _dispatch(app, a):
         watch.report(app.cfg, app.con, app.src, to_date(a.date) if a.date else dt.date.today())
     elif a.cmd == "watch":
         watch.run(app, once=a.once, list_only=a.list)
+    elif a.cmd == "kiwoom" and a.themes is not None:
+        from .sources.kiwoom import KiwoomSource
+        src = getattr(app.src, "kiwoom", None) or KiwoomSource(app.cfg)
+        watch.ensure_theme_map(app.con, src, force=True)
+        book = watch.ThemeBook(app.con, src, app.cfg)
+        for code in a.themes:
+            c = str(code).strip().zfill(6)
+            nm = app.con.execute("SELECT name FROM theme_members WHERE code=? LIMIT 1", (c,)).fetchone()
+            print(f"  {c} {nm[0] if nm else ''}: {', '.join(book.get(c, nm[0] if nm else '')) or '(없음)'}")
     elif a.cmd == "kiwoom":
         from .sources.kiwoom import check
         check(app.cfg)

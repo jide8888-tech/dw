@@ -20,7 +20,6 @@ import json
 import math
 import re
 import time as _time
-from collections import Counter
 
 import numpy as np
 import pandas as pd
@@ -173,8 +172,13 @@ def extra_tags(tg: dict, pct, surge, breadth) -> list[str]:
 
 def retag(con, cfg, date=None) -> int:
     """이미 쌓인 신호에 하락중반등·전일급등·시장강세/약세를 다시 계산해 붙인다 (DB 만 사용, 네트워크 없음).
-    시장 상승비율은 그 시각 ① 거래대금상위 스냅샷으로 계산하므로 이 기능이 생기기 전 기록에도 붙는다. 바뀐 행 수"""
+    시장 상승비율은 그 시각 ① 거래대금상위 스냅샷으로 계산하므로 이 기능이 생기기 전 기록에도 붙는다.
+    키움 전체 테마 구성 종목을 받아 두었으면 테마동반도 다시 계산한다 (예전 종목별 조회가 빈 목록을 줘서 놓친 묶음). 바뀐 행 수"""
     tg = cfg["watch"].get("tags", {})
+    book = ThemeBook(con, None, cfg)
+    redo_theme = book.has_map()
+    win, need = int(tg.get("theme_window_min", 15)), int(tg.get("theme_min_stocks", 3))
+    recent_by: dict = {}
     top_n = int(gcfg(cfg, "live").get("top_n", 100))
     min_n = int(tg.get("market_min_stocks", 20))
     days = sorted({r[0] for r in con.execute("SELECT DISTINCT date FROM value_rank_daily UNION "
@@ -196,10 +200,22 @@ def retag(con, cfg, date=None) -> int:
             if "pct" in r.keys():
                 pct = r["pct"]
             else:
-                x = con.execute("SELECT pct FROM watch_ticks2 WHERE date=? AND grp=? AND time=? AND code=?",
-                                (d, r["grp"], hm, r["code"])).fetchone()
+                x = con.execute("SELECT pct FROM watch_ticks2 WHERE date=? AND grp=? AND time=? AND code=? UNION ALL "
+                                "SELECT pct FROM watch_signals2 WHERE date=? AND grp=? AND time=? AND code=? LIMIT 1",
+                                (d, r["grp"], hm, r["code"]) * 2).fetchone()
                 pct = x["pct"] if x else None
-            keep = [x for x in (r["tags"] or "").split(",") if x and not x.startswith(NEW_TAGS)]
+            keep = [x for x in (r["tags"] or "").split(",") if x and not x.startswith(NEW_TAGS)
+                    and not (redo_theme and x.startswith("테마동반"))]
+            if redo_theme:          # 그 시각까지 최근 15분 안의 신호 종목(모든 그룹·주목 포함)으로 다시 계산
+                if (d, hm) not in recent_by:
+                    since = (dt.datetime.strptime(hm, "%H:%M") - dt.timedelta(minutes=win)).strftime("%H:%M")
+                    rec = {x["code"]: x["name"] for x in con.execute(
+                        "SELECT code, name FROM watch_signals2 WHERE date=? AND time>=? AND time<=? ORDER BY time, code",
+                        (d, since, hm)) if not is_etf(x["name"])}
+                    recent_by[(d, hm)] = (rec, {c: set(book.get(c, n)) for c, n in rec.items()})
+                rec, th = recent_by[(d, hm)]
+                tt = theme_tag(r["code"], rec, th, need, book.size) if r["code"] in rec else None
+                keep = ([tt] if tt else []) + keep
             tags = ",".join(keep + extra_tags(tg, _f(pct), surge_by[d].get(r["code"]), br))
             if tags != (r["tags"] or "") or br != r["breadth"]:
                 con.execute(f"UPDATE {table} SET tags=?, breadth=? WHERE rowid=?", (tags, br, r["rid"]))
@@ -268,6 +284,21 @@ class ThemeBook:
     def __init__(self, con, feed, cfg=None):
         self.con, self.feed, self.cfg = con, feed, cfg
         self.mem: dict[str, list[str]] = {}
+        self._has_map: bool | None = None
+        self._size: dict[str, int] | None = None
+
+    def has_map(self) -> bool:
+        """키움 전체 테마 구성 종목(theme_members)을 받아 두었나"""
+        if self._has_map is None:
+            self._has_map = self.con.execute("SELECT 1 FROM theme_members LIMIT 1").fetchone() is not None
+        return self._has_map
+
+    def size(self, theme) -> int:
+        """테마 구성 종목 수 (같은 수의 동료면 종목 수가 적은 = 더 구체적인 테마를 고르는 데 씀)"""
+        if self._size is None:
+            self._size = {r[0]: r[1] for r in self.con.execute(
+                "SELECT theme, COUNT(*) FROM theme_members GROUP BY theme")}
+        return self._size.get(theme, 0)
 
     def _fallback(self, code, name) -> list[str]:
         from .theme import DEFAULT_THEMES
@@ -285,23 +316,80 @@ class ThemeBook:
     def get(self, code, name="") -> list[str]:
         if code in self.mem:
             return self.mem[code]
-        row = self.con.execute("SELECT themes, updated FROM stock_themes WHERE code=?", (code,)).fetchone()
-        fresh = row and row["updated"] >= (dt.date.today() - dt.timedelta(days=7)).isoformat()
-        if fresh:
-            th = json.loads(row["themes"])
-        else:
-            th = None
-            if hasattr(self.feed, "stock_themes"):
-                try:
-                    th = self.feed.stock_themes(code)
-                    self.con.execute("INSERT OR REPLACE INTO stock_themes VALUES (?,?,?)",
-                                     (code, json.dumps(th, ensure_ascii=False), dt.date.today().isoformat()))
-                except Exception as e:
-                    print(f"[warn] 테마 조회 실패 {name}({code}): {e.__class__.__name__}")
-            if not th:
-                th = self._fallback(code, name)
+        if self.has_map():      # 1) 키움 전체 테마 구성 종목
+            th = [r[0] for r in self.con.execute("SELECT theme FROM theme_members WHERE code=? ORDER BY theme",
+                                                  (code,))]
+        else:                   # 2) (전체 목록이 없을 때) 종목별 테마 조회, 7일 캐시
+            th = self._per_stock(code, name)
+        if not th:              # 3) 빈 결과면 종목명 키워드·테마 분석 기록으로 (예전엔 빈 결과를 7일 동안 그대로 씀)
+            th = self._fallback(code, name)
         self.mem[code] = th
         return th
+
+    def _per_stock(self, code, name) -> list[str]:
+        row = self.con.execute("SELECT themes, updated FROM stock_themes WHERE code=?", (code,)).fetchone()
+        if row and row["updated"] >= (dt.date.today() - dt.timedelta(days=7)).isoformat():
+            return json.loads(row["themes"])
+        if not hasattr(self.feed, "stock_themes"):
+            return []
+        try:
+            th = self.feed.stock_themes(code)
+            self.con.execute("INSERT OR REPLACE INTO stock_themes VALUES (?,?,?)",
+                             (code, json.dumps(th, ensure_ascii=False), dt.date.today().isoformat()))
+            return th
+        except Exception as e:
+            print(f"[warn] 테마 조회 실패 {name}({code}): {e.__class__.__name__}")
+            return []
+
+
+def ensure_theme_map(con, feed, days=7, force=False, quiet=False) -> int:
+    """키움 전체 테마 구성 종목을 주 1회 받아 theme_members 에 저장 (1~2분). 저장한 (테마, 종목) 수"""
+    if not hasattr(feed, "theme_map"):
+        return 0
+    last = con.execute("SELECT MAX(updated) FROM theme_members").fetchone()[0]
+    if not force and last and last >= (dt.date.today() - dt.timedelta(days=days)).isoformat():
+        return 0
+    if not quiet:
+        print("[감시] 키움 테마 구성 종목을 받는 중입니다 (주 1회, 1~2분)...")
+    try:
+        m = feed.theme_map()
+    except Exception as e:
+        print(f"[warn] 테마 구성 종목을 받지 못했습니다 ({e.__class__.__name__}: {str(e)[:120]}). 종목별 조회로 대신합니다.")
+        return 0
+    rows = {(th, c): n for th, members in m.items() for c, n in members if c}
+    if not rows:
+        print("[warn] 테마 구성 종목이 비어 있습니다. 종목별 조회로 대신합니다.")
+        return 0
+    today = dt.date.today().isoformat()
+    con.execute("DELETE FROM theme_members")
+    con.executemany("INSERT OR REPLACE INTO theme_members VALUES (?,?,?,?)",
+                    [(th, c, n, today) for (th, c), n in rows.items()])
+    con.commit()
+    if not quiet:
+        print(f"[감시] 테마 {len(m)}개, 종목-테마 {len(rows)}건 저장")
+    return len(rows)
+
+
+def theme_tag(c, recent: dict, th: dict, need: int, size=lambda t: 0):
+    """테마동반 표시: c 와 같은 테마인 종목이 recent(최근 신호 종목 {코드: 이름}) 안에 need-1 개 이상.
+    계열사(이름 앞 3글자 같음)는 1개로 센다. 동료 수가 같으면 종목 수가 적은(더 구체적인) 테마를 고른다."""
+    cnt: dict[str, list[str]] = {}
+    for x in sorted(th.get(c, set())):
+        kept: list[str] = []
+        for o, n in recent.items():
+            if o == c or x not in th.get(o, set()) or is_affiliate(n, recent.get(c, "")):
+                continue
+            if any(is_affiliate(n, k) for k in kept):
+                continue
+            kept.append(n)
+        if kept:
+            cnt[x] = kept
+    if not cnt:
+        return None
+    best = min(cnt, key=lambda x: (-len(cnt[x]), size(x) or 10 ** 6, x))
+    if len(cnt[best]) + 1 < need:
+        return None
+    return f"테마동반({best}: {'·'.join(cnt[best][:3])})"
 
 
 # ------------------------------------------------------------------ 한 회차에 한 번만 조회
@@ -358,6 +446,9 @@ class TickFeed:
 
     def themes(self, code, name=""):
         return self.book.get(code, name) if self.book else []
+
+    def theme_size(self, theme) -> int:
+        return self.book.size(theme) if self.book else 0
 
     def quotes(self, codes):
         if self._q.empty:
@@ -530,27 +621,13 @@ class Watcher:
         recent.update({c: q.at[c, "name"] for c in sig})
         recent = {c: n for c, n in recent.items() if not is_etf(n)}
         themes_of = (lambda c, n: self.feed.themes(c, n)) if hasattr(self.feed, "themes") else (lambda c, n: [])
+        size = getattr(self.feed, "theme_size", lambda x: 0)
         th = {c: set(themes_of(c, n)) for c, n in recent.items()}
         for c in sig:
             t: list[str] = []
-            mine = th.get(c, set())
-            cnt: Counter = Counter()
-            mates_by: dict[str, list[str]] = {}
-            for x in mine:
-                kept: list[str] = []          # 같은 테마 동료 — 나와 계열사이거나, 이미 센 동료와 계열사면 1개로 봄
-                for o, n in recent.items():
-                    if o == c or x not in th.get(o, set()) or is_affiliate(n, recent[c]):
-                        continue
-                    if any(is_affiliate(n, k) for k in kept):
-                        continue
-                    kept.append(n)
-                if kept:
-                    cnt[x] = len(kept)
-                    mates_by[x] = kept
-            if cnt:
-                best, n = cnt.most_common(1)[0]
-                if n + 1 >= need:
-                    t.append(f"테마동반({best}: {'·'.join(mates_by[best][:3])})")
+            tt = theme_tag(c, recent, th, need, size) if c in recent else None
+            if tt:
+                t.append(tt)
             pct = _f(q.at[c, "pct"]) or 0
             if pct <= crash:
                 t.append("급락반등")
@@ -692,9 +769,9 @@ def report(cfg, con, src, date, quiet=False):
         if not quiet:
             print(f"[감시] {iso(date)} 감시 기록이 없습니다.")
         return None
-    k = retag(con, cfg)         # 지난 기록 전체에 하락중반등·전일급등·시장강세/약세 (누적 '태그별성과' 용)
+    k = retag(con, cfg)         # 지난 기록 전체에 하락중반등·전일급등·시장강세/약세·테마동반 (누적 '태그별성과' 용)
     if k and not quiet:
-        print(f"[감시] 신호 {k}건에 하락중반등·전일급등·시장강세/약세 표시를 다시 계산했습니다.")
+        print(f"[감시] 신호 {k}건의 표시(하락중반등·전일급등·시장강세/약세·테마동반)를 다시 계산했습니다.")
     path = write_excel(cfg, con, date, unis, cfg.sub("watch") / f"{iso(date)}_실시간감시.xlsx")
     if not quiet:
         print(f"[감시] 1분봉 {n}종목 반영, 신호 후 움직임·매도 방법 비교 갱신 → {path}")
@@ -1024,6 +1101,8 @@ def run(app, once=False, demo=False, list_only=False, clock=None, sleep=_time.sl
         print("감시할 종목이 없습니다. ①은 08:55~08:59 에 켜 두어야 하고, ②는 KRX 로그인 또는 며칠간의 evening 기록이 "
               "필요합니다. 급하면 config 의 watch.extra_codes 에 종목코드를 넣으세요.")
         return unis
+    if not demo:
+        ensure_theme_map(con, feed)     # 테마동반용: 키움 전체 테마 구성 종목 (주 1회)
     tf = TickFeed(feed, live_n=gcfg(cfg, "live").get("fetch_n", 200) if "live" in unis else 0, con=con, cfg=cfg)
     # '주도주눌림' 표시용: 최근 급등 이력 종목 (직접 추가한 종목은 제외)
     hu = unis.get("history")

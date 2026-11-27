@@ -87,6 +87,10 @@ CREATE TABLE IF NOT EXISTS minute_bars (        -- 매수 신호 종목의 1분�
 CREATE TABLE IF NOT EXISTS stock_themes (       -- 종목이 속한 테마 (키움 종목별 테마 조회, 7일 캐시)
     code TEXT PRIMARY KEY, themes TEXT, updated TEXT
 );
+CREATE TABLE IF NOT EXISTS theme_members (      -- 키움 전체 테마의 구성 종목 (ka90001 전체 + ka90002, 주 1회)
+    theme TEXT, code TEXT, name TEXT, updated TEXT,
+    PRIMARY KEY (theme, code)
+);
 CREATE TABLE IF NOT EXISTS paper_trades (       -- Day 71~ 소액 매매 (모의)
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     date TEXT, code TEXT, stage TEXT, qty INTEGER, entry REAL, exit REAL,
