@@ -127,6 +127,87 @@ def is_etf(name: str) -> bool:
     return bool(_ETF.search(str(name or "")))
 
 
+# ------------------------------------------------------------------ 신호 표시: 하락중반등 · 전일급등 · 시장강세/약세
+NEW_TAGS = ("하락중반등", "전일급등", "시장강세", "시장약세")     # 저장된 기록에 다시 계산해 붙이는 표시
+
+
+def market_breadth(df: pd.DataFrame, top_n=100, min_n=20):
+    """거래대금 상위 top_n 종목(ETF·ETN 제외) 중 지금 전일 대비 오르고 있는 종목 비율(%). 종목이 min_n 보다 적으면 None"""
+    if df is None or df.empty or "pct" not in df:
+        return None
+    rk = "rank" if "rank" in df else "mk_rank"
+    d = df[pd.to_numeric(df[rk], errors="coerce").fillna(10 ** 6) <= top_n]
+    if d.empty:
+        return None
+    d = d[~d["name"].map(is_etf).astype(bool)]
+    pct = pd.to_numeric(d["pct"], errors="coerce").dropna()
+    if len(pct) < max(1, int(min_n)):
+        return None
+    return round(float((pct > 0).mean() * 100), 1)
+
+
+def prev_surge_map(con, cfg, prev_date) -> dict[str, float]:
+    """전 거래일 거래대금 상위 100위 안에서 +15% 이상 오른 종목 {코드: 등락률}"""
+    if not prev_date:
+        return {}
+    tg = cfg["watch"].get("tags", {})
+    return {r["code"]: float(r["change_pct"]) for r in con.execute(
+        "SELECT code, change_pct FROM value_rank_daily WHERE date=? AND rank<=? AND change_pct>=?",
+        (iso(prev_date), int(tg.get("prev_surge_top_n", 100)), float(tg.get("prev_surge_pct", 15.0))))}
+
+
+def extra_tags(tg: dict, pct, surge, breadth) -> list[str]:
+    """하락중반등 = 신호 때 전일 대비 하락 중 / 전일급등 = 전 거래일 +15%↑ / 시장강세·약세 = 상위 100 중 상승 종목 비율"""
+    t = []
+    if pct is not None and pct < 0:
+        t.append("하락중반등")
+    if surge is not None:
+        t.append(f"전일급등({surge:+.0f}%)")
+    if breadth is not None:
+        if breadth >= float(tg.get("market_strong_pct", 70.0)):
+            t.append(f"시장강세(상승 {breadth:.0f}%)")
+        elif breadth <= float(tg.get("market_weak_pct", 40.0)):
+            t.append(f"시장약세(상승 {breadth:.0f}%)")
+    return t
+
+
+def retag(con, cfg, date=None) -> int:
+    """이미 쌓인 신호에 하락중반등·전일급등·시장강세/약세를 다시 계산해 붙인다 (DB 만 사용, 네트워크 없음).
+    시장 상승비율은 그 시각 ① 거래대금상위 스냅샷으로 계산하므로 이 기능이 생기기 전 기록에도 붙는다. 바뀐 행 수"""
+    tg = cfg["watch"].get("tags", {})
+    top_n = int(gcfg(cfg, "live").get("top_n", 100))
+    min_n = int(tg.get("market_min_stocks", 20))
+    days = sorted({r[0] for r in con.execute("SELECT DISTINCT date FROM value_rank_daily UNION "
+                                             "SELECT DISTINCT date FROM watch_ticks2")})
+    cond, args = ("WHERE date=?", (iso(date),)) if date else ("", ())
+    surge_by: dict = {}
+    br_by: dict = {}
+    n = 0
+    for table in ("watch_outcomes", "watch_signals2"):
+        for r in con.execute(f"SELECT rowid AS rid, * FROM {table} {cond}", args).fetchall():
+            d, hm = r["date"], r["time"]
+            if d not in surge_by:       # 전 거래일 = 기록이 있는 날 중 바로 앞 날
+                surge_by[d] = prev_surge_map(con, cfg, max((x for x in days if x < d), default=None))
+            if (d, hm) not in br_by:
+                ticks = pd.DataFrame([dict(x) for x in con.execute(
+                    "SELECT name, pct, mk_rank FROM watch_ticks2 WHERE date=? AND time=? AND grp='live'", (d, hm))])
+                br_by[(d, hm)] = market_breadth(ticks, top_n, min_n) if len(ticks) else None
+            br = r["breadth"] if r["breadth"] is not None else br_by[(d, hm)]
+            if "pct" in r.keys():
+                pct = r["pct"]
+            else:
+                x = con.execute("SELECT pct FROM watch_ticks2 WHERE date=? AND grp=? AND time=? AND code=?",
+                                (d, r["grp"], hm, r["code"])).fetchone()
+                pct = x["pct"] if x else None
+            keep = [x for x in (r["tags"] or "").split(",") if x and not x.startswith(NEW_TAGS)]
+            tags = ",".join(keep + extra_tags(tg, _f(pct), surge_by[d].get(r["code"]), br))
+            if tags != (r["tags"] or "") or br != r["breadth"]:
+                con.execute(f"UPDATE {table} SET tags=?, breadth=? WHERE rowid=?", (tags, br, r["rid"]))
+                n += 1
+    con.commit()
+    return n
+
+
 def history_universe(cfg, con, src, today) -> pd.DataFrame:
     h = gcfg(cfg, "history")
     days = lookback_dates(src, today, h["lookback_days"])
@@ -231,18 +312,26 @@ class TickFeed:
         self.feed = feed
         self.live_n = live_n
         self.book = ThemeBook(con, feed, cfg) if con is not None else None
+        self.cfg = cfg
         self._q = pd.DataFrame()
         self._live = pd.DataFrame()
         self._mk: dict = {}
+        self._br = None
+        self.leaders: set = set()                 # 주도주눌림용: 최근 급등 이력 종목
+        self.prev_surge: dict[str, float] = {}    # 전일급등용: 전 거래일 +15%↑ 종목
 
     def begin(self, codes):
         codes = sorted(set(codes))
         self._q = self.feed.quotes(codes) if codes else pd.DataFrame()
         self._live = pd.DataFrame()
+        self._br = None
         try:
             if self.live_n:     # ① 거래대금상위: 시장 순위 목록 자체가 시세 (한 번의 조회로 순위도 같이 얻음)
                 self._live = self.feed.live_top(self.live_n)
                 self._mk = dict(zip(self._live["code"], self._live["rank"]))
+                tg = self.cfg["watch"].get("tags", {}) if self.cfg else {}
+                top_n = gcfg(self.cfg, "live").get("top_n", 100) if self.cfg else 100
+                self._br = market_breadth(self._live, top_n, tg.get("market_min_stocks", 20))
             else:
                 self._mk = self.feed.market_rank(300)
         except Exception as e:
@@ -251,6 +340,10 @@ class TickFeed:
 
     def live(self):
         return self._live.copy()
+
+    def breadth(self):
+        """이번 회차 거래대금 상위 100(ETF 제외) 중 상승 종목 비율(%) — ① 그룹을 켰을 때만"""
+        return self._br
 
     def new_listings(self, date) -> set:
         d = iso(date)
@@ -365,7 +458,8 @@ class Watcher:
             q["buy"] = buy.fillna(False).astype(bool)
 
         signals = []
-        tags = self._tags(now, q)
+        br = self.feed.breadth() if hasattr(self.feed, "breadth") else None    # 시장 상승비율(%)
+        tags = self._tags(now, q, br)
         for c, r in q.iterrows():
             kinds = (["주목"] if r.red else []) + ([("매수" if c not in self.bought else "재신호")] if r.buy else [])
             tg = ",".join(tags.get(c, []))
@@ -378,20 +472,21 @@ class Watcher:
                     self.cash -= amount
                     self.bought.add(c)
                     self.con.execute("INSERT OR REPLACE INTO watch_outcomes (date, grp, time, code, name, entry, qty, "
-                                     "r30, r60, rclose, rmax, tags) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-                                     (self.date, self.grp, hm, c, r["name"], r.price, qty, None, None, None, 0.0, tg))
+                                     "r30, r60, rclose, rmax, tags, breadth) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                                     (self.date, self.grp, hm, c, r["name"], r.price, qty, None, None, None, 0.0, tg,
+                                      br))
                 sig = {"grp": self.grp, "time": hm, "code": c, "name": r["name"], "kind": k, "price": r.price,
                        "pct": r.pct, "d_value": r.d_value, "d_pct": r.d_pct, "d_ret": r.d_ret,
                        "mode": mode, "rank_prev": _int(r.rank_prev),
                        "rank_now": _int(r[basis]), "qty": qty, "amount": amount, "cash_left": self.cash,
-                       "tags": tg}
+                       "tags": tg, "breadth": br}
                 signals.append(sig)
                 self.con.execute("INSERT OR REPLACE INTO watch_signals2 (date, time, grp, code, name, kind, price, pct, "
-                                 "d_value, d_pct, rank_prev, rank_now, qty, amount, cash_left, d_ret, tags) "
-                                 "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                                 "d_value, d_pct, rank_prev, rank_now, qty, amount, cash_left, d_ret, tags, breadth) "
+                                 "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                                  (self.date, hm, self.grp, c, sig["name"], k, r.price, r.pct, _f(r.d_value),
                                   _f(r.d_pct), sig["rank_prev"], sig["rank_now"], qty, amount,
-                                  self.cash if k == "매수" else None, _f(r.d_ret), tg))
+                                  self.cash if k == "매수" else None, _f(r.d_ret), tg, br))
         for c, r in q.iterrows():
             self.con.execute("INSERT OR REPLACE INTO watch_ticks2 (date, time, grp, code, name, price, pct, value, "
                              "strength, wl_rank, mk_rank, d_value, d_pct, d_strength, per_won, rank_prev, rank_up, "
@@ -414,11 +509,13 @@ class Watcher:
         return {"grp": self.grp, "time": hm, "rows": q.reset_index(), "signals": signals, "basis": basis,
                 "n_watch": n_watch}
 
-    def _tags(self, now, q) -> dict[str, list[str]]:
+    def _tags(self, now, q, br=None) -> dict[str, list[str]]:
         """신호 종목 표시: 테마동반(같은 테마 종목이 최근 15분 안에 함께 신호) / 급락반등(전일 대비 -10% 이하) /
         상대강도(신호 때 전일 대비 +4~+15%: 시장과 상관없이 이미 강한 종목) /
-        약한상승(신호 때 0~+4%) / 주도주눌림(최근 급등 이력 종목이 신호 때 전일 대비 하락 중)"""
+        약한상승(신호 때 0~+4%) / 주도주눌림(최근 급등 이력 종목이 신호 때 전일 대비 하락 중) /
+        하락중반등(신호 때 전일 대비 하락 중) / 전일급등(전 거래일 +15%↑) / 시장강세·시장약세(상위 100 중 상승 비율)"""
         leaders = set(getattr(self.feed, "leaders", set()) or set())
+        surge = getattr(self.feed, "prev_surge", None) or {}
         tg = self.w.get("tags", {})
         crash = float(tg.get("crash_pct", -10.0))
         need = int(tg.get("theme_min_stocks", 3))
@@ -463,6 +560,8 @@ class Watcher:
                 t.append("약한상승")            # 지수 따라 조금 오르던 종목 — 6일치에서 매일 약했던 구간
             if pct < 0 and c in leaders:
                 t.append("주도주눌림")          # 최근 급등 이력(②) 종목이 오늘 밀려 있다가 다시 거래대금이 붙음
+            # 11-26·27 분석: 전날 크게 오른 종목은 다음 날 실패 / 하락 중 신호는 크게 오름 / 시장 분위기가 결과를 좌우
+            t += extra_tags(tg, _f(q.at[c, "pct"]), surge.get(c), br)
             if t:
                 out[c] = t
         return out
@@ -593,6 +692,9 @@ def report(cfg, con, src, date, quiet=False):
         if not quiet:
             print(f"[감시] {iso(date)} 감시 기록이 없습니다.")
         return None
+    k = retag(con, cfg)         # 지난 기록 전체에 하락중반등·전일급등·시장강세/약세 (누적 '태그별성과' 용)
+    if k and not quiet:
+        print(f"[감시] 신호 {k}건에 하락중반등·전일급등·시장강세/약세 표시를 다시 계산했습니다.")
     path = write_excel(cfg, con, date, unis, cfg.sub("watch") / f"{iso(date)}_실시간감시.xlsx")
     if not quiet:
         print(f"[감시] 1분봉 {n}종목 반영, 신호 후 움직임·매도 방법 비교 갱신 → {path}")
@@ -612,6 +714,23 @@ def compare_rows(con, date=None):
         f"SELECT grp, COUNT(*) n FROM watch_signals2 {cond} {'AND' if cond else 'WHERE'} kind='주목' GROUP BY grp",
         args)}
     return out, sig
+
+
+def _has(k):
+    return lambda r: k in (r.get("tags") or "")
+
+
+def _mid_market(r):
+    t = r.get("tags") or ""
+    return r.get("breadth") is not None and "시장강세" not in t and "시장약세" not in t
+
+
+# 엑셀 '태그별성과'의 구분 (한 신호가 여러 구분에 들어갈 수 있음)
+TAG_CATS = [("테마동반", _has("테마동반")), ("급락반등", _has("급락반등")), ("상대강도", _has("상대강도")),
+            ("약한상승", _has("약한상승")), ("주도주눌림", _has("주도주눌림")), ("하락중반등", _has("하락중반등")),
+            ("전일급등", _has("전일급등")), ("전일급등 아님", lambda r: "전일급등" not in (r.get("tags") or "")),
+            ("시장강세", _has("시장강세")), ("시장보통", _mid_market), ("시장약세", _has("시장약세")),
+            ("태그 없음", lambda r: not r.get("tags"))]
 
 
 def write_excel(cfg, con, date, unis: dict, path):
@@ -685,13 +804,13 @@ def write_excel(cfg, con, date, unis: dict, path):
 
     # 신호 성과 (신호 뒤 움직임)
     ws = _sheet(wb, "신호성과", ["그룹", "신호시각", "종목명", "코드", "신호가격", "제안수량", "태그",
-                             "최고 상승(%)", "최고 시각", "최고까지(분)", "최대 하락(%)", "최저 시각", "먼저 온 것",
+                             "시장 상승비율(%)", "최고 상승(%)", "최고 시각", "최고까지(분)", "최대 하락(%)", "최저 시각", "먼저 온 것",
                              "10분 최고", "10분 최저", "30분 최고", "30분 최저", "60분 최고", "60분 최저"]
                 + [f"{n}(%)" for _, n in strats] + ["데이터"],
-                [16, 8, 16, 9, 11, 9, 34, 11, 9, 11, 11, 9, 11, 9, 9, 9, 9, 9, 9] + [14] * len(strats) + [9])
+                [16, 8, 16, 9, 11, 9, 34, 12, 11, 9, 11, 11, 9, 11, 9, 9, 9, 9, 9, 9] + [14] * len(strats) + [9])
     for r in evals["오늘"]:
         ws.append([label(cfg, r["grp"]), r["time"], r["name"], r["code"], r["entry"], r["qty"], r["tags"],
-                   r.get("up"), r.get("up_time"), r.get("up_min"), r.get("down"), r.get("down_time"), r.get("first"),
+                   r.get("breadth"), r.get("up"), r.get("up_time"), r.get("up_min"), r.get("down"), r.get("down_time"), r.get("first"),
                    r.get("up10"), r.get("dn10"), r.get("up30"), r.get("dn30"), r.get("up60"), r.get("dn60")]
                   + [(r["strat"].get(k) or (None,))[0] for k, _ in strats] + [r["source"]])
 
@@ -703,11 +822,8 @@ def write_excel(cfg, con, date, unis: dict, path):
     for period in ("오늘", "누적"):
         for g in shown:
             og = [r for r in evals[period] if r["grp"] == g]
-            for lbl, pick in (("테마동반", lambda t: "테마동반" in t), ("급락반등", lambda t: "급락반등" in t),
-                              ("상대강도", lambda t: "상대강도" in t), ("약한상승", lambda t: "약한상승" in t),
-                              ("주도주눌림", lambda t: "주도주눌림" in t),
-                              ("태그 없음", lambda t: not t)):
-                sm = summarize([r for r in og if pick(r["tags"] or "")], cfg)
+            for lbl, pick in TAG_CATS:
+                sm = summarize([r for r in og if pick(r)], cfg)
                 ws.append([label(cfg, g), period, lbl, sm["n"], sm["up"], sm["down"], sm["first_up"], sm["up_min"]]
                           + [sm[k] for k, _ in strats] + [sm[k + "_win"] for k, _ in strats] + [sm["best"]])
     ws.append([])
@@ -715,18 +831,25 @@ def write_excel(cfg, con, date, unis: dict, path):
                f"주목/매수 신호 · 급락반등 = 신호 때 전일 대비 {w.get('tags', {}).get('crash_pct', -10.0)}% 이하 · "
                f"상대강도 = 신호 때 전일 대비 +{w.get('tags', {}).get('rs_min_pct', 4.0)}~+{w.get('tags', {}).get('rs_max_pct', 15.0)}% · "
                f"약한상승 = 신호 때 +{w.get('tags', {}).get('weak_min_pct', 0.0)}~+{w.get('tags', {}).get('weak_max_pct', 4.0)}% 미만 · "
-               "주도주눌림 = 최근 급등 이력(② 거래대금이력) 종목이 신호 때 전일 대비 하락 중. "
-               "한 신호가 두 태그를 모두 가질 수 있음. 승률 = 그 방법으로 팔았을 때 플러스인 비율."])
+               "주도주눌림 = 최근 급등 이력(② 거래대금이력) 종목이 신호 때 전일 대비 하락 중 · "
+               "하락중반등 = 신호 때 전일 대비 하락 중인 모든 종목 · "
+               f"전일급등 = 전 거래일 거래대금 {w.get('tags', {}).get('prev_surge_top_n', 100)}위 안에서 "
+               f"+{w.get('tags', {}).get('prev_surge_pct', 15.0)}% 이상 오른 종목 (전일급등 아님 = 그 밖의 전부) · "
+               f"시장강세 / 시장약세 = 신호 시각 거래대금 상위 100(ETF 제외) 중 오르는 종목이 "
+               f"{w.get('tags', {}).get('market_strong_pct', 70.0)}% 이상 / {w.get('tags', {}).get('market_weak_pct', 40.0)}% 이하, "
+               "시장보통 = 그 사이. "
+               "한 신호가 여러 태그를 가질 수 있음. 승률 = 그 방법으로 팔았을 때 플러스인 비율."])
 
     # 신호기록
     ws = _sheet(wb, "신호기록", ["그룹", "시각", "구분", "종목명", "코드", "현재가", "등락률", "5분 대금증가(억)",
                              "5분 등락률변화(%p)", "5분 상승률(%)", "이전순위", "현재순위", "제안수량", "제안금액",
-                             "그룹 남은 보유금", "태그"],
-                [16, 7, 7, 16, 9, 11, 9, 13, 14, 11, 8, 8, 10, 13, 14, 40])
+                             "그룹 남은 보유금", "태그", "시장 상승비율(%)"],
+                [16, 7, 7, 16, 9, 11, 9, 13, 14, 11, 8, 8, 10, 13, 14, 40, 12])
     for r in con.execute("SELECT * FROM watch_signals2 WHERE date=? ORDER BY time, grp, kind", (d,)):
         ws.append([label(cfg, r["grp"]), r["time"], r["kind"], r["name"], r["code"], r["price"], r["pct"],
                    None if r["d_value"] is None else round(r["d_value"] / 1e8, 2), r["d_pct"], r["d_ret"],
-                   r["rank_prev"], r["rank_now"], r["qty"] or None, r["amount"] or None, r["cash_left"], r["tags"]])
+                   r["rank_prev"], r["rank_now"], r["qty"] or None, r["amount"] or None, r["cash_left"], r["tags"],
+                   r["breadth"]])
         fill = BUY if r["kind"] == "매수" else (RED if r["kind"] == "주목" else None)
         if fill:
             for c in ws[ws.max_row]:
@@ -905,6 +1028,21 @@ def run(app, once=False, demo=False, list_only=False, clock=None, sleep=_time.sl
     # '주도주눌림' 표시용: 최근 급등 이력 종목 (직접 추가한 종목은 제외)
     hu = unis.get("history")
     tf.leaders = set(hu.loc[hu["reason"] != "직접 추가(extra_codes)", "code"]) if hu is not None and len(hu) else set()
+    # '전일급등' 표시용: 전 거래일 거래대금 100위 안 +15%↑ 종목 (evening 이 저장한 기록, 없으면 한 번 받아 봄)
+    try:
+        prev = lookback_dates(src, today, 1)
+    except Exception:
+        prev = []
+    if prev:
+        if not demo and not con.execute("SELECT 1 FROM value_rank_daily WHERE date=? LIMIT 1", (iso(prev[-1]),)).fetchone():
+            try:
+                record_day(con, src, prev[-1], 100)
+            except Exception:
+                pass
+        tf.prev_surge = prev_surge_map(con, cfg, prev[-1])
+        tg = w.get("tags", {})
+        print(f"[감시] 전일({iso(prev[-1])}) 거래대금 {tg.get('prev_surge_top_n', 100)}위 안 "
+              f"+{tg.get('prev_surge_pct', 15.0):g}%↑ {len(tf.prev_surge)}종목 → 신호에 '전일급등' 표시")
     watchers = {g: Watcher(cfg, con, tf, u, today, g, now=clock()) for g, u in unis.items()}
     fixed = sorted({c for g, u in unis.items() if g != "live" for c in u["code"]})
     path = cfg.sub("watch") / f"{iso(today)}_실시간감시.xlsx"
