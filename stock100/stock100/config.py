@@ -47,7 +47,10 @@ DEFAULTS = {
               # 신호 표시: 테마동반 = 15분 안에 같은 테마 3종목 이상(계열사는 1개로) 신호 / 급락반등 = 전일 대비 -10% 이하
               "tags": {"theme_window_min": 15, "theme_min_stocks": 3, "crash_pct": -10.0,
                        "rs_min_pct": 4.0, "rs_max_pct": 15.0,      # 상대강도 = 신호 때 전일 대비 +4~+15%
-                       "weak_min_pct": 0.0, "weak_max_pct": 4.0}},  # 약한상승 = 신호 때 0~+4% 미만
+                       "weak_min_pct": 0.0, "weak_max_pct": 4.0,    # 약한상승 = 신호 때 0~+4% 미만
+                       "prev_surge_pct": 15.0, "prev_surge_top_n": 100,  # 전일급등 = 전 거래일 100위 안 +15%↑
+                       # 시장강세 / 시장약세 = 신호 때 상위 100(ETF 제외) 중 상승 종목 70%↑ / 40%↓ (20종목 미만이면 계산 안 함)
+                       "market_strong_pct": 70.0, "market_weak_pct": 40.0, "market_min_stocks": 20}},
     "morning": {"queries": ["특징주", "상한가", "공급계약", "수주"], "min_score": 2},
     "track": {"horizons": [1, 3, 5], "hit_pct": 3.0},
     "paper": {"enabled": True, "take_profit_pct": 3.0, "stop_loss_pct": 3.0, "max_per_day": 1},

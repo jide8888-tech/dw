@@ -550,7 +550,9 @@ def test_watch_tags_and_etf_signal_exclusion(tmp_path, monkeypatch):
     p = watch.write_excel(cfg, con, dt.date(2026, 11, 18), {"live": w.uni}, tmp_path / "w.xlsx")
     import openpyxl
     rows = list(openpyxl.load_workbook(p)["태그별성과"].iter_rows(min_row=2, max_row=7, values_only=True))
-    assert [x[2] for x in rows] == ["테마동반", "급락반등", "상대강도", "약한상승", "주도주눌림", "태그 없음"]
+    rows = list(openpyxl.load_workbook(p)["태그별성과"].iter_rows(min_row=2, max_row=13, values_only=True))
+    assert [x[2] for x in rows] == ["테마동반", "급락반등", "상대강도", "약한상승", "주도주눌림", "하락중반등",
+                                    "전일급등", "전일급등 아님", "시장강세", "시장보통", "시장약세", "태그 없음"]
     assert rows[0][3] == 1   # 매수는 로보티즈 1건
 
 
@@ -745,3 +747,78 @@ def test_watch_weak_rise_and_leader_pullback_tags(tmp_path, monkeypatch):
     assert "주도주눌림" in by["L"]["tags"]                # 최근 급등 이력 + -3.1%
     assert "주도주눌림" not in (by["D"]["tags"] or "")     # 하락 중이지만 급등 이력 없음
     assert "약한상승" not in (by["L"]["tags"] or "")
+
+
+def test_watch_prev_surge_breadth_and_falling_tags(tmp_path, monkeypatch):
+    """11-26·27 분석 반영: 전일급등(전 거래일 100위 안 +15%↑) / 시장강세·약세(상위 100 중 상승 비율) /
+    하락중반등(신호 때 하락 중) — 신호 때 붙고, 지난 기록에는 retag 로 다시 계산해 붙는다"""
+    import openpyxl
+    import pandas as pd
+    from stock100 import watch
+    cfg, con = _watch_env(tmp_path, monkeypatch, {"watch": {"groups": {"live": {"top_n": 10, "fetch_n": 12}},
+                                                            "tags": {"market_min_stocks": 5}}})
+    con.executemany("INSERT INTO value_rank_daily VALUES (?,?,?,?,?,?,?)",
+                    [("2026-11-26", "A", "아리바이오랩", 5, 1e11, 23.3, 10000),    # 전일 +23% → 전일급등
+                     ("2026-11-26", "B", "비", 8, 1e11, 9.0, 10000),              # +9% → 아님
+                     ("2026-11-26", "C", "씨", 140, 1e10, 29.9, 10000)])          # 100위 밖 → 아님
+    con.commit()
+
+    def board(rows):
+        return pd.DataFrame([{"code": c, "name": n, "price": p, "pct": r, "value": v * 1e8, "rank": i + 1}
+                             for i, (c, n, p, r, v) in enumerate(rows)])
+
+    fill = [(f"F{i}", f"보합{i}", 10000, 1.0, 500 - i * 10) for i in range(6)]       # 오르는 종목들
+    b0 = fill + [("K", "KODEX 인버스", 10000, -1.0, 650), ("A", "아리바이오랩", 10000, 5.0, 300),
+                 ("B", "비", 10000, 2.0, 200), ("D", "동양고속", 10000, -6.0, 100)]          # 8·9·10위
+    b1 = [("A", "아리바이오랩", 10200, 7.1, 1000), ("B", "비", 10200, 4.0, 900),             # 1·2·3위로
+          ("D", "동양고속", 10200, -4.1, 820), ("K", "KODEX 인버스", 10000, -1.0, 651)] + fill
+    boards = [board(b0), board(b1)]
+
+    class Feed:
+        def live_top(self, n):
+            return boards.pop(0)
+
+        def quotes(self, codes):
+            return pd.DataFrame(columns=["code", "name", "price", "pct", "value", "strength"])
+
+        def market_rank(self, n=300):
+            return {}
+
+    tf = watch.TickFeed(Feed(), live_n=12, con=con, cfg=cfg)
+    tf.prev_surge = watch.prev_surge_map(con, cfg, dt.date(2026, 11, 26))
+    assert tf.prev_surge == {"A": 23.3}
+    w = watch.Watcher(cfg, con, tf, pd.DataFrame(columns=watch.UNI_COLS), dt.date(2026, 11, 27), "live")
+    t0 = dt.datetime(2026, 11, 27, 9, 30)
+    for k in range(2):
+        tf.begin([])
+        r = w.tick(t0 + dt.timedelta(minutes=5 * k))
+    assert tf.breadth() == 88.9                 # ETF 제외 9종목 중 8종목 상승
+    by = {s["code"]: s for s in r["signals"] if s["kind"] == "매수"}
+    assert "전일급등(+23%)" in by["A"]["tags"] and "시장강세(상승 89%)" in by["A"]["tags"]
+    assert "전일급등" not in (by["B"]["tags"] or "")
+    assert "하락중반등" in by["D"]["tags"] and "하락중반등" not in by["A"]["tags"]
+    o = con.execute("SELECT tags, breadth FROM watch_outcomes WHERE code='A'").fetchone()
+    assert o["breadth"] == 88.9 and "전일급등" in o["tags"]
+
+    # 이 기능이 생기기 전 기록처럼 표시를 지우고 다시 계산 → 같은 결과, 두 번 돌려도 그대로
+    before = {x["code"]: x["tags"] for x in con.execute("SELECT code, tags FROM watch_outcomes")}
+    con.execute("UPDATE watch_outcomes SET tags='테마동반(로봇: 가·나)', breadth=NULL WHERE code='A'")
+    con.execute("UPDATE watch_signals2 SET breadth=NULL, tags='' WHERE code='D'")
+    con.commit()
+    assert watch.retag(con, cfg) >= 2
+    o = con.execute("SELECT tags, breadth FROM watch_outcomes WHERE code='A'").fetchone()
+    assert o["tags"] == "테마동반(로봇: 가·나),전일급등(+23%),시장강세(상승 89%)" and o["breadth"] == 88.9
+    assert all("하락중반등" in x["tags"] for x in con.execute("SELECT tags FROM watch_signals2 WHERE code='D'"))
+    assert watch.retag(con, cfg) == 0
+    assert con.execute("SELECT tags FROM watch_outcomes WHERE code='D'").fetchone()["tags"] == before["D"]
+
+    p = watch.write_excel(cfg, con, dt.date(2026, 11, 27), {"live": w.uni}, tmp_path / "w.xlsx")
+    wb = openpyxl.load_workbook(p)
+    head = [c.value for c in wb["신호성과"][1]]
+    assert head[7] == "시장 상승비율(%)"
+    cats = {x[2]: x[3] for x in wb["태그별성과"].iter_rows(min_row=2, values_only=True) if x and x[1] == "오늘"}
+    assert cats["전일급등"] == 1 and cats["전일급등 아님"] == 2 and cats["하락중반등"] == 1
+    assert cats["시장강세"] == 3 and cats["시장보통"] == 0
+
+    assert watch.market_breadth(board(b1[:3]), 10, 5) is None      # 종목이 너무 적으면 계산 안 함
+    assert watch.extra_tags({}, -0.5, None, 35.0) == ["하락중반등", "시장약세(상승 35%)"]
