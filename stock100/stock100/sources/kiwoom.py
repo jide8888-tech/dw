@@ -298,6 +298,38 @@ class KiwoomSource(BaseSource):
                             "stex_tp": "1"}, max_pages=2)
         return list(dict.fromkeys((r.get("thema_nm") or "").strip() for r in rows if r.get("thema_nm")))
 
+    def theme_groups(self) -> list[tuple[str, str, int]]:
+        """키움 테마 전체 목록 [(테마그룹코드, 테마명, 종목수)] (ka90001 전체검색)"""
+        rows = self.c.call("/api/dostk/thme", "ka90001",
+                           {"qry_tp": "0", "stk_cd": "", "date_tp": "1", "thema_nm": "", "flu_pl_amt_tp": "1",
+                            "stex_tp": "1"}, max_pages=30)
+        out: dict[str, tuple[str, str, int]] = {}
+        for r in rows:
+            cd, nm = str(r.get("thema_grp_cd") or "").strip(), (r.get("thema_nm") or "").strip()
+            if cd and nm:
+                out[cd] = (cd, nm, int(_num(r.get("stk_num")) or 0))
+        return list(out.values())
+
+    def theme_members(self, grp_cd: str) -> list[tuple[str, str]]:
+        """한 테마의 구성 종목 [(코드, 종목명)] (ka90002)"""
+        rows = self.c.call("/api/dostk/thme", "ka90002", {"date_tp": "1", "thema_grp_cd": grp_cd, "stex_tp": "1"},
+                           max_pages=5)
+        return [(_code(r.get("stk_cd", "")), (r.get("stk_nm") or "").strip()) for r in rows if r.get("stk_cd")]
+
+    def theme_map(self, progress=None) -> dict[str, list[tuple[str, str]]]:
+        """{테마명: [(코드, 종목명)]} — 전체 테마의 구성 종목. 종목별 테마 조회(ka90001 종목검색)는
+        대표 종목 몇 개만 찾아 주는 것으로 보여(심텍·티엘비·라온시큐어 등이 빈 목록) 이 방식으로 받는다."""
+        groups = self.theme_groups()
+        out: dict[str, list[tuple[str, str]]] = {}
+        for i, (cd, nm, _) in enumerate(groups, 1):
+            try:
+                out.setdefault(nm, []).extend(self.theme_members(cd))
+            except KiwoomError as e:
+                print(f"[warn] 테마 구성 종목 실패 {nm}: {str(e)[:80]}")
+            if progress:
+                progress(i, len(groups))
+        return out
+
     def market_rank(self, n: int = 300) -> dict[str, int]:
         rows = self.c.call("/api/dostk/rkinfo", "ka10032", {"mrkt_tp": "000", "mang_stk_incls": "1", "stex_tp": "1"},
                            max_pages=10, stop=_enough(n))

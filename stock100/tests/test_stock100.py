@@ -141,6 +141,17 @@ def test_kiwoom_source_with_fake_server(tmp_path, monkeypatch):
             return R({"stk_dt_pole_chart_qry": [
                 {"dt": today, "open_pric": "+100", "high_pric": "+110", "low_pric": "-95", "cur_prc": "+105",
                  "trde_qty": "1000"}], "return_code": 0})
+        if api == "ka90001":   # 테마 전체 목록 — 2페이지
+            assert json["qry_tp"] == "0"
+            if headers["cont-yn"] == "N":
+                return R({"thema_grp": [{"thema_grp_cd": "100", "thema_nm": "PCB(인쇄회로기판)", "stk_num": "2"}],
+                          "return_code": 0}, {"cont-yn": "Y", "next-key": "t1"})
+            return R({"thema_grp": [{"thema_grp_cd": "200", "thema_nm": "보안_인터넷", "stk_num": "1"}],
+                      "return_code": 0})
+        if api == "ka90002":
+            mem = {"100": [("A356860", "티엘비"), ("222800", "심텍")], "200": [("042510", "라온시큐어")]}
+            return R({"flu_rt": "+1.0", "thema_comp_stk": [{"stk_cd": c, "stk_nm": n} for c, n in
+                                                           mem[json["thema_grp_cd"]]], "return_code": 0})
         raise AssertionError(api)
 
     monkeypatch.setattr(kw.requests.Session, "post", fake_post)
@@ -160,6 +171,8 @@ def test_kiwoom_source_with_fake_server(tmp_path, monkeypatch):
     n_token = sum(1 for c in calls if c[0].endswith("/oauth2/token"))
     kw.KiwoomSource(cfg).c.token()                            # 캐시된 토큰 재사용
     assert sum(1 for c in calls if c[0].endswith("/oauth2/token")) == n_token == 1
+    assert src.theme_map() == {"PCB(인쇄회로기판)": [("356860", "티엘비"), ("222800", "심텍")],
+                               "보안_인터넷": [("042510", "라온시큐어")]}
 
 
 def _watch_env(tmp_path, monkeypatch, over=None):
@@ -822,3 +835,45 @@ def test_watch_prev_surge_breadth_and_falling_tags(tmp_path, monkeypatch):
 
     assert watch.market_breadth(board(b1[:3]), 10, 5) is None      # 종목이 너무 적으면 계산 안 함
     assert watch.extra_tags({}, -0.5, None, 35.0) == ["하락중반등", "시장약세(상승 35%)"]
+
+
+def test_theme_map_fallback_and_retag_theme(tmp_path, monkeypatch):
+    """11-27: 종목별 테마 조회가 빈 목록(티엘비·심텍·라온시큐어…) → 테마동반을 놓침.
+    전체 테마 구성 종목으로 다시 계산 / 빈 캐시는 키워드로 대신 / 같은 동료 수면 더 구체적인 테마"""
+    from stock100 import watch
+    cfg, con = _watch_env(tmp_path, monkeypatch)
+    # 전체 목록이 없을 때: 캐시된 빈 목록이면 종목명 키워드로 대신 (예전엔 7일 동안 빈 목록)
+    con.execute("INSERT INTO stock_themes VALUES ('000001', '[]', ?)", (dt.date.today().isoformat(),))
+    assert "로봇" in watch.ThemeBook(con, None, cfg).get("000001", "에이엘로봇")
+
+    class Feed:
+        def theme_map(self):
+            return {"PCB(인쇄회로기판)": [("356860", "티엘비"), ("007810", "코리아써키트"), ("222800", "심텍")],
+                    "스마트폰_삼성전자관련주": [("356860", "티엘비"), ("007810", "코리아써키트"), ("222800", "심텍"),
+                                          ("000010", "가"), ("000020", "나")],
+                    "보안_인터넷": [("042510", "라온시큐어"), ("053800", "안랩"), ("263860", "지니언스")]}
+
+    assert watch.ensure_theme_map(con, Feed(), quiet=True) == 11
+    assert watch.ensure_theme_map(con, Feed(), quiet=True) == 0          # 7일 안에는 다시 받지 않음
+    book = watch.ThemeBook(con, None, cfg)
+    assert book.get("356860") == ["PCB(인쇄회로기판)", "스마트폰_삼성전자관련주"] and book.size("PCB(인쇄회로기판)") == 3
+
+    d = "2026-11-27"
+    for t, code, name, kind, pct in (("09:10", "042510", "라온시큐어", "매수", 10.08), ("09:10", "053800", "안랩", "매수", 5.65),
+                                     ("09:10", "263860", "지니언스", "매수", 4.58),
+                                     ("09:25", "356860", "티엘비", "매수", -4.95), ("09:25", "007810", "코리아써키트", "주목", -1.62),
+                                     ("09:25", "222800", "심텍", "주목", -2.63),
+                                     ("09:45", "007810", "코리아써키트", "매수", 0.13)):
+        con.execute("INSERT INTO watch_signals2 (date, time, grp, code, name, kind, price, pct, tags) "
+                    "VALUES (?,?,?,?,?,?,?,?,?)", (d, t, "live", code, name, kind, 10000, pct, "상대강도" if pct > 4 else ""))
+        if kind == "매수":
+            con.execute("INSERT INTO watch_outcomes (date, grp, time, code, name, entry, qty, rmax, tags) "
+                        "VALUES (?,?,?,?,?,10000,10,0,?)", (d, "live", t, code, name, "상대강도" if pct > 4 else ""))
+    con.commit()
+    watch.retag(con, cfg)
+    tag = {r["code"] + r["time"]: r["tags"] for r in con.execute("SELECT code, time, tags FROM watch_outcomes")}
+    assert tag["04251009:10"].startswith("테마동반(보안_인터넷: 안랩·지니언스),상대강도")
+    assert tag["35686009:25"].startswith("테마동반(PCB(인쇄회로기판): 코리아써키트·심텍)")   # 더 구체적인 테마
+    assert "하락중반등" in tag["35686009:25"]
+    assert "테마동반" not in tag["00781009:45"]          # 20분 전(09:25) 티엘비·심텍은 15분 밖
+    assert watch.retag(con, cfg) == 0                     # 다시 돌려도 그대로
